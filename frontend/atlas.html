@@ -531,6 +531,56 @@
       transition:border-color .15s, color .15s; }
     #map-actions button:hover { border-color:var(--accent); color:var(--accent); }
 
+    /* SPEC_088 — constraint pill chips + counter (above the map, left) */
+    #chip-strip { position:absolute; top:12px; left:16px; right:120px;
+      z-index:500; display:none; align-items:center; gap:8px;
+      flex-wrap:wrap; }
+    #chip-strip.show { display:flex; }
+    .chip { display:inline-flex; align-items:center; gap:6px;
+      background:rgba(124,131,255,.16); color:var(--primary-hover);
+      border:1px solid rgba(124,131,255,.42); border-radius:14px;
+      padding:5px 10px 5px 11px; font-size:11px; font-weight:600;
+      letter-spacing:.01em; font-family:inherit;
+      transition:background .14s, border-color .14s; }
+    .chip:hover { background:rgba(124,131,255,.24); border-color:var(--primary); }
+    .chip .x { display:inline-flex; align-items:center; justify-content:center;
+      width:14px; height:14px; border-radius:50%; cursor:pointer;
+      color:var(--primary-hover); font-size:13px; line-height:1;
+      transition:background .12s, color .12s; }
+    .chip .x:hover { background:var(--warn); color:#fff; }
+    #chip-add { background:rgba(22,29,49,.85); color:var(--muted);
+      border:1px dashed var(--border); border-radius:14px;
+      padding:5px 10px; font-size:11px; cursor:pointer; font-family:inherit;
+      transition:color .14s, border-color .14s; }
+    #chip-add:hover { color:var(--accent); border-color:var(--accent); }
+    #chip-counter { margin-left:auto; font-size:11px; color:var(--muted);
+      font-variant-numeric:tabular-nums; background:rgba(22,29,49,.82);
+      backdrop-filter:blur(6px); padding:5px 10px; border-radius:8px;
+      border:1px solid var(--border); }
+    #chip-counter b { color:var(--text); font-weight:700; }
+    /* Compact preset menu (anchored under #chip-add) */
+    #chip-menu { position:absolute; top:38px; left:0; z-index:600;
+      background:rgba(22,29,49,.96); backdrop-filter:blur(10px);
+      border:1px solid var(--border); border-radius:8px;
+      padding:8px; box-shadow:0 8px 28px rgba(0,0,0,.5);
+      display:flex; flex-direction:column; gap:6px; min-width:280px; }
+    #chip-menu[hidden] { display:none; }
+    #chip-menu .head { font-size:10px; text-transform:uppercase;
+      letter-spacing:.08em; color:var(--dim); padding:2px 4px 4px; font-weight:600; }
+    #chip-menu .preset { display:flex; align-items:center; gap:6px;
+      font-size:12px; color:var(--text); padding:4px 6px; border-radius:5px;
+      transition:background .12s; }
+    #chip-menu .preset:hover { background:rgba(255,255,255,.04); }
+    #chip-menu .preset input { width:70px; background:rgba(10,14,26,.7);
+      border:1px solid var(--border); color:var(--text);
+      padding:3px 6px; border-radius:4px; font-family:inherit; font-size:11px; }
+    #chip-menu .preset input:focus { outline:none; border-color:var(--primary); }
+    #chip-menu .preset button { margin-left:auto; background:var(--primary);
+      color:#fff; border:none; padding:4px 10px; border-radius:4px;
+      cursor:pointer; font-size:11px; font-weight:600; font-family:inherit;
+      transition:filter .14s; }
+    #chip-menu .preset button:hover { filter:brightness(1.1); }
+
     /* SPEC_066c — FEMA time-cascade scrubber */
     #scrubber { position:absolute; top:60px; left:50%; transform:translateX(-50%);
       background:rgba(20,27,45,.95); border:1px solid var(--border);
@@ -1085,6 +1135,29 @@
         <button id="reset-view">Reset view</button>
         <button id="boundaries-toggle">Hide boundaries</button>
         <button id="heat-toggle" style="display:none">🔥 Heat</button>
+      </div>
+
+      <!-- SPEC_088 — constraint pill chips + candidate counter -->
+      <div id="chip-strip">
+        <div id="chip-list"></div>
+        <button id="chip-add" title="Add a constraint">+ Add</button>
+        <div id="chip-counter"></div>
+        <!-- Compact preset menu, anchored to #chip-add -->
+        <div id="chip-menu" hidden>
+          <div class="head">Add constraint</div>
+          <div class="preset" data-dimension="hhi_min">
+            HHI ≥ <input type="number" data-val placeholder="80000" min="0"> <button>Add</button>
+          </div>
+          <div class="preset" data-dimension="establishments_min">
+            Establishments ≥ <input type="number" data-val placeholder="1000" min="0"> <button>Add</button>
+          </div>
+          <div class="preset" data-dimension="broadband_min">
+            Broadband ≥ <input type="number" data-val placeholder="80" min="0" max="100"> % <button>Add</button>
+          </div>
+          <div class="preset" data-dimension="exclude_nri">
+            Exclude high-NRI (NRI ≤ <input type="number" data-val placeholder="50" min="0"> ) <button>Add</button>
+          </div>
+        </div>
       </div>
 
       <!-- SPEC_087 — blank-landing prompt card. Shown when no thesis is
@@ -1783,17 +1856,135 @@
 
   // ═══════════════════════════════════════════════════════════════════════
   // SPEC_087 — DECISION MAP fit-score painting + top-N pins
+  // SPEC_088 — Constraint pill chips (CONSTRAINTS state + helpers)
   // ═══════════════════════════════════════════════════════════════════════
+
+  // Chip state (SPEC_088). Each item: {id, dimension, value, label}
+  const CONSTRAINTS_LS_KEY = 'atlas_constraints_v1';
+  let CONSTRAINTS = [];
+  function loadConstraints() {
+    try {
+      const raw = localStorage.getItem(CONSTRAINTS_LS_KEY);
+      CONSTRAINTS = raw ? JSON.parse(raw) : [];
+    } catch (_) { CONSTRAINTS = []; }
+  }
+  function saveConstraints() {
+    localStorage.setItem(CONSTRAINTS_LS_KEY, JSON.stringify(CONSTRAINTS));
+  }
+  function fmtChipLabel(dim, value) {
+    const v = Number(value);
+    if (dim === 'hhi_min') {
+      const k = v >= 1000 ? Math.round(v / 1000) + 'K' : v;
+      return 'HHI ≥ $' + k;
+    }
+    if (dim === 'hhi_max') {
+      const k = v >= 1000 ? Math.round(v / 1000) + 'K' : v;
+      return 'HHI ≤ $' + k;
+    }
+    if (dim === 'establishments_min') return 'Establishments ≥ ' + v.toLocaleString();
+    if (dim === 'broadband_min') return 'Broadband ≥ ' + v + '%';
+    if (dim === 'exclude_nri')   return 'Exclude NRI > ' + v;
+    return dim + ' ' + v;
+  }
+  function addChip(dimension, value) {
+    const v = Number(value);
+    if (!dimension || !Number.isFinite(v)) return;
+    // Dedupe: if the same dimension already exists, replace its value
+    const i = CONSTRAINTS.findIndex(c => c.dimension === dimension);
+    const chip = { id: 'c' + Date.now() + Math.floor(Math.random() * 999),
+                    dimension, value: v, label: fmtChipLabel(dimension, v) };
+    if (i >= 0) CONSTRAINTS[i] = chip; else CONSTRAINTS.push(chip);
+    saveConstraints();
+    renderChips();
+    applyChipsAndRefit();
+    track('chip_added', { dimension, value: v });
+  }
+  function removeChip(id) {
+    CONSTRAINTS = CONSTRAINTS.filter(c => c.id !== id);
+    saveConstraints();
+    renderChips();
+    applyChipsAndRefit();
+    track('chip_removed', { id });
+  }
+  function clearAllChips() {
+    CONSTRAINTS = []; saveConstraints(); renderChips();
+  }
+  function deriveChipsFromThesis(t) {
+    const chips = [];
+    if (!t) return chips;
+    const mk = (dimension, value) => ({
+      id: 'c' + Date.now() + Math.floor(Math.random() * 999),
+      dimension, value, label: fmtChipLabel(dimension, value),
+    });
+    if (Number.isFinite(t.target_hhi_min) && t.target_hhi_min > 0)
+      chips.push(mk('hhi_min', t.target_hhi_min));
+    // SPEC_088 — target_pop_density_min is a tract-grain notion; the
+    // closest county-grain proxy is "establishments". We don't auto-
+    // derive it here — let the user add Establishments ≥ N if they want.
+    const excl = (t.exclude_layers || '').toLowerCase();
+    if (excl.includes('disaster_nri') || excl.includes('nri'))
+      chips.push(mk('exclude_nri', 50));
+    return chips;
+  }
+  function renderChips() {
+    const strip = document.getElementById('chip-strip');
+    const list  = document.getElementById('chip-list');
+    if (!strip || !list) return;
+    list.innerHTML = '';
+    CONSTRAINTS.forEach(c => {
+      const el = document.createElement('span');
+      el.className = 'chip';
+      el.textContent = c.label;
+      const x = document.createElement('span');
+      x.className = 'x'; x.textContent = '×'; x.title = 'Remove';
+      x.onclick = (ev) => { ev.stopPropagation(); removeChip(c.id); };
+      el.appendChild(x);
+      list.appendChild(el);
+    });
+  }
+  function applyChipsAndRefit() {
+    // Re-fit with current thesis + chips. If no thesis, do nothing.
+    const t = (typeof loadThesis === 'function') ? loadThesis() : null;
+    if (!t || (typeof thesisIsEmpty === 'function' && thesisIsEmpty(t))) return;
+    fetchAndPaintFitScore(t);
+  }
+  function openAddChipMenu() {
+    const m = document.getElementById('chip-menu');
+    if (!m) return;
+    m.hidden = !m.hidden;
+    if (!m.hidden) {
+      // Anchor to the #chip-add button (top:38px is the default in CSS;
+      // we just need to compute the right left offset.)
+      const btn = document.getElementById('chip-add');
+      const stripRect = document.getElementById('chip-strip').getBoundingClientRect();
+      const btnRect = btn.getBoundingClientRect();
+      m.style.left = (btnRect.left - stripRect.left) + 'px';
+    }
+  }
+
   async function fetchAndPaintFitScore(thesis) {
     try {
       const r = await fetch(API + '/fit-score', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ thesis: thesis || {}, top_n: 10 }),
+        body: JSON.stringify({
+          thesis: thesis || {}, top_n: 10,
+          // SPEC_088 — wire the active chip set
+          constraints: CONSTRAINTS.map(c => ({
+            dimension: c.dimension, value: c.value })),
+        }),
       }).then(x => x.json());
       paintFitScore(r);
+      // SPEC_088 — counter
+      const counter = document.getElementById('chip-counter');
+      if (counter && Number.isFinite(r.total_candidates)) {
+        const f = r.filtered_candidates ?? r.total_candidates;
+        counter.innerHTML = `<b>${f.toLocaleString()}</b> of ${r.total_candidates.toLocaleString()} candidates`;
+      }
+      document.getElementById('chip-strip').classList.add('show');
       track('fit_score_painted', {
         recipe: r.recipe, n_components: (r.weights || []).length,
         n_candidates: Object.keys(r.scores || {}).length,
+        n_constraints: CONSTRAINTS.length,
       });
     } catch (e) {
       console.warn('fit-score fetch failed', e);
@@ -3031,6 +3222,33 @@
     document.getElementById('legend').classList.add('hidden');
     track('legend_dismissed', {});
   };
+
+  // SPEC_088 — chip wiring
+  loadConstraints();
+  renderChips();
+  document.getElementById('chip-add').onclick = openAddChipMenu;
+  document.querySelectorAll('#chip-menu .preset').forEach(row => {
+    const dim = row.dataset.dimension;
+    const input = row.querySelector('input[data-val]');
+    const btn = row.querySelector('button');
+    const doAdd = () => {
+      const val = parseFloat(input.value || input.placeholder);
+      if (Number.isFinite(val)) {
+        addChip(dim, val);
+        document.getElementById('chip-menu').hidden = true;
+        input.value = '';
+      }
+    };
+    btn.onclick = doAdd;
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') doAdd(); });
+  });
+  // Click outside to close the menu
+  document.addEventListener('click', e => {
+    const m = document.getElementById('chip-menu');
+    const a = document.getElementById('chip-add');
+    if (!m || m.hidden) return;
+    if (!m.contains(e.target) && e.target !== a) m.hidden = true;
+  });
   document.getElementById('reset-view').onclick = () => MAP.setView([38.5, -96], 4);
   document.getElementById('boundaries-toggle').onclick = e => {
     state.showBoundaries = !state.showBoundaries;
@@ -3330,6 +3548,12 @@
     document.querySelectorAll('#view-thesis details.block').forEach(d => {
       d.open = ['industry', 'demographics'].includes(d.dataset.block);
     });
+    // SPEC_088 — seed chips from the demo thesis if user hasn't set any
+    if (CONSTRAINTS.length === 0) {
+      CONSTRAINTS = deriveChipsFromThesis(FURNITURE_DEMO);
+      saveConstraints();
+      renderChips();
+    }
     // SPEC_087 — paint the Decision Map fit-score for the demo thesis
     if (typeof fetchAndPaintFitScore === 'function') {
       fetchAndPaintFitScore(FURNITURE_DEMO);
@@ -3394,6 +3618,9 @@
     }
     document.getElementById('legend').classList.add('hidden');
     document.getElementById('map-empty').classList.add('show');
+    // SPEC_088 — also clear chip strip
+    if (typeof clearAllChips === 'function') clearAllChips();
+    document.getElementById('chip-strip').classList.remove('show');
     // User picking a layer manually after reset shouldn't be auto-clobbered
     window.__userPickedLayer = false;
   }
@@ -3406,6 +3633,13 @@
     track('thesis_saved', { fields: Object.keys(t).filter(k => t[k] != null).length });
     // SPEC_084 — refresh preview text on the collapsed blocks
     if (typeof refreshThesisPreviews === 'function') refreshThesisPreviews();
+    // SPEC_088 — seed chips from the thesis when none are set yet, so the
+    // first paint already reflects the user's stated must-haves.
+    if (CONSTRAINTS.length === 0) {
+      CONSTRAINTS = deriveChipsFromThesis(t);
+      saveConstraints();
+      renderChips();
+    }
     // SPEC_087 — re-paint the Decision Map fit-score for the new thesis.
     // We only auto-refit when the user hasn't manually overridden the
     // map this session (otherwise saving the thesis would clobber what

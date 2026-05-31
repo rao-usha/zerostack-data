@@ -28,35 +28,40 @@ logger = logging.getLogger(__name__)
 # Layer ids must match the real registry — see /atlas/layers.
 
 _RECIPES: Dict[str, List[Dict[str, Any]]] = {
+    # SPEC_088 — county-grain only, so constraint chips applied to the
+    # same set as the score actually intersect. (Mixing tract + county
+    # layers made the funnel collapse to 0 even on plausible inputs.)
     "retail": [
         {"layer_id": "demo_acs_median_income",
-         "label": "Median income",        "weight": 0.60, "polarity": 1},
-        {"layer_id": "demo_tract_population",
-         "label": "Population density",   "weight": 0.30, "polarity": 1},
+         "label": "Median income",        "weight": 0.55, "polarity": 1},
+        {"layer_id": "econ_cbp_establishments_county",
+         "label": "Commercial activity",  "weight": 0.30, "polarity": 1},
         {"layer_id": "infra_broadband_subscription",
-         "label": "Broadband access",     "weight": 0.10, "polarity": 1},
+         "label": "Broadband access",     "weight": 0.15, "polarity": 1},
     ],
     "housing": [
-        {"layer_id": "demo_tract_population",
-         "label": "Population density",   "weight": 0.50, "polarity": 1},
+        {"layer_id": "realestate_building_permits",
+         "label": "Building permits",     "weight": 0.40, "polarity": 1},
         {"layer_id": "demo_acs_median_income",
-         "label": "Median income",        "weight": 0.30, "polarity": 1},
-        {"layer_id": "infra_broadband_subscription",
-         "label": "Broadband access",     "weight": 0.20, "polarity": 1},
+         "label": "Median income",        "weight": 0.35, "polarity": 1},
+        {"layer_id": "econ_cbp_establishments_county",
+         "label": "Commercial activity",  "weight": 0.25, "polarity": 1},
     ],
     "industrial": [
         {"layer_id": "infra_broadband_subscription",
-         "label": "Broadband access",     "weight": 0.50, "polarity": 1},
-        {"layer_id": "demo_tract_population",
-         "label": "Population density",   "weight": 0.30, "polarity": 1},
+         "label": "Broadband access",     "weight": 0.40, "polarity": 1},
+        {"layer_id": "econ_cbp_establishments_county",
+         "label": "Commercial activity",  "weight": 0.35, "polarity": 1},
         {"layer_id": "demo_acs_median_income",
-         "label": "Median income",        "weight": 0.20, "polarity": 1},
+         "label": "Median income",        "weight": 0.25, "polarity": 1},
     ],
     "default": [
         {"layer_id": "demo_acs_median_income",
-         "label": "Median income",        "weight": 0.60, "polarity": 1},
-        {"layer_id": "demo_tract_population",
-         "label": "Population density",   "weight": 0.40, "polarity": 1},
+         "label": "Median income",        "weight": 0.50, "polarity": 1},
+        {"layer_id": "econ_cbp_establishments_county",
+         "label": "Commercial activity",  "weight": 0.30, "polarity": 1},
+        {"layer_id": "infra_broadband_subscription",
+         "label": "Broadband access",     "weight": 0.20, "polarity": 1},
     ],
 }
 
@@ -85,6 +90,68 @@ def classify_industry(thesis: Optional[Dict[str, Any]]) -> str:
     return "default"
 
 
+# ─── SPEC_088 — Constraint funnel ─────────────────────────────────────────
+# Hard filters on top of the fit-score. Each dimension maps to a layer
+# from the registry and a comparator. The frontend renders these as
+# removable pill chips above the map.
+_CONSTRAINT_DEFS: Dict[str, Dict[str, Any]] = {
+    # All county-grain so the survivor set intersects the fit-score set.
+    "hhi_min":            {"layer": "demo_acs_median_income",        "op": ">="},
+    "hhi_max":            {"layer": "demo_acs_median_income",        "op": "<="},
+    "establishments_min": {"layer": "econ_cbp_establishments_county", "op": ">="},
+    "broadband_min":      {"layer": "infra_broadband_subscription",  "op": ">="},
+    # exclude_nri means "keep only places with NRI ≤ value" (default = 50)
+    "exclude_nri":        {"layer": "disaster_nri",                  "op": "<="},
+}
+
+
+def _apply_constraints(
+    db: Session,
+    constraints: List[Dict[str, Any]],
+    candidates,
+) -> set:
+    """Intersect candidate geo_ids with every constraint. A constraint
+    whose layer fails to load is silently skipped (the survivor set is
+    not narrowed by a broken constraint)."""
+    survivors = set(candidates)
+    if not constraints:
+        return survivors
+    # Cache layer values across constraints that share a layer
+    layer_cache: Dict[str, Dict[str, Any]] = {}
+    for c in constraints:
+        spec = _CONSTRAINT_DEFS.get(c.get("dimension"))
+        if not spec:
+            continue
+        try:
+            threshold = float(c.get("value"))
+        except (TypeError, ValueError):
+            continue
+        layer_id = spec["layer"]
+        if layer_id not in layer_cache:
+            try:
+                layer_cache[layer_id] = build_layer(db, layer_id).values or {}
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("constraint layer %s failed: %s", layer_id, exc)
+                layer_cache[layer_id] = {}
+                continue
+        vals = layer_cache[layer_id]
+        op = spec["op"]
+        keep = set()
+        for gid in survivors:
+            v = vals.get(gid)
+            if v is None:
+                continue
+            try:
+                vf = float(v)
+            except (TypeError, ValueError):
+                continue
+            ok = (vf >= threshold) if op == ">=" else (vf <= threshold)
+            if ok:
+                keep.add(gid)
+        survivors = keep
+    return survivors
+
+
 def _normalize(values: Dict[str, Any]) -> Dict[str, float]:
     """Min-max normalize a {geo_id: value} dict to 0..1. Skips Nones."""
     if not values:
@@ -110,6 +177,7 @@ def compute_fit_score(
     db: Session,
     thesis: Optional[Dict[str, Any]] = None,
     top_n: int = 10,
+    constraints: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Return per-geo fit scores 0–100, the effective weight breakdown,
     and the top-N candidates by score.
@@ -138,7 +206,8 @@ def compute_fit_score(
 
     if not components:
         return {"scores": {}, "weights": [], "top_n": [],
-                "recipe": recipe_key}
+                "recipe": recipe_key,
+                "total_candidates": 0, "filtered_candidates": 0}
 
     # Renormalize weights so the components that DID load sum to 1.0
     total_w = sum(c["weight"] for c in components)
@@ -164,6 +233,15 @@ def compute_fit_score(
         # Clamp and scale to 0..100
         scores[gid] = int(round(max(0.0, min(1.0, s)) * 100))
 
+    # SPEC_088 — apply the constraint funnel. Surviving geo_ids keep
+    # their scores; the rest drop out of the response so the frontend
+    # paints them as "no data".
+    total_candidates = len(scores)
+    if constraints:
+        survivors = _apply_constraints(db, constraints, scores.keys())
+        scores = {gid: s for gid, s in scores.items() if gid in survivors}
+    filtered_candidates = len(scores)
+
     top = sorted(scores.items(), key=lambda kv: -kv[1])[:top_n]
 
     return {
@@ -175,4 +253,6 @@ def compute_fit_score(
         ],
         "top_n": [{"geo_id": gid, "score": sc} for gid, sc in top],
         "recipe": recipe_key,
+        "total_candidates": total_candidates,
+        "filtered_candidates": filtered_candidates,
     }

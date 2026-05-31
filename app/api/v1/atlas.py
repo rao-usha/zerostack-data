@@ -302,18 +302,23 @@ class FitScoreBody(BaseModel):
     # SPEC_087 — Decision Map fit-score request body. thesis is the same
     # shape the Pilot accepts via thesis_context; top_n is capped server-
     # side in compute_fit_score (1..50).
+    # SPEC_088 — constraints is a list of hard filters applied AFTER the
+    # weighted score: [{dimension, value, label?}, ...]. See
+    # _CONSTRAINT_DEFS in fit_score.py for recognized dimensions.
     thesis: Optional[Dict[str, Any]] = None
     top_n: Optional[int] = 10
+    constraints: Optional[List[Dict[str, Any]]] = None
 
 
 @router.post("/fit-score")
 def atlas_fit_score(body: FitScoreBody, db: Session = Depends(get_db)):
-    """SPEC_087 — return per-geo thesis fit scores 0-100 + weight
-    breakdown + top-N candidates. Land-page replacement for the old
-    default-layer choropleth."""
+    """SPEC_087/088 — per-geo thesis fit scores 0-100 + weights + top-N,
+    optionally filtered by a constraint list (HHI ≥ X, exclude high-NRI…).
+    Land-page replacement for the old default-layer choropleth."""
     from app.services.atlas.fit_score import compute_fit_score
     return compute_fit_score(db, thesis=body.thesis,
-                              top_n=body.top_n or 10)
+                              top_n=body.top_n or 10,
+                              constraints=body.constraints)
 
 
 class PilotBody(BaseModel):
