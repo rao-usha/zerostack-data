@@ -461,43 +461,41 @@
       border:1px solid var(--border);
     }
 
-    /* SPEC_087 — blank-landing prompt card */
-    #map-empty { position:absolute; inset:0; z-index:450;
-      display:none; align-items:center; justify-content:center;
-      pointer-events:none; }
-    #map-empty.show { display:flex; }
-    #map-empty .card { pointer-events:auto;
-      max-width:420px; padding:22px 24px;
-      background:rgba(22,29,49,.88); backdrop-filter:blur(12px) saturate(140%);
+    /* SPEC_092 — storytelling step banner (top-center of the map).
+       Replaces the SPEC_087 centered "Where does your thesis fit?"
+       modal, which the user found obstructive. */
+    #story-banner { position:absolute; top:16px; left:50%;
+      transform:translateX(-50%) translateY(-6px); z-index:560;
+      pointer-events:none; opacity:0; min-width:380px; max-width:560px;
+      background:rgba(22,29,49,.92); backdrop-filter:blur(12px) saturate(140%);
       -webkit-backdrop-filter:blur(12px) saturate(140%);
-      border:1px solid rgba(124,131,255,.35); border-radius:14px;
-      box-shadow:0 10px 36px rgba(0,0,0,.55),
-                 0 0 0 4px rgba(124,131,255,.08);
-      color:var(--text);
-    }
-    #map-empty .kicker { font-size:10px; letter-spacing:.10em;
-      text-transform:uppercase; color:var(--accent); margin-bottom:4px;
-      font-weight:600; }
-    #map-empty .title { font-size:18px; font-weight:600;
-      letter-spacing:-.012em; margin-bottom:8px; color:var(--text); }
-    #map-empty p { margin:0 0 14px; font-size:13px; line-height:1.55;
-      color:var(--muted); }
-    #map-empty p b { color:var(--text); font-weight:600; }
-    #map-empty .actions { display:flex; gap:8px; flex-wrap:wrap; }
-    #map-empty button { background:linear-gradient(135deg,
-      var(--primary), var(--primary-2)); color:#fff; border:none;
-      padding:9px 14px; border-radius:8px; cursor:pointer; font-size:12px;
-      font-weight:600; font-family:inherit;
-      box-shadow:0 1px 2px rgba(0,0,0,.3), 0 2px 8px rgba(124,131,255,.25);
-      transition:filter .14s, transform .08s; }
-    #map-empty button:hover { filter:brightness(1.10); }
-    #map-empty button:active { transform:translateY(1px); }
-    #map-empty button#map-empty-thesis { background:transparent;
-      border:1px solid var(--border); color:var(--text); box-shadow:none; }
-    #map-empty button#map-empty-thesis:hover { border-color:var(--accent);
-      color:var(--accent); filter:none; }
-    #map-empty .footnote { margin-top:12px; font-size:10.5px;
-      color:var(--dim); font-style:italic; }
+      border:1px solid rgba(124,131,255,.40); border-radius:12px;
+      padding:10px 14px; box-shadow:0 10px 30px rgba(0,0,0,.45),
+                 0 0 0 4px rgba(124,131,255,.10); color:var(--text);
+      transition:opacity .25s ease,
+                 transform .25s cubic-bezier(.2,.9,.3,1.4); }
+    #story-banner.show { opacity:1; pointer-events:auto;
+      transform:translateX(-50%) translateY(0); }
+    #story-banner[hidden] { display:none; }
+    #story-banner .kicker { font-size:10px; letter-spacing:.10em;
+      text-transform:uppercase; color:var(--accent); font-weight:600;
+      margin-bottom:3px; }
+    #story-banner .kicker .step { color:var(--text); margin-right:6px;
+      font-variant-numeric:tabular-nums; }
+    #story-banner .msg { font-size:12.5px; line-height:1.45; color:var(--text); }
+    #story-banner .row { display:flex; align-items:center; gap:10px;
+      margin-top:6px; }
+    #story-banner .dots { display:flex; gap:5px; flex:1; }
+    #story-banner .dots .d { width:6px; height:6px; border-radius:50%;
+      background:rgba(255,255,255,.18); transition:background .18s ease; }
+    #story-banner .dots .d.on { background:var(--accent); }
+    #story-banner .dots .d.done { background:var(--primary); }
+    #story-banner .skip { background:transparent;
+      border:1px solid var(--border); color:var(--muted); cursor:pointer;
+      font-size:11px; padding:3px 9px; border-radius:6px;
+      transition:color .14s, border-color .14s; font-family:inherit; }
+    #story-banner .skip:hover { color:var(--accent); border-color:var(--accent); }
+
     #legend-close { position:absolute; top:4px; right:6px; background:transparent;
       border:none; color:var(--dim); cursor:pointer; font-size:14px; line-height:1;
       padding:2px 4px; border-radius:4px; }
@@ -1252,20 +1250,16 @@
         </div>
       </div>
 
-      <!-- SPEC_087 — blank-landing prompt card. Shown when no thesis is
-           saved; hidden once a fit-score has been painted. -->
-      <div id="map-empty">
-        <div class="card">
-          <div class="kicker">Decision Map</div>
-          <div class="title">Where does your thesis fit?</div>
-          <p>Set your <b>investment thesis</b> on the left —
-             I'll paint the country with a thesis-fit score
-             and pin the top candidates.</p>
-          <div class="actions">
-            <button id="map-empty-demo">⚡ Try the furniture-store demo</button>
-            <button id="map-empty-thesis">Open the thesis form</button>
-          </div>
-          <div class="footnote">No opinion until you give me one.</div>
+      <!-- SPEC_092 — storytelling step banner (top-center). The old
+           SPEC_087 #map-empty centered modal is removed entirely. -->
+      <div id="story-banner" hidden>
+        <div class="kicker">
+          <span class="step">Step 1 / 6</span>· Decision Map walkthrough
+        </div>
+        <div class="msg">…</div>
+        <div class="row">
+          <div class="dots"></div>
+          <button class="skip" type="button">Skip ▶︎</button>
         </div>
       </div>
 
@@ -1679,8 +1673,10 @@
     } else if (entryMode === 'fit-score') {
       await fetchAndPaintFitScore(savedThesis);
     } else {
-      // 'blank' — leave the map empty + show the prompt card
-      document.getElementById('map-empty').classList.add('show');
+      // SPEC_092 — 'blank' mode: truly blank basemap. The onboarding
+      // nudge under the header is the only landing cue; the user
+      // either fills the thesis form or clicks ⚡ Demo to start the
+      // walkthrough.
     }
 
     if (state.overlayId) await activateOverlay(state.overlayId);
@@ -2080,14 +2076,11 @@
       });
     } catch (e) {
       console.warn('fit-score fetch failed', e);
-      toast('Fit-score unavailable — showing blank map');
-      document.getElementById('map-empty').classList.add('show');
+      toast('Fit-score unavailable');
     }
   }
 
   function paintFitScore(r) {
-    // Hide the empty-landing card
-    document.getElementById('map-empty').classList.remove('show');
     if (!r || !r.scores || !Object.keys(r.scores).length) {
       toast('No fit-score data for this thesis');
       return;
@@ -3853,31 +3846,155 @@
          + 'drive. Want affluent, growing, household-formation-age areas; '
          + 'avoid pure-rural and disaster-risk-dominated tracts.',
   };
-  function loadFurnitureDemo() {
-    localStorage.setItem(THESIS_LS_KEY, JSON.stringify(FURNITURE_DEMO));
-    fillThesisForm();
-    refreshThesisPreviews();
-    // Expand a couple of blocks so the user sees it filled in
-    document.querySelectorAll('#view-thesis details.block').forEach(d => {
-      d.open = ['industry', 'demographics'].includes(d.dataset.block);
+  // SPEC_092 — Storytelling walkthrough state + helpers.
+  // The Demo button used to silently apply everything at once; user
+  // couldn't tell anything had happened. We now run a 6-beat sequence
+  // with a top-center step banner so each action is visible.
+  const STORY_TOTAL_BEATS = 6;
+  let RUNNING_STORY = null;          // cancellation token {cancelled: bool}
+  let STORY_DELAY_MS = 1600;          // base pause between beats
+
+  function openStoryBanner() {
+    const b = document.getElementById('story-banner');
+    if (!b) return;
+    b.hidden = false;
+    requestAnimationFrame(() => b.classList.add('show'));
+    // Render the progress dots once
+    const dots = b.querySelector('.dots');
+    dots.innerHTML = '';
+    for (let i = 0; i < STORY_TOTAL_BEATS; i++) {
+      const d = document.createElement('span');
+      d.className = 'd'; dots.appendChild(d);
+    }
+  }
+  function closeStoryBanner() {
+    const b = document.getElementById('story-banner');
+    if (!b) return;
+    b.classList.remove('show');
+    setTimeout(() => { b.hidden = true; }, 280);
+  }
+  function paintStoryDots(step) {
+    const ds = document.querySelectorAll('#story-banner .dots .d');
+    ds.forEach((d, i) => {
+      d.classList.toggle('done', i < step - 1);
+      d.classList.toggle('on',   i === step - 1);
     });
-    // SPEC_088 — seed chips from the demo thesis if user hasn't set any
-    if (CONSTRAINTS.length === 0) {
-      CONSTRAINTS = deriveChipsFromThesis(FURNITURE_DEMO);
-      saveConstraints();
-      renderChips();
+  }
+  function setStoryBeat(step, msg) {
+    const b = document.getElementById('story-banner');
+    if (!b) return;
+    b.querySelector('.step').textContent = `Step ${step} / ${STORY_TOTAL_BEATS}`;
+    b.querySelector('.msg').textContent = msg;
+    paintStoryDots(step);
+  }
+  function sleep(ms, tok) {
+    return new Promise(res => {
+      const id = setTimeout(res, ms);
+      // Pre-empt the sleep if the story was cancelled
+      const i = setInterval(() => {
+        if (tok && tok.cancelled) { clearTimeout(id); clearInterval(i); res(); }
+      }, 80);
+    });
+  }
+  async function storyBeat(step, msg, action, tok) {
+    if (tok && tok.cancelled) return;
+    setStoryBeat(step, msg);
+    if (typeof action === 'function') {
+      try { await action(); } catch (e) { console.warn('story beat threw', e); }
     }
-    // SPEC_087 — paint the Decision Map fit-score for the demo thesis
-    if (typeof fetchAndPaintFitScore === 'function') {
-      fetchAndPaintFitScore(FURNITURE_DEMO);
-    }
-    // Hide onboarding nudge — we now have a thesis
+    await sleep(STORY_DELAY_MS, tok);
+  }
+  function skipStory() {
+    if (RUNNING_STORY) RUNNING_STORY.cancelled = true;
+    closeStoryBanner();
+  }
+  function cancelAnyRunningStory() {
+    if (RUNNING_STORY) RUNNING_STORY.cancelled = true;
+    RUNNING_STORY = null;
+  }
+
+  // SPEC_092 — Storytelling walkthrough for the furniture-store demo.
+  // Each beat shows a visible step banner and performs ONE deliberate
+  // action so the user can see the Decision Map being built around them.
+  async function runFurnitureStoryDemo() {
+    cancelAnyRunningStory();
+    const tok = { cancelled: false };
+    RUNNING_STORY = tok;
+    track('thesis_demo_loaded', { preset: 'furniture', mode: 'story' });
+
+    openStoryBanner();
+    // Hide onboarding nudge if it's still up.
     const nudge = document.getElementById('onboarding-nudge');
     if (nudge) nudge.classList.remove('show');
-    if (typeof toast === 'function')
-      toast('Furniture-store demo loaded — ask the Pilot "walk me through where to open this"');
-    track('thesis_demo_loaded', { preset: 'furniture' });
+    // Make sure the user is on the Thesis view so they see beat 1's effect.
+    if (typeof setLeftView === 'function') setLeftView('thesis');
+
+    // BEAT 1 — load thesis, fill form, expand the entry blocks.
+    await storyBeat(1,
+      'Loading thesis: Furniture stores · Austin, TX metro · NAICS 442110.',
+      () => {
+        localStorage.setItem(THESIS_LS_KEY, JSON.stringify(FURNITURE_DEMO));
+        fillThesisForm();
+        refreshThesisPreviews();
+        document.querySelectorAll('#view-thesis details.block').forEach(d => {
+          d.open = ['industry', 'demographics'].includes(d.dataset.block);
+        });
+        // Reset chips so each story run is a clean slate.
+        CONSTRAINTS = []; saveConstraints(); renderChips();
+      }, tok);
+
+    // BEAT 2 — must-have HHI ≥ $75K (chip animates in via addChip).
+    await storyBeat(2,
+      'Filtering: must-have HHI ≥ $75K — affluent purchasing power.',
+      () => { addChip('hhi_min', 75000); }, tok);
+
+    // BEAT 3 — exclude high-NRI counties.
+    await storyBeat(3,
+      'Avoiding hazard-heavy areas (NRI > 50).',
+      () => { addChip('exclude_nri', 50); }, tok);
+
+    // BEAT 4 — paint the fit-score (paint already triggered by chip
+    // adds via applyChipsAndRefit, but call once more to ensure the
+    // user sees the final state if any earlier paint was preempted).
+    await storyBeat(4,
+      'Scoring 3,248 counties against your thesis. Watch the map fill in.',
+      async () => { await fetchAndPaintFitScore(FURNITURE_DEMO); }, tok);
+
+    // BEAT 5 — point at the top result (read CURRENT_FIT_RESULT).
+    let topGid = null, topScore = null, topName = null;
+    if (CURRENT_FIT_RESULT && Array.isArray(CURRENT_FIT_RESULT.top_n)
+        && CURRENT_FIT_RESULT.top_n.length) {
+      topGid = CURRENT_FIT_RESULT.top_n[0].geo_id;
+      topScore = CURRENT_FIT_RESULT.top_n[0].score;
+      // Try to pull a name from the boundary layer
+      if (BOUNDARY_LAYER) BOUNDARY_LAYER.eachLayer(fl => {
+        if (fl.feature.properties.geo_id === topGid)
+          topName = fl.feature.properties.geo_name || null;
+      });
+    }
+    await storyBeat(5,
+      topGid
+        ? `Top candidate: ${topName || 'FIPS ' + topGid} (fit ${topScore}/100). Indigo pins are the top 10.`
+        : 'Top 10 candidates are now pinned. Click any pin to drill in.',
+      null, tok);
+
+    // BEAT 6 — auto-open trade area for #1.
+    await storyBeat(6,
+      topGid
+        ? `Opening trade area around ${topName || 'the top pick'} (25 mi). Demographics + competition follow.`
+        : 'Click a pin to open its trade area (25 mi).',
+      async () => {
+        if (topGid && typeof enterTradeArea === 'function')
+          await enterTradeArea(topGid, 50);
+      }, tok);
+
+    setTimeout(closeStoryBanner, 4500);
+    if (RUNNING_STORY === tok) RUNNING_STORY = null;
   }
+
+  // Legacy callable kept for compatibility (any old wiring still
+  // routes through the story version now).
+  function loadFurnitureDemo() { return runFurnitureStoryDemo(); }
 
   // SPEC_085 follow-up — inline two-click confirm to replace browser
   // confirm() dialogs. First click arms the button ("Confirm?"); a second
@@ -3930,7 +4047,7 @@
       }));
     }
     document.getElementById('legend').classList.add('hidden');
-    document.getElementById('map-empty').classList.add('show');
+    // SPEC_092 — no centered modal; reset leaves a clean basemap.
     // SPEC_088 — also clear chip strip
     if (typeof clearAllChips === 'function') clearAllChips();
     document.getElementById('chip-strip').classList.remove('show');
@@ -4134,12 +4251,12 @@
     fillThesisForm();
     initThesisBlocks();
     document.getElementById('thesis-save').onclick = saveThesis;
-    document.getElementById('thesis-demo').onclick = loadFurnitureDemo;
-    // SPEC_087 — blank-landing card actions
-    const meDemo = document.getElementById('map-empty-demo');
-    if (meDemo) meDemo.onclick = loadFurnitureDemo;
-    const meThesis = document.getElementById('map-empty-thesis');
-    if (meThesis) meThesis.onclick = () => setLeftView('thesis');
+    // SPEC_092 — Demo button now kicks off a storytelling walkthrough
+    // instead of a silent fit-score paint. The user wanted visible beats.
+    document.getElementById('thesis-demo').onclick = runFurnitureStoryDemo;
+    // Skip button on the story banner
+    const skip = document.querySelector('#story-banner .skip');
+    if (skip) skip.onclick = skipStory;
     // SPEC_085 follow-up — destructive buttons use an inline two-click
     // confirm instead of a browser alert().
     armConfirm(document.getElementById('thesis-reset'), doResetThesis);

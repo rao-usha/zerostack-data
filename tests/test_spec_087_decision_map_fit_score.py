@@ -78,17 +78,16 @@ class TestSpec087Backend:
 
 class TestSpec087Frontend:
 
-    def test_empty_landing_marker(self, html):
-        """T9: blank-landing card markup + the init guard that skips
-        fetching a default layer when no thesis is saved."""
-        assert 'id="map-empty"' in html
-        assert 'id="map-empty-demo"' in html
-        assert 'id="map-empty-thesis"' in html
-        # The init() flow picks an entryMode and only fetches a specific
-        # layer when entryMode === 'url-layer'.
+    def test_empty_landing_init_guard(self, html):
+        """T9: init() picks an entryMode and only fetches a specific layer
+        in url-layer mode. (SPEC_092 removed the #map-empty centered modal
+        — blank mode is now a clean basemap with the header onboarding
+        nudge as the only landing cue.)"""
         assert "entryMode = 'blank'" in html
         assert "entryMode = 'fit-score'" in html
         assert "entryMode = 'url-layer'" in html
+        # And the deprecated modal is truly gone
+        assert 'id="map-empty"' not in html
 
     def test_paint_fit_score_helper(self, html):
         """T10: paintFitScore / renderTopNPins / renderFitLegend exist
