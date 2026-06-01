@@ -751,6 +751,37 @@
     /* SPEC_093 — chain-of-thought assistant messages (no user bubble).
        Slightly muted to distinguish system rationale from human-driven
        Pilot replies. Lead-in icon hints "this is reasoning". */
+    /* SPEC_098 — visible reasoning surface. The "thinking" chip appears
+       while a tool call is running, then is replaced by a permanent
+       "cause receipt" line under the narration when the call finishes. */
+    .msg.assistant .thinking-chip {
+      display:inline-flex; align-items:center; gap:6px;
+      background:rgba(124,131,255,.10);
+      border:1px solid rgba(124,131,255,.35);
+      color:var(--primary-hover);
+      font-size:10.5px; font-family:ui-monospace,Menlo,monospace;
+      padding:3px 8px; border-radius:10px;
+      margin-top:6px; max-width:100%; overflow:hidden;
+      text-overflow:ellipsis; white-space:nowrap;
+      animation: thinking-pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes thinking-pulse {
+      0%, 100% { opacity:.55; } 50% { opacity:1; }
+    }
+    .msg.assistant .receipts { margin-top:8px;
+      display:flex; flex-direction:column; gap:3px; }
+    .msg.assistant .cause-receipt {
+      font-size:10.5px; color:var(--dim);
+      font-family:ui-monospace,Menlo,monospace; line-height:1.4;
+      padding-left:14px; position:relative;
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .msg.assistant .cause-receipt::before {
+      content:'→'; position:absolute; left:0; color:var(--primary);
+      font-family:'Inter',sans-serif;
+    }
+    .msg.assistant .cause-receipt.is-error { color:var(--warn); }
+    .msg.assistant .cause-receipt.is-error::before { color:var(--warn); }
     .msg.assistant.cot .narration { color:var(--muted);
       font-style:italic; padding-left:22px; position:relative; }
     .msg.assistant.cot .narration::before {
@@ -3054,6 +3085,7 @@
     asst.innerHTML =
       '<div class="loading"><span class="pilot-spinner"></span>Pilot working…</div>'
       + '<div class="narration" style="display:none"></div>'
+      + '<div class="receipts"></div>'   // SPEC_098 — cause-and-effect log
       + '<div class="options"></div>'
       + '<div class="meta" style="display:none"></div>';
     thread.appendChild(asst);
@@ -3063,6 +3095,8 @@
       narrEl: asst.querySelector('.narration'),
       optionsEl: asst.querySelector('.options'),
       metaEl: asst.querySelector('.meta'),
+      receiptsEl: asst.querySelector('.receipts'),   // SPEC_098
+      asstEl: asst,
     };
   }
   function scrollThreadToBottom() {
@@ -3413,6 +3447,9 @@
       // SPEC_086 — per-turn DOM refs
       narrEl: turn.narrEl, optionsEl: turn.optionsEl,
       loadingEl: turn.loadingEl, metaEl: turn.metaEl,
+      // SPEC_098 — visible reasoning refs
+      receiptsEl: turn.receiptsEl, asstEl: turn.asstEl,
+      thinkingEl: null,
     };
 
     PILOT_ABORT = new AbortController();
@@ -3557,6 +3594,23 @@
       appendToolLog(toolsEl, `[${ev.loop}] ${tag} ${ev.name}(${
         JSON.stringify(ev.args).slice(0, 70)
       })`);
+      // SPEC_098 — live "thinking" chip under the assistant turn
+      if (c.asstEl) {
+        // Remove any prior chip (one at a time).
+        if (c.thinkingEl && c.thinkingEl.parentNode) {
+          c.thinkingEl.parentNode.removeChild(c.thinkingEl);
+        }
+        const chip = document.createElement('div');
+        chip.className = 'thinking-chip';
+        const icon = ev.is_ui ? '🎬' : '🔧';
+        const argsPreview = JSON.stringify(ev.args || {}).slice(0, 50);
+        chip.textContent = `${icon} ${ev.name}(${argsPreview})`;
+        // Insert before the receipts container so the chip sits above past receipts
+        if (c.receiptsEl) c.asstEl.insertBefore(chip, c.receiptsEl);
+        else c.asstEl.appendChild(chip);
+        c.thinkingEl = chip;
+      }
+      scrollThreadToBottom();
     }
     else if (ev.event === 'tool_call_completed') {
       c.tool_calls.push({ loop: ev.loop, name: ev.name,
@@ -3566,6 +3620,20 @@
       if (last) {
         last.className = cls;
         last.innerHTML += `<br><span style="color:var(--muted)">  ↳ ${escapeHtml(ev.summary)}</span>`;
+      }
+      // SPEC_098 — drop the live chip, append a permanent receipt.
+      if (c.thinkingEl && c.thinkingEl.parentNode) {
+        c.thinkingEl.parentNode.removeChild(c.thinkingEl);
+      }
+      c.thinkingEl = null;
+      if (c.receiptsEl) {
+        const r = document.createElement('div');
+        r.className = 'cause-receipt' + (ev.is_error ? ' is-error' : '');
+        const argsPreview = JSON.stringify(c.last_args || {}).slice(0, 40);
+        r.textContent = `${ev.name}(${argsPreview}) — ${ev.summary || ''}`.slice(0, 180);
+        r.title = `${ev.name}\nargs: ${JSON.stringify(c.last_args || {})}\n${ev.summary || ''}`;
+        c.receiptsEl.appendChild(r);
+        scrollThreadToBottom();
       }
       // SPEC_082 — mirror into the bottom Queries pane
       if (typeof appendQueryRow === 'function') {
@@ -3610,6 +3678,11 @@
           `${ev.loops_used} loops · ${ev.tool_count} tools · ${ev.ui_action_count} UI · ${ev.duration_seconds.toFixed(1)}s · ${c.model}` +
           (ev.truncated ? ' · TRUNCATED' : '');
       }
+      // SPEC_098 — defensively clear any lingering thinking chip.
+      if (c.thinkingEl && c.thinkingEl.parentNode) {
+        c.thinkingEl.parentNode.removeChild(c.thinkingEl);
+      }
+      c.thinkingEl = null;
       // Citation hardening: warn on unlinked numerical claims (in-turn)
       if (Array.isArray(ev.unlinked_claims) && ev.unlinked_claims.length && narrEl) {
         const warn = document.createElement('div');
