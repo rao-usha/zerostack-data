@@ -1461,6 +1461,10 @@
   // SPEC_087 — top-N candidate pins for the Decision Map fit-score.
   let FIT_PINS_LAYER = null;
   let CURRENT_FIT_RESULT = null;   // last /fit-score response (for re-paint, e.g. opacity)
+  // SPEC_097 — Pilot's set_fit_weights tool stashes overrides here;
+  // fetchAndPaintFitScore forwards them on every /fit-score call until
+  // cleared (by reset_thesis or a user thesis save).
+  let CUSTOM_WEIGHTS = null;
   let ARC_LAYER = null;
   let REGISTRY = null;
   let LAYER_SPECS = {};
@@ -2088,6 +2092,8 @@
           // SPEC_088 — wire the active chip set
           constraints: CONSTRAINTS.map(c => ({
             dimension: c.dimension, value: c.value })),
+          // SPEC_097 — Pilot recipe-weight overrides (null when unset)
+          weights_override: CUSTOM_WEIGHTS,
         }),
       }).then(x => x.json());
       paintFitScore(r);
@@ -3807,6 +3813,50 @@
     }
     else if (a.name === 'exit_trade_area') {
       if (typeof exitTradeArea === 'function') exitTradeArea();
+    }
+    // ─── SPEC_097 — chat-driven nav actions ────────────────────────
+    else if (a.name === 'select_pin') {
+      let gid = args.geo_id;
+      if (!gid && Number.isFinite(args.rank)
+          && CURRENT_FIT_RESULT
+          && Array.isArray(CURRENT_FIT_RESULT.top_n)
+          && CURRENT_FIT_RESULT.top_n[args.rank - 1]) {
+        gid = CURRENT_FIT_RESULT.top_n[args.rank - 1].geo_id;
+      }
+      if (gid && typeof enterTradeArea === 'function')
+        await enterTradeArea(gid, 50);
+    }
+    else if (a.name === 'set_fit_weights') {
+      CUSTOM_WEIGHTS = (args && args.weights) || null;
+      const thesis = (typeof loadThesis === 'function') ? loadThesis() : null;
+      if (typeof fetchAndPaintFitScore === 'function')
+        await fetchAndPaintFitScore(thesis);
+    }
+    else if (a.name === 'reset_thesis') {
+      if (typeof doResetThesis === 'function') doResetThesis();
+      CUSTOM_WEIGHTS = null;
+    }
+    else if (a.name === 'set_thesis_field') {
+      const t = (typeof loadThesis === 'function') ? (loadThesis() || {}) : {};
+      if (args && args.key) {
+        // Numeric fields get coerced; the rest stored as-is.
+        const numericKeys = new Set([
+          'target_hhi_min','target_hhi_max','target_pop_density_min',
+        ]);
+        let v = args.value;
+        if (numericKeys.has(args.key)) {
+          const n = parseFloat(v);
+          v = Number.isFinite(n) ? n : null;
+        }
+        t[args.key] = v;
+        try { localStorage.setItem(THESIS_LS_KEY, JSON.stringify(t)); }
+        catch (_) {}
+        if (typeof fillThesisForm === 'function') fillThesisForm();
+        if (typeof refreshThesisPreviews === 'function') refreshThesisPreviews();
+        if (typeof setLeftView === 'function') setLeftView('thesis');
+        logAction('pilot', 'thesis_field_set',
+                   `${args.key}=${String(v).slice(0,40)}`);
+      }
     }
     window.__PILOT_DRIVING = false;   // SPEC_096
   }

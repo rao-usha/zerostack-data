@@ -173,11 +173,19 @@ def _normalize(values: Dict[str, Any]) -> Dict[str, float]:
     return {gid: (v - lo) / span for gid, v in nums.items()}
 
 
+_WEIGHT_KEY_TO_LAYER = {
+    "income":     "demo_acs_median_income",
+    "commercial": "econ_cbp_establishments_county",
+    "broadband":  "infra_broadband_subscription",
+}
+
+
 def compute_fit_score(
     db: Session,
     thesis: Optional[Dict[str, Any]] = None,
     top_n: int = 10,
     constraints: Optional[List[Dict[str, Any]]] = None,
+    weights_override: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Return per-geo fit scores 0–100, the effective weight breakdown,
     and the top-N candidates by score.
@@ -188,7 +196,26 @@ def compute_fit_score(
     silently down-weight the whole score).
     """
     recipe_key = classify_industry(thesis)
-    recipe = _RECIPES.get(recipe_key, _RECIPES["default"])
+    recipe = list(_RECIPES.get(recipe_key, _RECIPES["default"]))
+    # SPEC_097 — if the agent set custom weights, override matching
+    # component weights before renormalisation. Unknown weight keys
+    # ignored; non-numeric values dropped.
+    if isinstance(weights_override, dict) and weights_override:
+        overrides_by_layer: Dict[str, float] = {}
+        for k, v in weights_override.items():
+            layer_id = _WEIGHT_KEY_TO_LAYER.get(k)
+            if not layer_id:
+                continue
+            try:
+                overrides_by_layer[layer_id] = max(0.0, float(v))
+            except (TypeError, ValueError):
+                continue
+        if overrides_by_layer:
+            recipe = [
+                {**c, "weight": overrides_by_layer.get(
+                    c["layer_id"], c["weight"])}
+                for c in recipe
+            ]
     top_n = max(1, min(50, int(top_n) if top_n else 10))
 
     # Pull each component layer's values and normalize to 0..1

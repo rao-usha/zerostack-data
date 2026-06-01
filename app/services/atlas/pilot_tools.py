@@ -297,6 +297,99 @@ def _tool_exit_trade_area(db: Session) -> Dict[str, Any]:
             "note": "Exit trade-area queued."}
 
 
+# ─── SPEC_097 — Chat-driven nav tools (PLAN_078 Layer 3) ─────────────────
+
+_VALID_THESIS_KEYS = (
+    "industry_label", "industry_naics", "region",
+    "target_hhi_min", "target_hhi_max", "target_age_band",
+    "target_pop_density_min", "exclude_layers", "notes",
+)
+_VALID_WEIGHT_KEYS = ("income", "commercial", "broadband")
+
+
+def _tool_select_pin(db: Session, rank: Optional[int] = None,
+                      geo_id: Optional[str] = None) -> Dict[str, Any]:
+    """UI tool. Opens the trade-area card for the candidate at `rank`
+    or with `geo_id`. The frontend applies the action via the existing
+    enterTradeArea path (top_pick:true shorthand handled too)."""
+    args: Dict[str, Any] = {}
+    if geo_id:
+        args["geo_id"] = str(geo_id)
+    elif rank is not None:
+        try:
+            r = int(rank)
+        except (TypeError, ValueError):
+            return {"error": "rank must be int"}
+        if not 1 <= r <= 10:
+            return {"error": "rank must be 1..10"}
+        args["rank"] = r
+    else:
+        return {"error": "provide either rank or geo_id"}
+    return {"ok": True,
+            "action": {"name": "select_pin", "args": args},
+            "note": "Pin selection queued."}
+
+
+def _tool_set_fit_weights(db: Session, weights: Dict[str, Any]
+                            ) -> Dict[str, Any]:
+    """UI tool. Override the active recipe weights and re-paint the
+    fit-score. weights is `{income, commercial, broadband}` (any
+    subset). Values renormalised to sum to 1 on the backend at
+    paint time; the frontend just forwards them on the next /fit-score."""
+    if not isinstance(weights, dict):
+        return {"error": "weights must be an object"}
+    clean: Dict[str, float] = {}
+    for k, v in weights.items():
+        if k not in _VALID_WEIGHT_KEYS:
+            continue
+        try:
+            clean[k] = max(0.0, float(v))
+        except (TypeError, ValueError):
+            continue
+    if not clean:
+        return {"error": f"no valid weights; keys must be in {_VALID_WEIGHT_KEYS}"}
+    return {"ok": True,
+            "action": {"name": "set_fit_weights", "args": {"weights": clean}},
+            "note": f"Weights override queued: {clean}"}
+
+
+def _tool_describe_session(db: Session) -> Dict[str, Any]:
+    """Read tool. Returns a directive telling the agent that the
+    `<session_state>` block at the top of its system prompt is already
+    the answer — no separate fetch needed. Mostly serves as an
+    on-ramp the agent can explicitly call when asked 'describe what
+    I'm looking at'."""
+    return {
+        "ok": True,
+        "note": ("The <session_state> block at the top of your system "
+                  "prompt already contains the current view. Quote from it "
+                  "directly — thesis, chips, fit-score counter, top pins, "
+                  "current trade area, recent actions, map view."),
+    }
+
+
+def _tool_reset_thesis(db: Session) -> Dict[str, Any]:
+    """UI tool. Clears the thesis form."""
+    return {"ok": True,
+            "action": {"name": "reset_thesis", "args": {}},
+            "note": "Reset thesis queued."}
+
+
+def _tool_set_thesis_field(db: Session, key: str, value: Any
+                             ) -> Dict[str, Any]:
+    """UI tool. Sets one thesis field. Only whitelisted keys allowed."""
+    if key not in _VALID_THESIS_KEYS:
+        return {"error": f"key {key!r} not editable; "
+                          f"valid: {sorted(_VALID_THESIS_KEYS)}"}
+    v = value
+    if isinstance(v, str):
+        v = v.strip()[:200]
+    return {"ok": True,
+            "action": {"name": "set_thesis_field",
+                        "args": {"key": key, "value": v}},
+            "note": f"set_thesis_field({key}={v}) queued."}
+
+
 def _tool_find_competition(db: Session, geo_id: str,
                             radius_mi: float = 5.0,
                             term: Optional[str] = None,
@@ -723,6 +816,80 @@ TOOLS: List[Tuple[Dict[str, Any], Callable, str]] = [
             }, "required": ["geo_id"]},
         }},
         _tool_find_competition, "read",
+    ),
+    # ─── SPEC_097 — Decision Map nav tools ───────────────────────────
+    (
+        {"type": "function", "function": {
+            "name": "select_pin",
+            "description": "Open the trade-area card for one of the top-N "
+                            "pins. Provide either `rank` (1..10) for the "
+                            "ranked candidate from the current fit-score "
+                            "or `geo_id` for a specific county FIPS.",
+            "parameters": {"type": "object", "properties": {
+                "rank":   {"type": "integer", "minimum": 1, "maximum": 10},
+                "geo_id": {"type": "string"},
+            }, "required": []},
+        }},
+        _tool_select_pin, "ui",
+    ),
+    (
+        {"type": "function", "function": {
+            "name": "set_fit_weights",
+            "description": "Override the recipe weights and re-paint the "
+                            "fit-score. weights is {income, commercial, "
+                            "broadband} (any subset). Values renormalised "
+                            "to sum to 1. Use when the user wants to "
+                            "retune (e.g. 'weight broadband more').",
+            "parameters": {"type": "object", "properties": {
+                "weights": {"type": "object", "properties": {
+                    "income":     {"type": "number", "minimum": 0},
+                    "commercial": {"type": "number", "minimum": 0},
+                    "broadband":  {"type": "number", "minimum": 0},
+                }},
+            }, "required": ["weights"]},
+        }},
+        _tool_set_fit_weights, "ui",
+    ),
+    (
+        {"type": "function", "function": {
+            "name": "describe_session",
+            "description": "Read tool you can call when the user asks to "
+                            "describe or summarize the current view. It "
+                            "reminds you that the <session_state> block "
+                            "at the top of your system prompt already has "
+                            "the answer.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        }},
+        _tool_describe_session, "read",
+    ),
+    (
+        {"type": "function", "function": {
+            "name": "reset_thesis",
+            "description": "Clear every field of the thesis form. Use only "
+                            "if the user explicitly asks to start over.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        }},
+        _tool_reset_thesis, "ui",
+    ),
+    (
+        {"type": "function", "function": {
+            "name": "set_thesis_field",
+            "description": "Set one field of the thesis form (and persist). "
+                            "Valid keys: industry_label, industry_naics, "
+                            "region, target_hhi_min, target_hhi_max, "
+                            "target_age_band, target_pop_density_min, "
+                            "exclude_layers, notes.",
+            "parameters": {"type": "object", "properties": {
+                "key":   {"type": "string", "enum": [
+                    "industry_label", "industry_naics", "region",
+                    "target_hhi_min", "target_hhi_max",
+                    "target_age_band", "target_pop_density_min",
+                    "exclude_layers", "notes",
+                ]},
+                "value": {},
+            }, "required": ["key", "value"]},
+        }},
+        _tool_set_thesis_field, "ui",
     ),
 ]
 

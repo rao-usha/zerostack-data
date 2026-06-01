@@ -308,6 +308,8 @@ class FitScoreBody(BaseModel):
     thesis: Optional[Dict[str, Any]] = None
     top_n: Optional[int] = 10
     constraints: Optional[List[Dict[str, Any]]] = None
+    # SPEC_097 — Pilot can set weights via set_fit_weights tool.
+    weights_override: Optional[Dict[str, Any]] = None
 
 
 @router.post("/fit-score")
@@ -318,7 +320,8 @@ def atlas_fit_score(body: FitScoreBody, db: Session = Depends(get_db)):
     from app.services.atlas.fit_score import compute_fit_score
     return compute_fit_score(db, thesis=body.thesis,
                               top_n=body.top_n or 10,
-                              constraints=body.constraints)
+                              constraints=body.constraints,
+                              weights_override=body.weights_override)
 
 
 class PlanBody(BaseModel):

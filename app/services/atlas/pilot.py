@@ -152,6 +152,26 @@ How to work:
         count of competing businesses within radius. Use after
         enter_trade_area to answer "how much competition is already
         there?" Term is normally the thesis industry_label.
+
+      SPEC_097 — chat-driven nav tools (you can drive the WHOLE map
+      from this conversation):
+      * select_pin(rank?, geo_id?) — UI. Open the trade area for the
+        ranked candidate ("open pin 3", "show me Loudoun"). rank ∈ 1..10.
+      * set_fit_weights({income, commercial, broadband}) — UI. Override
+        recipe weights and re-paint. Use when the user says "weight
+        broadband higher" or "I care more about income".
+      * describe_session() — read. Reminds you the <session_state>
+        block already has the current view. Call this only if the
+        user explicitly asks "describe what I'm looking at" and you
+        want to acknowledge the call before quoting.
+      * reset_thesis() — UI. Clear the thesis form. Only call when the
+        user explicitly says "start over" or "reset".
+      * set_thesis_field(key, value) — UI. Edit one thesis field
+        ("change the industry to coffee shops" →
+        set_thesis_field('industry_label', 'Coffee shops')). Valid keys:
+        industry_label, industry_naics, region, target_hhi_min,
+        target_hhi_max, target_age_band, target_pop_density_min,
+        exclude_layers, notes.
     Prefer this chain — add_constraint(s) → recommend_candidates →
     enter_trade_area — over manually toggling individual layers when
     the user is in a site-selection conversation.
