@@ -3316,6 +3316,24 @@
       });
       await openPlace(args.geo_id);
     }
+    // ─── SPEC_090 — Decision Map UI actions ────────────────────────
+    else if (a.name === 'add_constraint') {
+      if (typeof addChip === 'function')
+        addChip(args.dimension, args.value);
+    }
+    else if (a.name === 'remove_constraint') {
+      if (typeof removeChip === 'function' && Array.isArray(CONSTRAINTS)) {
+        const c = CONSTRAINTS.find(x => x.dimension === args.dimension);
+        if (c) removeChip(c.id);
+      }
+    }
+    else if (a.name === 'enter_trade_area') {
+      if (typeof enterTradeArea === 'function')
+        await enterTradeArea(args.geo_id, args.radius_mi || 50);
+    }
+    else if (a.name === 'exit_trade_area') {
+      if (typeof exitTradeArea === 'function') exitTradeArea();
+    }
   }
 
   function plantFocalMarker(lat, lon, label, naics) {

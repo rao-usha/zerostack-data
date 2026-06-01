@@ -228,6 +228,75 @@ def _tool_highlight_place(db: Session, geo_id: str) -> Dict[str, Any]:
     }
 
 
+# ─── SPEC_090 — Decision Map Pilot tools ─────────────────────────────────
+# These drive the Phase A-D primitives from the chat:
+#   recommend_candidates → read tool (top-N from /fit-score)
+#   add_constraint / remove_constraint → UI tools (push/pop chips)
+#   enter_trade_area / exit_trade_area → UI tools (Trade Area card)
+
+_VALID_DIMENSIONS = {
+    "hhi_min", "hhi_max", "establishments_min", "broadband_min", "exclude_nri",
+}
+
+
+def _tool_recommend_candidates(db: Session, top_n: int = 5,
+                                 thesis_context: Optional[Dict[str, Any]] = None,
+                                 ) -> Dict[str, Any]:
+    """Return the top-N counties by current thesis fit. Read tool."""
+    from app.services.atlas.fit_score import compute_fit_score
+    n = max(1, min(20, int(top_n or 5)))
+    r = compute_fit_score(db, thesis=thesis_context or {}, top_n=n)
+    return {
+        "candidates": r.get("top_n", []),
+        "recipe": r.get("recipe"),
+        "weights": r.get("weights", []),
+        "total_candidates": r.get("total_candidates", 0),
+    }
+
+
+def _tool_add_constraint(db: Session, dimension: str, value: float
+                          ) -> Dict[str, Any]:
+    if dimension not in _VALID_DIMENSIONS:
+        return {"error": f"unknown dimension {dimension!r}; "
+                          f"valid: {sorted(_VALID_DIMENSIONS)}"}
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return {"error": "value must be numeric"}
+    return {"ok": True,
+            "action": {"name": "add_constraint",
+                        "args": {"dimension": dimension, "value": v}},
+            "note": f"Constraint {dimension}={v} queued."}
+
+
+def _tool_remove_constraint(db: Session, dimension: str) -> Dict[str, Any]:
+    if dimension not in _VALID_DIMENSIONS:
+        return {"error": f"unknown dimension {dimension!r}"}
+    return {"ok": True,
+            "action": {"name": "remove_constraint",
+                        "args": {"dimension": dimension}},
+            "note": f"Removed constraint on {dimension}."}
+
+
+def _tool_enter_trade_area(db: Session, geo_id: str,
+                            radius_mi: float = 50.0) -> Dict[str, Any]:
+    try:
+        rm = float(radius_mi or 50.0)
+    except (TypeError, ValueError):
+        rm = 50.0
+    rm = max(1.0, min(250.0, rm))
+    return {"ok": True,
+            "action": {"name": "enter_trade_area",
+                        "args": {"geo_id": str(geo_id), "radius_mi": rm}},
+            "note": f"Trade-area mode queued for {geo_id} ({rm} mi)."}
+
+
+def _tool_exit_trade_area(db: Session) -> Dict[str, Any]:
+    return {"ok": True,
+            "action": {"name": "exit_trade_area", "args": {}},
+            "note": "Exit trade-area queued."}
+
+
 def _tool_present_options(db: Session, intro: str,
                            options: List[Dict[str, str]]) -> Dict[str, Any]:
     """SPEC_081 — present 2-4 clickable next-step options. Use AFTER
@@ -536,6 +605,77 @@ TOOLS: List[Tuple[Dict[str, Any], Callable, str]] = [
             },
         },
         _tool_present_options, "ui",
+    ),
+    # ─── SPEC_090 — Decision Map tools ────────────────────────────────
+    (
+        {"type": "function", "function": {
+            "name": "recommend_candidates",
+            "description": "Return the top-N counties by current thesis "
+                            "fit-score. Use this when the user asks 'where "
+                            "should I open/locate X?' instead of toggling "
+                            "individual layers. The current thesis is the "
+                            "one in the system prompt's <thesis> block.",
+            "parameters": {"type": "object", "properties": {
+                "top_n": {"type": "integer", "minimum": 1, "maximum": 20,
+                          "description": "How many candidates to return"},
+            }, "required": []},
+        }},
+        _tool_recommend_candidates, "read",
+    ),
+    (
+        {"type": "function", "function": {
+            "name": "add_constraint",
+            "description": "Add a hard filter to the Decision Map "
+                            "(equivalent to clicking + Add chip). Use when "
+                            "the user states a must-have (e.g. 'only "
+                            "counties above $80K HHI').",
+            "parameters": {"type": "object", "properties": {
+                "dimension": {"type": "string", "enum": [
+                    "hhi_min", "hhi_max", "establishments_min",
+                    "broadband_min", "exclude_nri"]},
+                "value": {"type": "number",
+                          "description": "Threshold value (e.g. 80000 for "
+                                         "$80K HHI, 50 for max NRI)"},
+            }, "required": ["dimension", "value"]},
+        }},
+        _tool_add_constraint, "ui",
+    ),
+    (
+        {"type": "function", "function": {
+            "name": "remove_constraint",
+            "description": "Remove an active constraint chip by dimension.",
+            "parameters": {"type": "object", "properties": {
+                "dimension": {"type": "string", "enum": [
+                    "hhi_min", "hhi_max", "establishments_min",
+                    "broadband_min", "exclude_nri"]},
+            }, "required": ["dimension"]},
+        }},
+        _tool_remove_constraint, "ui",
+    ),
+    (
+        {"type": "function", "function": {
+            "name": "enter_trade_area",
+            "description": "Open the Trade Area view for a candidate county "
+                            "(zoom + radius + neighbour summary card). Use "
+                            "after recommend_candidates to drill into the "
+                            "top pick.",
+            "parameters": {"type": "object", "properties": {
+                "geo_id": {"type": "string",
+                            "description": "5-digit county FIPS"},
+                "radius_mi": {"type": "number", "minimum": 1, "maximum": 250,
+                               "description": "Trade-area radius (default 50)"},
+            }, "required": ["geo_id"]},
+        }},
+        _tool_enter_trade_area, "ui",
+    ),
+    (
+        {"type": "function", "function": {
+            "name": "exit_trade_area",
+            "description": "Close the Trade Area card and return to the "
+                            "fit-score view.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        }},
+        _tool_exit_trade_area, "ui",
     ),
 ]
 

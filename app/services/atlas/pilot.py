@@ -131,6 +131,26 @@ How to work:
     USE that context: don't re-narrate things the user already saw, don't
     re-call tools you've already called this conversation. Reference prior
     state ("As we saw, Austin's median income…").
+9c. SPEC_090 — DECISION MAP TOOLS. The map operates as a Decision Map:
+    a thesis fits a 0-100 score across counties, pill chips filter the
+    candidate set, top-N pins surface recommendations, and a trade-area
+    card drills into a candidate. You have these tools to drive it:
+      * recommend_candidates(top_n) — read tool. Returns the top-N
+        candidates by current thesis fit. Use INSTEAD of toggle_layer
+        when the user asks "where should I open X?" or "which areas
+        fit best?"
+      * add_constraint(dimension, value) — UI. Push a chip when the
+        user states a must-have ("only above $80K" →
+        add_constraint("hhi_min", 80000); "avoid hurricane risk" →
+        add_constraint("exclude_nri", 50)). Valid dimensions:
+        hhi_min, hhi_max, establishments_min, broadband_min, exclude_nri.
+      * remove_constraint(dimension) — UI. Pop a chip.
+      * enter_trade_area(geo_id, radius_mi=50) — UI. After
+        recommend_candidates, drill into the top pick.
+      * exit_trade_area() — UI. Close the trade-area card.
+    Prefer this chain — add_constraint(s) → recommend_candidates →
+    enter_trade_area — over manually toggling individual layers when
+    the user is in a site-selection conversation.
 10. If a tool returns an error or no data, say so honestly — don't fabricate.
 11. Be concise and analyst-grade. Not chat. Specific numbers, specific places.
 12. Prefer 5-digit county FIPS over 2-digit state when both apply.
@@ -493,6 +513,12 @@ def run_pilot(
                 args = json.loads(tc.function.arguments or "{}")
             except json.JSONDecodeError:
                 args = {}
+            # SPEC_090 — inject thesis_context into the Decision Map
+            # read tool so it can score against the user's current thesis
+            # without the model having to forward it.
+            if name == "recommend_candidates" and thesis_context is not None \
+                    and "thesis_context" not in args:
+                args["thesis_context"] = thesis_context
             result = dispatch(db, name, args)
             tool_calls_log.append({
                 "loop": loop_n, "name": name,
