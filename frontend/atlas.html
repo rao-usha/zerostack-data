@@ -581,6 +581,58 @@
       transition:filter .14s; }
     #chip-menu .preset button:hover { filter:brightness(1.1); }
 
+    /* SPEC_089 — Trade Area card (top-right of the map, below #map-actions) */
+    #trade-area-card { position:absolute; top:60px; left:16px; z-index:550;
+      width:340px; max-height:calc(100vh - 200px); overflow-y:auto;
+      background:rgba(22,29,49,.93); backdrop-filter:blur(12px) saturate(140%);
+      -webkit-backdrop-filter:blur(12px) saturate(140%);
+      border:1px solid rgba(124,131,255,.35); border-radius:12px;
+      padding:14px 16px; box-shadow:0 10px 30px rgba(0,0,0,.55),
+                 0 0 0 4px rgba(124,131,255,.10);
+      color:var(--text); font-size:12px; line-height:1.5; }
+    #trade-area-card[hidden] { display:none; }
+    #trade-area-card .ta-head { display:flex; align-items:flex-start;
+      gap:10px; margin-bottom:8px; }
+    #trade-area-card .ta-name { font-size:14px; font-weight:600;
+      color:var(--text); letter-spacing:-.01em; line-height:1.2; }
+    #trade-area-card .ta-sub { font-size:10.5px; color:var(--dim);
+      margin-top:2px; letter-spacing:.04em; text-transform:uppercase; }
+    #trade-area-exit { margin-left:auto; background:transparent;
+      border:none; color:var(--dim); cursor:pointer; font-size:18px;
+      line-height:1; padding:2px 6px; border-radius:5px; }
+    #trade-area-exit:hover { color:var(--warn); background:rgba(255,255,255,.05); }
+    #trade-area-card .ta-focal-stats { display:grid;
+      grid-template-columns:1fr 1fr; gap:6px 14px; font-size:11px;
+      padding:8px 0; border-top:1px solid var(--border);
+      border-bottom:1px solid var(--border); margin-bottom:10px; }
+    #trade-area-card .ta-stat { display:flex; justify-content:space-between;
+      align-items:baseline; }
+    #trade-area-card .ta-stat .k { color:var(--dim); font-size:10px;
+      text-transform:uppercase; letter-spacing:.04em; }
+    #trade-area-card .ta-stat .v { color:var(--text); font-weight:600;
+      font-variant-numeric:tabular-nums; }
+    #trade-area-card .ta-summary { font-size:11px; color:var(--muted);
+      margin-bottom:10px; line-height:1.55; }
+    #trade-area-card .ta-summary b { color:var(--accent); font-weight:600; }
+    #trade-area-card .ta-neighbors-head { display:flex;
+      align-items:baseline; gap:6px; font-size:10px; color:var(--dim);
+      text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px; }
+    #trade-area-card .ta-neighbors-count { font-variant-numeric:tabular-nums;
+      color:var(--muted); }
+    #trade-area-card .ta-row { display:grid;
+      grid-template-columns:1fr 60px 60px; gap:8px;
+      padding:5px 4px; border-bottom:1px dashed var(--border);
+      font-size:11px; align-items:center; cursor:pointer;
+      transition:background .12s; }
+    #trade-area-card .ta-row:last-child { border-bottom:none; }
+    #trade-area-card .ta-row:hover { background:rgba(124,131,255,.08); }
+    #trade-area-card .ta-row .nm { color:var(--text); overflow:hidden;
+      text-overflow:ellipsis; white-space:nowrap; }
+    #trade-area-card .ta-row .dist { color:var(--dim);
+      font-variant-numeric:tabular-nums; text-align:right; font-size:10px; }
+    #trade-area-card .ta-row .inc { color:var(--muted);
+      font-variant-numeric:tabular-nums; text-align:right; }
+
     /* SPEC_066c — FEMA time-cascade scrubber */
     #scrubber { position:absolute; top:60px; left:50%; transform:translateX(-50%);
       background:rgba(20,27,45,.95); border:1px solid var(--border);
@@ -1135,6 +1187,24 @@
         <button id="reset-view">Reset view</button>
         <button id="boundaries-toggle">Hide boundaries</button>
         <button id="heat-toggle" style="display:none">🔥 Heat</button>
+      </div>
+
+      <!-- SPEC_089 — Trade Area card (shown when a pin is clicked) -->
+      <div id="trade-area-card" hidden>
+        <div class="ta-head">
+          <div>
+            <div class="ta-name"></div>
+            <div class="ta-sub"></div>
+          </div>
+          <button id="trade-area-exit" title="Exit trade area">×</button>
+        </div>
+        <div class="ta-focal-stats"></div>
+        <div class="ta-summary"></div>
+        <div class="ta-neighbors-head">
+          <span class="ta-neighbors-title">Neighbour counties</span>
+          <span class="ta-neighbors-count"></span>
+        </div>
+        <div class="ta-neighbors-list"></div>
       </div>
 
       <!-- SPEC_088 — constraint pill chips + candidate counter -->
@@ -2046,6 +2116,111 @@
     if (FIT_PINS_LAYER) { MAP.removeLayer(FIT_PINS_LAYER); FIT_PINS_LAYER = null; }
   }
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // SPEC_089 — TRADE-AREA MODE
+  // ═══════════════════════════════════════════════════════════════════════
+  let TRADE_AREA_CIRCLE = null;
+  let TRADE_AREA_STATE  = null;   // {geo_id, radius_mi}
+
+  function fmtNum(n, opts) {
+    if (n === null || n === undefined || !Number.isFinite(Number(n))) return '—';
+    opts = opts || {};
+    const v = Number(n);
+    if (opts.money) return '$' + v.toLocaleString(undefined, { maximumFractionDigits: 0 });
+    if (opts.pct)   return v.toFixed(1) + '%';
+    return v.toLocaleString();
+  }
+
+  async function enterTradeArea(geoId, radiusMi) {
+    radiusMi = radiusMi || 50;
+    try {
+      const r = await fetch(API + '/trade-area', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ geo_id: geoId, radius_mi: radiusMi }),
+      }).then(x => x.json());
+      if (r.error || !r.focal) {
+        toast(r.error || 'Trade area unavailable');
+        return;
+      }
+      TRADE_AREA_STATE = { geo_id: geoId, radius_mi: radiusMi };
+      renderTradeAreaCard(r);
+      // Zoom to focal + draw the radius circle (radius in meters)
+      MAP.setView([r.focal.lat, r.focal.lon], 8);
+      if (TRADE_AREA_CIRCLE) { MAP.removeLayer(TRADE_AREA_CIRCLE); }
+      TRADE_AREA_CIRCLE = L.circle([r.focal.lat, r.focal.lon], {
+        radius: radiusMi * 1609.34,
+        color: 'rgba(124,131,255,.85)', weight: 2,
+        fillColor: 'rgba(124,131,255,.10)', fillOpacity: 1,
+      }).addTo(MAP);
+      track('trade_area_entered', { geo_id: geoId, radius_mi: radiusMi,
+                                      n_neighbors: r.summary?.n_neighbors });
+    } catch (e) {
+      console.warn('trade-area fetch failed', e);
+      toast('Trade area request failed');
+    }
+  }
+
+  function exitTradeArea() {
+    if (TRADE_AREA_CIRCLE) { MAP.removeLayer(TRADE_AREA_CIRCLE); TRADE_AREA_CIRCLE = null; }
+    const card = document.getElementById('trade-area-card');
+    if (card) card.hidden = true;
+    TRADE_AREA_STATE = null;
+    track('trade_area_exited', {});
+  }
+
+  function renderTradeAreaCard(r) {
+    const card = document.getElementById('trade-area-card');
+    if (!card) return;
+    const focal = r.focal || {};
+    card.querySelector('.ta-name').textContent = focal.name || focal.geo_id || '—';
+    card.querySelector('.ta-sub').textContent =
+      `FIPS ${focal.geo_id} · ${r.radius_mi} mi trade area`;
+    // Focal stats grid
+    const fs = card.querySelector('.ta-focal-stats');
+    fs.innerHTML = '';
+    const rows = [
+      ['Income',        fmtNum(focal.income, { money: true })],
+      ['Establishments', fmtNum(focal.establishments)],
+      ['Broadband',     fmtNum(focal.broadband, { pct: true })],
+      ['NRI',           fmtNum(focal.nri)],
+    ];
+    rows.forEach(([k, v]) => {
+      const d = document.createElement('div');
+      d.className = 'ta-stat';
+      d.innerHTML = `<span class="k">${k}</span><span class="v">${v}</span>`;
+      fs.appendChild(d);
+    });
+    // Neighbour summary line
+    const s = r.summary || {};
+    const sumEl = card.querySelector('.ta-summary');
+    sumEl.innerHTML = '';
+    if (s.n_neighbors) {
+      sumEl.innerHTML =
+        `<b>${s.n_neighbors}</b> counties within <b>${r.radius_mi} mi</b>. ` +
+        `Avg income <b>${fmtNum(s.avg_income, { money: true })}</b>, ` +
+        `avg broadband <b>${fmtNum(s.avg_broadband, { pct: true })}</b>, ` +
+        `max NRI <b>${fmtNum(s.max_nri)}</b>.`;
+    } else {
+      sumEl.textContent = 'No neighbour counties within this radius.';
+    }
+    card.querySelector('.ta-neighbors-count').textContent =
+      `(${(r.neighbors || []).length})`;
+    // Neighbour list (clickable → make that the new focal)
+    const list = card.querySelector('.ta-neighbors-list');
+    list.innerHTML = '';
+    (r.neighbors || []).slice(0, 50).forEach(n => {
+      const row = document.createElement('div');
+      row.className = 'ta-row';
+      row.innerHTML =
+        `<span class="nm" title="${escapeHtml(n.name || n.geo_id)}">${escapeHtml(n.name || n.geo_id)}</span>` +
+        `<span class="inc">${fmtNum(n.income, { money: true })}</span>` +
+        `<span class="dist">${n.distance_mi} mi</span>`;
+      row.onclick = () => enterTradeArea(n.geo_id, r.radius_mi);
+      list.appendChild(row);
+    });
+    card.hidden = false;
+  }
+
   function renderTopNPins(topN) {
     clearTopNPins();
     if (!topN || !topN.length || !BOUNDARY_LAYER) return;
@@ -2062,8 +2237,11 @@
       });
       const m = L.marker([c.lat, c.lon], { icon, zIndexOffset: 1000 });
       m.on('click', () => {
-        if (typeof selectPlace === 'function') selectPlace(cand.geo_id);
+        // SPEC_089 — pin clicks enter trade-area mode rather than just
+        // opening the place panel. selectPlace can still be invoked
+        // from the place card if the user wants the full county facts.
         track('fit_pin_clicked', { rank: i + 1, geo_id: cand.geo_id, score: cand.score });
+        if (typeof enterTradeArea === 'function') enterTradeArea(cand.geo_id, 50);
       });
       FIT_PINS_LAYER.addLayer(m);
     });
@@ -3222,6 +3400,10 @@
     document.getElementById('legend').classList.add('hidden');
     track('legend_dismissed', {});
   };
+
+  // SPEC_089 — Trade Area exit button
+  const taExit = document.getElementById('trade-area-exit');
+  if (taExit) taExit.onclick = exitTradeArea;
 
   // SPEC_088 — chip wiring
   loadConstraints();

@@ -321,6 +321,22 @@ def atlas_fit_score(body: FitScoreBody, db: Session = Depends(get_db)):
                               constraints=body.constraints)
 
 
+class TradeAreaBody(BaseModel):
+    # SPEC_089 — trade-area request: focal county geo_id + radius in miles
+    # (clamped 1..250 server-side).
+    geo_id: str = Field(..., min_length=2, max_length=12)
+    radius_mi: Optional[float] = 50.0
+
+
+@router.post("/trade-area")
+def atlas_trade_area(body: TradeAreaBody, db: Session = Depends(get_db)):
+    """SPEC_089 — return focal county stats + neighbour counties within
+    `radius_mi` miles (haversine on county centroids) + an aggregate
+    summary. Used by the Decision Map trade-area mode."""
+    from app.services.atlas.trade_area import compute_trade_area
+    return compute_trade_area(db, body.geo_id, body.radius_mi)
+
+
 class PilotBody(BaseModel):
     question: str = Field(..., min_length=1, max_length=2000)
     session_id: Optional[str] = None
