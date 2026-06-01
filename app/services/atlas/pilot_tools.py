@@ -297,6 +297,33 @@ def _tool_exit_trade_area(db: Session) -> Dict[str, Any]:
             "note": "Exit trade-area queued."}
 
 
+def _tool_find_competition(db: Session, geo_id: str,
+                            radius_mi: float = 5.0,
+                            term: Optional[str] = None,
+                            ) -> Dict[str, Any]:
+    """SPEC_091 — count competing businesses near a county's centroid.
+    Read tool. Resolves geo_id → centroid via county_centroids, then
+    calls Yelp Fusion via the competition service. Returns a count + top 5.
+    Honest about Yelp's hard 25-mi cap and YELP_API_KEY soft-fail."""
+    from app.services.atlas.trade_area import county_centroids
+    from app.services.atlas.competition import find_competition
+    centroids = county_centroids(db)
+    c = centroids.get(str(geo_id))
+    if not c:
+        return {"error": f"unknown geo_id {geo_id!r}"}
+    lat, lon, name = c
+    r = find_competition(lat=lat, lon=lon,
+                          radius_mi=radius_mi, term=term, limit=20)
+    return {
+        "geo_id": geo_id, "name": name,
+        "count": r.get("count", 0), "total": r.get("total", 0),
+        "term_used": r.get("term_used"),
+        "radius_mi": r.get("radius_mi"),
+        "top": (r.get("businesses") or [])[:5],
+        "error": r.get("error"),
+    }
+
+
 def _tool_present_options(db: Session, intro: str,
                            options: List[Dict[str, str]]) -> Dict[str, Any]:
     """SPEC_081 — present 2-4 clickable next-step options. Use AFTER
@@ -676,6 +703,26 @@ TOOLS: List[Tuple[Dict[str, Any], Callable, str]] = [
             "parameters": {"type": "object", "properties": {}, "required": []},
         }},
         _tool_exit_trade_area, "ui",
+    ),
+    (
+        {"type": "function", "function": {
+            "name": "find_competition",
+            "description": "Count competing businesses (Yelp Fusion) near "
+                            "a county's centroid for the given search term. "
+                            "Use after recommend_candidates / enter_trade_area "
+                            "to answer 'how much competition is already there?' "
+                            "Yelp caps radius at 25 mi.",
+            "parameters": {"type": "object", "properties": {
+                "geo_id": {"type": "string",
+                            "description": "5-digit county FIPS"},
+                "radius_mi": {"type": "number", "minimum": 0.5, "maximum": 25,
+                               "description": "Search radius (default 5)"},
+                "term": {"type": "string",
+                          "description": "Search term — usually the thesis "
+                                         "industry_label (e.g. 'Furniture stores')"},
+            }, "required": ["geo_id"]},
+        }},
+        _tool_find_competition, "read",
     ),
 ]
 

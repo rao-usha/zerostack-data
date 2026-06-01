@@ -581,6 +581,27 @@
       transition:filter .14s; }
     #chip-menu .preset button:hover { filter:brightness(1.1); }
 
+    /* SPEC_091 — competition pins (rendered over the trade-area circle) */
+    .competition-pin { position:relative; width:20px; height:20px;
+      pointer-events:auto; }
+    .competition-pin .dot {
+      position:absolute; left:0; top:0; width:20px; height:20px;
+      border-radius:50%; background:rgba(249,115,22,.92); color:#fff;
+      border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.5);
+      display:flex; align-items:center; justify-content:center;
+      font-family:'Inter',sans-serif; font-weight:700; font-size:10px;
+      transition:transform .12s, background .12s;
+    }
+    .competition-pin .dot:hover { transform:scale(1.25); background:#fb923c; }
+
+    /* SPEC_091 — competition row inside Trade Area card */
+    #trade-area-card .ta-comp { font-size:11px; margin-bottom:10px;
+      padding:6px 8px; background:rgba(249,115,22,.10);
+      border:1px solid rgba(249,115,22,.30); border-radius:6px;
+      color:var(--muted); display:none; }
+    #trade-area-card .ta-comp.show { display:block; }
+    #trade-area-card .ta-comp b { color:#fb923c; font-weight:700; }
+
     /* SPEC_089 — Trade Area card (top-right of the map, below #map-actions) */
     #trade-area-card { position:absolute; top:60px; left:16px; z-index:550;
       width:340px; max-height:calc(100vh - 200px); overflow-y:auto;
@@ -1199,6 +1220,7 @@
           <button id="trade-area-exit" title="Exit trade area">×</button>
         </div>
         <div class="ta-focal-stats"></div>
+        <div class="ta-comp"></div>
         <div class="ta-summary"></div>
         <div class="ta-neighbors-head">
           <span class="ta-neighbors-title">Neighbour counties</span>
@@ -2121,6 +2143,9 @@
   // ═══════════════════════════════════════════════════════════════════════
   let TRADE_AREA_CIRCLE = null;
   let TRADE_AREA_STATE  = null;   // {geo_id, radius_mi}
+  // SPEC_091 — competition pins (Yelp Fusion, in-radius)
+  let COMPETITION_LAYER = null;
+  const COMPETITION_RADIUS_MI = 25;   // Yelp's hard cap
 
   function fmtNum(n, opts) {
     if (n === null || n === undefined || !Number.isFinite(Number(n))) return '—';
@@ -2154,6 +2179,17 @@
       }).addTo(MAP);
       track('trade_area_entered', { geo_id: geoId, radius_mi: radiusMi,
                                       n_neighbors: r.summary?.n_neighbors });
+      // SPEC_091 — pull competition automatically when thesis names an industry.
+      try {
+        const t = (typeof loadThesis === 'function') ? loadThesis() : null;
+        const term = (t && t.industry_label) ? String(t.industry_label).trim() : '';
+        if (term && r.focal && Number.isFinite(r.focal.lat) && Number.isFinite(r.focal.lon)) {
+          fetchCompetition(r.focal.lat, r.focal.lon,
+                             Math.min(COMPETITION_RADIUS_MI, radiusMi), term);
+        } else {
+          clearCompetitionPins();
+        }
+      } catch (_) {}
     } catch (e) {
       console.warn('trade-area fetch failed', e);
       toast('Trade area request failed');
@@ -2162,6 +2198,7 @@
 
   function exitTradeArea() {
     if (TRADE_AREA_CIRCLE) { MAP.removeLayer(TRADE_AREA_CIRCLE); TRADE_AREA_CIRCLE = null; }
+    if (typeof clearCompetitionPins === 'function') clearCompetitionPins();
     const card = document.getElementById('trade-area-card');
     if (card) card.hidden = true;
     TRADE_AREA_STATE = null;
@@ -2219,6 +2256,82 @@
       list.appendChild(row);
     });
     card.hidden = false;
+  }
+
+  // ─── SPEC_091 — Competition pins (Yelp Fusion) ─────────────────────────
+  function clearCompetitionPins() {
+    if (COMPETITION_LAYER) { MAP.removeLayer(COMPETITION_LAYER); COMPETITION_LAYER = null; }
+    const row = document.querySelector('#trade-area-card .ta-comp');
+    if (row) { row.classList.remove('show'); row.innerHTML = ''; }
+  }
+
+  function renderCompetitionPins(r) {
+    clearCompetitionPins();
+    const bs = (r && r.businesses) || [];
+    if (!bs.length) return;
+    COMPETITION_LAYER = L.layerGroup();
+    bs.forEach((b, i) => {
+      const icon = L.divIcon({
+        className: 'competition-pin',
+        iconSize: [20, 20], iconAnchor: [10, 10],
+        html: `<div class="dot" title="${escapeHtml(b.name)}">${i + 1}</div>`,
+      });
+      const m = L.marker([b.lat, b.lon], { icon, zIndexOffset: 800 });
+      const rating = (b.rating != null) ? `★ ${b.rating}` : '';
+      const revs   = (b.review_count != null) ? `· ${b.review_count} reviews` : '';
+      m.bindTooltip(
+        `<b>${escapeHtml(b.name)}</b><br>${rating} ${revs}<br>` +
+        `${escapeHtml(b.address || '')}<br>${b.distance_mi} mi`,
+        { sticky: true }
+      );
+      m.on('click', () => {
+        if (b.url) window.open(b.url, '_blank', 'noopener,noreferrer');
+        track('competition_pin_clicked', { name: b.name, distance_mi: b.distance_mi });
+      });
+      COMPETITION_LAYER.addLayer(m);
+    });
+    COMPETITION_LAYER.addTo(MAP);
+  }
+
+  function updateCompetitionCardRow(r) {
+    const row = document.querySelector('#trade-area-card .ta-comp');
+    if (!row) return;
+    const n = (r && r.count) || 0;
+    const term = (r && r.term_used) || '';
+    if (r && r.error) {
+      row.innerHTML = `<i>Competition data unavailable (${escapeHtml(r.error)})</i>`;
+      row.classList.add('show');
+      return;
+    }
+    if (!n) {
+      row.innerHTML = `<i>No ${escapeHtml(term || 'competing')} businesses found within ${r.radius_mi} mi.</i>`;
+      row.classList.add('show'); return;
+    }
+    row.innerHTML =
+      `<b>${n}</b> ${escapeHtml(term ? '"' + term + '"' : 'competing')} ` +
+      `businesses within <b>${r.radius_mi} mi</b>. ` +
+      `Click an orange pin to open it on Yelp.`;
+    row.classList.add('show');
+  }
+
+  async function fetchCompetition(lat, lon, radiusMi, term) {
+    if (!term) { clearCompetitionPins(); return; }
+    try {
+      const r = await fetch(API + '/competition', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lat, lon,
+          radius_mi: Math.min(COMPETITION_RADIUS_MI, radiusMi || COMPETITION_RADIUS_MI),
+          term, limit: 30,
+        }),
+      }).then(x => x.json());
+      renderCompetitionPins(r);
+      updateCompetitionCardRow(r);
+      track('competition_fetched', {
+        count: r.count || 0, term, radius_mi: r.radius_mi });
+    } catch (e) {
+      console.warn('competition fetch failed', e);
+    }
   }
 
   function renderTopNPins(topN) {

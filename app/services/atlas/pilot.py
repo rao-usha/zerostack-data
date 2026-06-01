@@ -148,6 +148,10 @@ How to work:
       * enter_trade_area(geo_id, radius_mi=50) — UI. After
         recommend_candidates, drill into the top pick.
       * exit_trade_area() — UI. Close the trade-area card.
+      * find_competition(geo_id, radius_mi, term) — read. Yelp-backed
+        count of competing businesses within radius. Use after
+        enter_trade_area to answer "how much competition is already
+        there?" Term is normally the thesis industry_label.
     Prefer this chain — add_constraint(s) → recommend_candidates →
     enter_trade_area — over manually toggling individual layers when
     the user is in a site-selection conversation.

@@ -321,6 +321,32 @@ def atlas_fit_score(body: FitScoreBody, db: Session = Depends(get_db)):
                               constraints=body.constraints)
 
 
+class CompetitionBody(BaseModel):
+    # SPEC_091 — Yelp-backed in-radius competition lookup. Used by the
+    # Trade Area panel and the Pilot's find_competition tool. radius_mi
+    # is capped server-side (Yelp's hard 40 km / ~25 mi limit).
+    lat: float
+    lon: float
+    radius_mi: Optional[float] = 5.0
+    term: Optional[str] = None
+    categories: Optional[str] = None
+    limit: Optional[int] = 20
+
+
+@router.post("/competition")
+def atlas_competition(body: CompetitionBody, db: Session = Depends(get_db)):
+    """SPEC_091 — return competing businesses within radius (Yelp Fusion).
+    Soft-fails (200 with error string + empty list) when Yelp is
+    unconfigured or unavailable, so the trade-area UI keeps working."""
+    from app.services.atlas.competition import find_competition
+    return find_competition(
+        lat=body.lat, lon=body.lon,
+        radius_mi=body.radius_mi,
+        term=body.term, categories=body.categories,
+        limit=body.limit,
+    )
+
+
 class TradeAreaBody(BaseModel):
     # SPEC_089 — trade-area request: focal county geo_id + radius in miles
     # (clamped 1..250 server-side).
