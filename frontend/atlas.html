@@ -482,7 +482,14 @@
       margin-bottom:3px; }
     #story-banner .kicker .step { color:var(--text); margin-right:6px;
       font-variant-numeric:tabular-nums; }
-    #story-banner .msg { font-size:12.5px; line-height:1.45; color:var(--text); }
+    #story-banner .msg { font-size:12.5px; line-height:1.45; color:var(--text);
+      display:flex; align-items:center; gap:9px; }
+    #story-banner .planning-msg { flex:1; }
+    #story-banner .planning-spinner { display:inline-block; flex-shrink:0;
+      width:14px; height:14px; border-radius:50%;
+      border:2px solid rgba(124,131,255,.30); border-top-color:var(--primary);
+      animation:planning-spin .9s linear infinite; }
+    @keyframes planning-spin { to { transform:rotate(360deg); } }
     #story-banner .row { display:flex; align-items:center; gap:10px;
       margin-top:6px; }
     #story-banner .dots { display:flex; gap:5px; flex:1; }
@@ -2345,16 +2352,21 @@
     if (!topN || !topN.length || !BOUNDARY_LAYER) return;
     FIT_PINS_LAYER = L.layerGroup();
     topN.forEach((cand, i) => {
-      // Find the centroid for this geo_id via the existing CENTROIDS map
+      // CENTROIDS[gid] is a [lon, lat] array (GeoJSON convention), NOT
+      // an object — earlier this code read c.lat/c.lon which were
+      // undefined and L.marker threw "Invalid LatLng object". Fixed by
+      // destructuring the array.
       const c = (typeof CENTROIDS === 'object' && CENTROIDS) ? CENTROIDS[cand.geo_id] : null;
-      if (!c) return;
+      if (!Array.isArray(c) || c.length < 2
+          || !Number.isFinite(c[0]) || !Number.isFinite(c[1])) return;
+      const [lon, lat] = c;
       const icon = L.divIcon({
         className: 'fit-pin',
         iconSize: [26, 26], iconAnchor: [13, 13],
         html: `<div class="badge" title="Rank ${i + 1} — fit ${cand.score}">${i + 1}</div>`
               + `<div class="score">${cand.score}</div>`,
       });
-      const m = L.marker([c.lat, c.lon], { icon, zIndexOffset: 1000 });
+      const m = L.marker([lat, lon], { icon, zIndexOffset: 1000 });
       m.on('click', () => {
         // SPEC_089 — pin clicks enter trade-area mode rather than just
         // opening the place panel. selectPlace can still be invoked
@@ -3273,7 +3285,30 @@
     const b = document.getElementById('story-banner');
     if (b) {
       b.querySelector('.step').textContent = 'Planning…';
-      b.querySelector('.msg').textContent  = 'Planning your walkthrough…';
+      // Visible feedback the LLM is doing work. Rotates through three
+      // hints so the wait doesn't read as a hang. Cleared once the
+      // plan returns or the run errors.
+      const msgEl = b.querySelector('.msg');
+      msgEl.innerHTML =
+        '<span class="planning-spinner"></span>' +
+        '<span class="planning-msg">Asking the Pilot to author your walkthrough…</span>';
+      const hints = [
+        'Asking the Pilot to author your walkthrough…',
+        'Reading your thesis…',
+        'Choosing constraints and beats…',
+        'Drafting the rationales…',
+      ];
+      let h = 0;
+      const txt = msgEl.querySelector('.planning-msg');
+      const cycle = setInterval(() => {
+        if (!document.getElementById('story-banner') ||
+            document.getElementById('story-banner').hidden) {
+          clearInterval(cycle); return;
+        }
+        h = (h + 1) % hints.length;
+        if (txt) txt.textContent = hints[h];
+      }, 1400);
+      window.__PLANNING_CYCLE = cycle;
     }
     let resp;
     try {
@@ -3286,8 +3321,14 @@
       }).then(x => x.json());
     } catch (e) {
       console.warn('plan fetch failed', e);
+      if (window.__PLANNING_CYCLE) clearInterval(window.__PLANNING_CYCLE);
       toast('Plan fetch failed — running fallback walkthrough');
       return runFurnitureStoryDemo();
+    }
+    // Stop the rotating "Planning…" hint cycle now that we have a plan.
+    if (window.__PLANNING_CYCLE) {
+      clearInterval(window.__PLANNING_CYCLE);
+      window.__PLANNING_CYCLE = null;
     }
     if (!resp || !resp.plan) {
       toast('Plan empty — running fallback walkthrough');
