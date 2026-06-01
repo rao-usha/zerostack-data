@@ -62,12 +62,15 @@ class TestSpec092StoryDemo:
         # Cancellation guard pattern
         assert "RUNNING_STORY" in html
         assert "cancelled:" in html or "cancelled =" in html
-        # 6 beats — count storyBeat( invocations inside the runner
+        # 6 beats — count the beat-invocation calls inside the runner.
+        # SPEC_093 wrapped each `storyBeat(...)` in `beatWithCoT(...)` so
+        # the runner now calls beatWithCoT 6×; storyBeat lives inside.
         m = re.search(r"async function runFurnitureStoryDemo.*?\n  \}",
                       html, re.DOTALL)
         assert m, "runFurnitureStoryDemo body not found"
         body = m.group(0)
-        assert body.count("await storyBeat(") == 6, body.count("await storyBeat(")
+        beats = body.count("await beatWithCoT(") + body.count("await storyBeat(")
+        assert beats == 6, beats
 
     def test_demo_button_invokes_story(self, html):
         """T4: thesis-demo onClick now wires to runFurnitureStoryDemo

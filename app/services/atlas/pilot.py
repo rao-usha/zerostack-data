@@ -722,3 +722,84 @@ def run_pilot_streaming(
                  unlinked_claims=unlinked,
                  truncated=truncated,
                  duration_seconds=(datetime.utcnow() - started).total_seconds())
+
+
+# ─── SPEC_093 — Chain-of-thought streaming for the storytelling demo ────
+# A lightweight LLM call that streams a 2-3 sentence rationale per
+# beat. No tools, no UI actions — just narration delta events.
+
+EXPLAIN_SYSTEM_PROMPT = """\
+You are a concise site-selection analyst inside a Decision Map app.
+Your job: 2-3 sentences of analyst-grade reasoning that explain the
+user's question. Honest, specific, no hedging. No emojis. Do NOT
+start with "Sure!", "Great question!", "Certainly!" or any preamble
+— begin directly with the reasoning. When an <thesis> block is
+present, ground the reasoning in that thesis. Keep it under 80 words.
+"""
+
+
+def run_explain_streaming(
+    prompt: str,
+    thesis_context: Optional[Dict[str, Any]] = None,
+    max_tokens: int = 200,
+    model: str = MODEL,
+) -> Iterator[str]:
+    """SPEC_093 — yield NDJSON events for one CoT explanation.
+
+    Events:
+      {event: "started"}
+      {event: "delta", text: "<chunk>"}
+      {event: "done", duration_seconds: float}
+      {event: "error", message: "..."}
+
+    No tools, no message-history, no narration aggregation — this is
+    the lightest possible LLM call. Used by the demo runner to
+    explain each scripted beat as it fires.
+    """
+    started = datetime.utcnow()
+
+    def event(kind: str, **payload):
+        return json.dumps({"event": kind, **payload}) + "\n"
+
+    yield event("started")
+
+    if not prompt or not prompt.strip():
+        yield event("error", message="empty prompt")
+        return
+
+    if not _have_openai_key():
+        yield event(
+            "delta",
+            text="(LLM unavailable — reasoning skipped for this beat)",
+        )
+        yield event("done", duration_seconds=0.0)
+        return
+
+    sys_content = _format_thesis_block(thesis_context) + EXPLAIN_SYSTEM_PROMPT
+    messages = [
+        {"role": "system", "content": sys_content},
+        {"role": "user",   "content": prompt[:2000]},
+    ]
+    try:
+        from openai import OpenAI
+        client = OpenAI()
+        stream = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            max_tokens=max(1, min(500, int(max_tokens or 200))),
+            stream=True,
+        )
+        for chunk in stream:
+            try:
+                delta = chunk.choices[0].delta.content
+            except (IndexError, AttributeError):
+                continue
+            if delta:
+                yield event("delta", text=delta)
+        yield event(
+            "done",
+            duration_seconds=(datetime.utcnow() - started).total_seconds(),
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("run_explain_streaming failed")
+        yield event("error", message=str(exc))

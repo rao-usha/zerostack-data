@@ -741,6 +741,19 @@
       border:1px solid var(--border); padding:8px 12px; border-radius:12px 12px 4px 12px;
       font-size:12.5px; line-height:1.45; max-width:88%; white-space:pre-wrap; }
     .msg.assistant { align-items:stretch; }
+    /* SPEC_093 — chain-of-thought assistant messages (no user bubble).
+       Slightly muted to distinguish system rationale from human-driven
+       Pilot replies. Lead-in icon hints "this is reasoning". */
+    .msg.assistant.cot .narration { color:var(--muted);
+      font-style:italic; padding-left:22px; position:relative; }
+    .msg.assistant.cot .narration::before {
+      content:'💭'; position:absolute; left:0; top:0;
+      font-style:normal; font-size:13px; opacity:.85;
+    }
+    .msg.assistant.cot .cot-beat { display:inline-block;
+      font-size:10px; color:var(--accent); font-weight:600;
+      text-transform:uppercase; letter-spacing:.06em;
+      margin-left:22px; margin-bottom:3px; font-style:normal; }
     .msg.assistant .narration { font-size:13px; line-height:1.55;
       color:var(--text); white-space:pre-wrap; }
     .msg.assistant .loading { color:var(--muted); font-size:12px;
@@ -3017,6 +3030,72 @@
     if (t) t.scrollTop = t.scrollHeight;
   }
 
+  // SPEC_093 — Chain-of-thought streaming for the demo. Appends an
+  // assistant-only message (no user bubble — this is internal
+  // narration) and grows it as delta chunks arrive. Returns when the
+  // server's `done` event fires (or the AbortSignal aborts).
+  async function streamCoT(prompt, thesis, abortSignal, beatLabel) {
+    const thread = document.getElementById('pilot-thread');
+    if (!thread) return;
+    const empty = document.getElementById('pilot-empty');
+    if (empty) empty.remove();
+    const msg = document.createElement('div');
+    msg.className = 'msg assistant cot';
+    if (beatLabel) {
+      const tag = document.createElement('div');
+      tag.className = 'cot-beat';
+      tag.textContent = beatLabel;
+      msg.appendChild(tag);
+    }
+    const narr = document.createElement('div');
+    narr.className = 'narration';
+    msg.appendChild(narr);
+    thread.appendChild(msg);
+    scrollThreadToBottom();
+    try {
+      const res = await fetch(API + '/explain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt, thesis_context: thesis || null, max_tokens: 200,
+        }),
+        signal: abortSignal,
+      });
+      if (!res.body) throw new Error('Streaming not supported');
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let nl;
+        while ((nl = buf.indexOf('\n')) >= 0) {
+          const line = buf.slice(0, nl).trim();
+          buf = buf.slice(nl + 1);
+          if (!line) continue;
+          let ev;
+          try { ev = JSON.parse(line); } catch (_) { continue; }
+          if (ev.event === 'delta' && ev.text) {
+            narr.textContent += ev.text;
+            scrollThreadToBottom();
+          } else if (ev.event === 'done') {
+            return;
+          } else if (ev.event === 'error') {
+            narr.textContent += `\n(reasoning failed: ${ev.message})`;
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      if (e.name === 'AbortError') {
+        narr.textContent += ' …(skipped)';
+      } else {
+        console.warn('streamCoT failed', e);
+      }
+    }
+  }
+
   async function askPilot(question, opts) {
     opts = opts || {};
     // SPEC_081 — if not continuing a guided tour, reset conversation
@@ -3846,6 +3925,50 @@
          + 'drive. Want affluent, growing, household-formation-age areas; '
          + 'avoid pure-rural and disaster-risk-dominated tracts.',
   };
+  // SPEC_093 — Per-beat prompts that drive the live chain-of-thought
+  // (streamed via /atlas/explain into the chat thread). Each beat
+  // gets a focused 2-3 sentence rationale from the LLM tied to the
+  // active thesis. Order matches the 6 scripted beats below.
+  const COT_BEAT_PROMPTS = [
+    // 1 — Set the stage
+    "I'm loading a furniture-store thesis in the Austin TX metro " +
+    "(NAICS 442110). In 2-3 sentences, explain what drives site " +
+    "selection for this kind of business — what matters most for " +
+    "where a furniture store should open.",
+    // 2 — HHI ≥ $75K
+    "I'm filtering to counties with median household income ≥ $75K. " +
+    "In 2-3 sentences, explain why this income threshold matters " +
+    "for furniture retail (think purchase frequency and basket size).",
+    // 3 — Exclude high-NRI
+    "I'm excluding counties with NRI > 50 (high FEMA natural-hazard " +
+    "risk). In 2-3 sentences, explain why hazard exposure matters " +
+    "for a retail thesis — insurance, storefront downtime, customer " +
+    "confidence.",
+    // 4 — Fit-score recipe
+    "I'm scoring counties as a weighted blend: 55% median income, " +
+    "30% commercial activity (CBP establishments), 15% broadband " +
+    "subscription. In 2-3 sentences, explain why this blend is a " +
+    "defensible proxy for furniture-retail fit.",
+    // 5 — Top picks
+    "The top fit-scoring counties are Loudoun VA (70), LA (67), " +
+    "Santa Clara (67), Fairfax VA (63), San Mateo (63). In 2-3 " +
+    "sentences, explain what these top counties have in common and " +
+    "what the #1 pick (Loudoun) suggests about where to look first.",
+    // 6 — Trade-area drill
+    "I'm opening a 50-mile trade-area view around the top candidate. " +
+    "In 2-3 sentences, explain why trade-area analysis matters for " +
+    "furniture retail and what the neighbour-county summary will " +
+    "tell us.",
+  ];
+  const COT_BEAT_LABELS = [
+    "Step 1 · Setting the stage",
+    "Step 2 · Income filter rationale",
+    "Step 3 · Hazard filter rationale",
+    "Step 4 · Fit-score blend rationale",
+    "Step 5 · Top candidates",
+    "Step 6 · Trade-area rationale",
+  ];
+
   // SPEC_092 — Storytelling walkthrough state + helpers.
   // The Demo button used to silently apply everything at once; user
   // couldn't tell anything had happened. We now run a 6-beat sequence
@@ -3853,6 +3976,15 @@
   const STORY_TOTAL_BEATS = 6;
   let RUNNING_STORY = null;          // cancellation token {cancelled: bool}
   let STORY_DELAY_MS = 1600;          // base pause between beats
+  // SPEC_093 — abort controllers for in-flight CoT fetches. Skip ▶︎
+  // walks this list to cancel any LLM stream still chunking in.
+  const COT_ABORTS = [];
+  function abortAllCoT() {
+    while (COT_ABORTS.length) {
+      const c = COT_ABORTS.shift();
+      try { c.abort(); } catch (_) {}
+    }
+  }
 
   function openStoryBanner() {
     const b = document.getElementById('story-banner');
@@ -3904,12 +4036,33 @@
     }
     await sleep(STORY_DELAY_MS, tok);
   }
+  // SPEC_093 — runs storyBeat AND kicks off a live chain-of-thought
+  // stream for this beat in parallel. The chat thread fills up with
+  // the LLM's rationale as the scripted action plays.
+  async function beatWithCoT(step, msg, action, tok) {
+    if (tok && tok.cancelled) return;
+    const ctrl = new AbortController();
+    COT_ABORTS.push(ctrl);
+    const cotP = streamCoT(
+      COT_BEAT_PROMPTS[step - 1] || msg,
+      FURNITURE_DEMO,
+      ctrl.signal,
+      COT_BEAT_LABELS[step - 1] || `Step ${step}`,
+    );
+    await storyBeat(step, msg, action, tok);
+    // Give the CoT up to 3s more to finish after the visible beat
+    // (the visible beat already ate STORY_DELAY_MS ≈ 1.6s).
+    await Promise.race([cotP, sleep(3000, tok)]);
+  }
   function skipStory() {
     if (RUNNING_STORY) RUNNING_STORY.cancelled = true;
+    // SPEC_093 — kill any in-flight CoT streams too
+    abortAllCoT();
     closeStoryBanner();
   }
   function cancelAnyRunningStory() {
     if (RUNNING_STORY) RUNNING_STORY.cancelled = true;
+    abortAllCoT();   // SPEC_093
     RUNNING_STORY = null;
   }
 
@@ -3930,7 +4083,7 @@
     if (typeof setLeftView === 'function') setLeftView('thesis');
 
     // BEAT 1 — load thesis, fill form, expand the entry blocks.
-    await storyBeat(1,
+    await beatWithCoT(1,
       'Loading thesis: Furniture stores · Austin, TX metro · NAICS 442110.',
       () => {
         localStorage.setItem(THESIS_LS_KEY, JSON.stringify(FURNITURE_DEMO));
@@ -3944,19 +4097,19 @@
       }, tok);
 
     // BEAT 2 — must-have HHI ≥ $75K (chip animates in via addChip).
-    await storyBeat(2,
+    await beatWithCoT(2,
       'Filtering: must-have HHI ≥ $75K — affluent purchasing power.',
       () => { addChip('hhi_min', 75000); }, tok);
 
     // BEAT 3 — exclude high-NRI counties.
-    await storyBeat(3,
+    await beatWithCoT(3,
       'Avoiding hazard-heavy areas (NRI > 50).',
       () => { addChip('exclude_nri', 50); }, tok);
 
     // BEAT 4 — paint the fit-score (paint already triggered by chip
     // adds via applyChipsAndRefit, but call once more to ensure the
     // user sees the final state if any earlier paint was preempted).
-    await storyBeat(4,
+    await beatWithCoT(4,
       'Scoring 3,248 counties against your thesis. Watch the map fill in.',
       async () => { await fetchAndPaintFitScore(FURNITURE_DEMO); }, tok);
 
@@ -3972,14 +4125,14 @@
           topName = fl.feature.properties.geo_name || null;
       });
     }
-    await storyBeat(5,
+    await beatWithCoT(5,
       topGid
         ? `Top candidate: ${topName || 'FIPS ' + topGid} (fit ${topScore}/100). Indigo pins are the top 10.`
         : 'Top 10 candidates are now pinned. Click any pin to drill in.',
       null, tok);
 
     // BEAT 6 — auto-open trade area for #1.
-    await storyBeat(6,
+    await beatWithCoT(6,
       topGid
         ? `Opening trade area around ${topName || 'the top pick'} (25 mi). Demographics + competition follow.`
         : 'Click a pin to open its trade area (25 mi).',

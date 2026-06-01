@@ -321,6 +321,30 @@ def atlas_fit_score(body: FitScoreBody, db: Session = Depends(get_db)):
                               constraints=body.constraints)
 
 
+class ExplainBody(BaseModel):
+    # SPEC_093 — chain-of-thought streaming for the storytelling demo.
+    # Lightweight LLM call: 2-3 sentence rationale for a single beat.
+    prompt: str = Field(..., min_length=1, max_length=2000)
+    thesis_context: Optional[Dict[str, Any]] = None
+    max_tokens: Optional[int] = 200
+
+
+@router.post("/explain")
+def atlas_explain(body: ExplainBody, db: Session = Depends(get_db)):
+    """SPEC_093 — stream a 2-3 sentence rationale for a demo beat.
+    No tools, no UI actions — narration delta events only."""
+    from fastapi.responses import StreamingResponse
+    from app.services.atlas.pilot import run_explain_streaming
+    return StreamingResponse(
+        run_explain_streaming(
+            body.prompt, body.thesis_context,
+            body.max_tokens or 200,
+        ),
+        media_type="application/x-ndjson",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )
+
+
 class CompetitionBody(BaseModel):
     # SPEC_091 — Yelp-backed in-radius competition lookup. Used by the
     # Trade Area panel and the Pilot's find_competition tool. radius_mi
