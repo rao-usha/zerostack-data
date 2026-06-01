@@ -410,6 +410,10 @@ class PilotBody(BaseModel):
     session_id: Optional[str] = None
     history: Optional[List[Dict[str, Any]]] = None   # SPEC_081 — prior turns
     thesis_context: Optional[Dict[str, Any]] = None  # SPEC_082 — user thesis
+    # SPEC_095 — Decision Map snapshot (chips, top pins, trade area, map
+    # view). Injected at the very front of the system prompt so the agent
+    # sees what the user is looking at before it speaks.
+    session_state: Optional[Dict[str, Any]] = None
 
 
 @router.post("/pilot")
@@ -420,7 +424,8 @@ def atlas_pilot_endpoint(body: PilotBody, db: Session = Depends(get_db)):
     from app.services.atlas.pilot import run_pilot
     result = run_pilot(db, question=body.question, session_id=body.session_id,
                         history=body.history,
-                        thesis_context=body.thesis_context)
+                        thesis_context=body.thesis_context,
+                        session_state=body.session_state)
     return result
 
 
@@ -437,7 +442,8 @@ def atlas_pilot_stream_endpoint(body: PilotBody, db: Session = Depends(get_db)):
         run_pilot_streaming(db, question=body.question,
                              session_id=body.session_id,
                              history=body.history,
-                             thesis_context=body.thesis_context),
+                             thesis_context=body.thesis_context,
+                             session_state=body.session_state),
         media_type="application/x-ndjson",
         headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
     )

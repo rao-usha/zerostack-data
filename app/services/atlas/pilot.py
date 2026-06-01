@@ -155,6 +155,34 @@ How to work:
     Prefer this chain — add_constraint(s) → recommend_candidates →
     enter_trade_area — over manually toggling individual layers when
     the user is in a site-selection conversation.
+9d. SPEC_095 — SESSION STATE (THIS IS THE BIG ONE). Every turn, you are
+    given a `<session_state>` block at the very top of this prompt that
+    describes EXACTLY what the user is currently looking at: their
+    thesis, the chip filters they have active, the top-N pins currently
+    on the map (by name + score), the open trade area (focal + summary
+    + closest neighbour counties), and the map view (zoom + center).
+
+    When the user asks ANY of these recap-style questions:
+      "what just happened?" / "what happened?" / "summarize what I did"
+      "what am I looking at?" / "where am I?" / "what's on the map?"
+      "what did we do?" / "recap" / "explain this view"
+    your FIRST move is to narrate directly from `<session_state>`. Do
+    NOT call `get_recent_events`, `get_migration_flows`, or any other
+    generic "recent data" tool for that intent — those tools serve
+    external-world questions ("what disasters happened recently in
+    the US?"), not session recap. Routing recap questions to those
+    tools is a bug.
+
+    Resolve indexicals from session_state too:
+      "this" / "here" / "the top pick" → the trade-area focal or top pin
+      "these" / "those candidates"      → the top pins listed
+      "my filters" / "the chips"        → the active chips section
+      "my thesis"                       → the thesis section
+
+    When the session_state has fresh information that contradicts what
+    the user said, gently flag it ("Looking at your current view, the
+    top pick is actually Loudoun VA, not Fairfax …").
+
 10. If a tool returns an error or no data, say so honestly — don't fabricate.
 11. Be concise and analyst-grade. Not chat. Specific numbers, specific places.
 12. Prefer 5-digit county FIPS over 2-digit state when both apply.
@@ -374,6 +402,186 @@ def _format_thesis_block(thesis: Optional[Dict[str, Any]]) -> str:
     return "<thesis>\n" + "\n".join(lines) + "\n</thesis>\n\n"
 
 
+# SPEC_095 — session-state injection. Every Pilot turn includes a
+# snapshot of what the user is currently looking at — thesis, chips,
+# top pins, current trade area, map view. Closes the "can you see
+# what just happened?" gap (PLAN_078 Layer 1).
+
+
+def _cap(s: Any, n: int) -> str:
+    if s is None:
+        return ""
+    return str(s).strip()[:n]
+
+
+def _fmt_money(v: Any) -> str:
+    try:
+        return f"${int(v):,}"
+    except (TypeError, ValueError):
+        return str(v)
+
+
+def _fmt_thesis_short(t: Dict[str, Any]) -> List[str]:
+    """A compact 1-3 line render for session state (denser than the
+    standalone <thesis> block we already prepend). Returns [] when the
+    thesis has no populated fields — avoids emitting a bare "Thesis:"
+    header into the session_state block."""
+    if not isinstance(t, dict):
+        return []
+    body: List[str] = []
+    if t.get("industry_label") or t.get("industry_naics"):
+        bits = []
+        if t.get("industry_label"):
+            bits.append(_cap(t["industry_label"], 80))
+        if t.get("industry_naics"):
+            bits.append(f"NAICS {_cap(t['industry_naics'], 8)}")
+        body.append("  Industry: " + " · ".join(bits))
+    if t.get("region"):
+        body.append(f"  Region focus: {_cap(t['region'], 80)}")
+    hhi_lo, hhi_hi = t.get("target_hhi_min"), t.get("target_hhi_max")
+    if hhi_lo is not None and hhi_hi is not None:
+        body.append(f"  Target HHI: {_fmt_money(hhi_lo)}–{_fmt_money(hhi_hi)}")
+    elif hhi_lo is not None:
+        body.append(f"  Target HHI: {_fmt_money(hhi_lo)}+")
+    if t.get("target_age_band"):
+        body.append(f"  Target age band: {_cap(t['target_age_band'], 16)}")
+    if t.get("target_pop_density_min") is not None:
+        body.append(f"  Min population density: {t['target_pop_density_min']}")
+    if t.get("notes"):
+        body.append(f"  Notes: {_cap(t['notes'], 320)}")
+    if not body:
+        return []
+    return ["Thesis:"] + body
+
+
+def _format_session_state_block(state: Optional[Dict[str, Any]]) -> str:
+    """SPEC_095 — render the user's current Decision Map view as a
+    `<session_state>` block to prepend to the system prompt. Empty
+    sections are omitted; everything is length-capped."""
+    if not isinstance(state, dict):
+        return ""
+    parts: List[str] = []
+
+    # Thesis
+    thesis_lines = _fmt_thesis_short(state.get("thesis") or {})
+    if thesis_lines:
+        parts.append("\n".join(thesis_lines))
+
+    # Chips
+    chips = state.get("chips") or []
+    if isinstance(chips, list) and chips:
+        labels = []
+        for c in chips[:10]:
+            if not isinstance(c, dict):
+                continue
+            lab = c.get("label") or c.get("dimension")
+            if lab:
+                labels.append(_cap(lab, 60))
+        if labels:
+            parts.append("Active filters (chips): " + " · ".join(labels))
+
+    # Fit result counter + recipe
+    fit = state.get("fit_result") or {}
+    if isinstance(fit, dict):
+        fc = fit.get("filtered_candidates")
+        tc = fit.get("total_candidates")
+        if isinstance(fc, int) and isinstance(tc, int):
+            parts.append(
+                f"Counter: {fc:,} of {tc:,} candidates passing the filters."
+            )
+        weights = fit.get("weights") or []
+        if fit.get("recipe") or weights:
+            recipe_line = "Active layer: Decision Map fit-score"
+            if fit.get("recipe"):
+                recipe_line += f" (recipe: {_cap(fit['recipe'], 30)})"
+            parts.append(recipe_line)
+            if isinstance(weights, list) and weights:
+                wbits = []
+                for w in weights[:5]:
+                    if not isinstance(w, dict):
+                        continue
+                    label = _cap(w.get("label") or w.get("layer_id") or "", 30)
+                    weight = w.get("weight")
+                    try:
+                        wp = int(round(float(weight) * 100))
+                    except (TypeError, ValueError):
+                        wp = None
+                    if label and wp is not None:
+                        wbits.append(f"{wp}% {label}")
+                if wbits:
+                    parts.append("  Weights: " + " · ".join(wbits))
+
+    # Top pins
+    pins = state.get("top_pins") or []
+    if isinstance(pins, list) and pins:
+        rows = ["Top candidates on map:"]
+        for p in pins[:10]:
+            if not isinstance(p, dict):
+                continue
+            rank = p.get("rank") or "?"
+            name = _cap(p.get("name") or p.get("geo_id") or "", 60)
+            score = p.get("score")
+            rows.append(f"  {rank}. {name} — fit {score}")
+        if len(rows) > 1:
+            parts.append("\n".join(rows))
+
+    # Trade area
+    ta = state.get("trade_area")
+    if isinstance(ta, dict):
+        focal = ta.get("focal") or {}
+        ta_lines = ["Current trade area:"]
+        nm = _cap(focal.get("name") or focal.get("geo_id") or "?", 60)
+        rmi = ta.get("radius_mi")
+        ta_lines.append(f"  Focal: {nm} · {rmi} mi radius")
+        # Focal stats
+        if any(focal.get(k) is not None
+                for k in ("income", "establishments", "broadband", "nri")):
+            ta_lines.append(
+                f"  Focal stats: income {_fmt_money(focal.get('income'))} · "
+                f"establishments {focal.get('establishments')} · "
+                f"broadband {focal.get('broadband')} · NRI {focal.get('nri')}"
+            )
+        summary = ta.get("summary") or {}
+        if isinstance(summary, dict) and summary.get("n_neighbors") is not None:
+            ta_lines.append(
+                f"  Neighbours: {summary['n_neighbors']} counties within "
+                f"{rmi} mi · avg income "
+                f"{_fmt_money(summary.get('avg_income'))} · "
+                f"avg broadband {summary.get('avg_broadband')} · "
+                f"max NRI {summary.get('max_nri')}"
+            )
+        nbrs = ta.get("neighbors") or []
+        if isinstance(nbrs, list) and nbrs:
+            ta_lines.append("  Closest neighbours:")
+            for n in nbrs[:5]:
+                if not isinstance(n, dict):
+                    continue
+                nm = _cap(n.get("name") or n.get("geo_id") or "?", 50)
+                d = n.get("distance_mi")
+                inc = n.get("income")
+                ta_lines.append(
+                    f"    - {nm} ({d} mi) — income {_fmt_money(inc)}"
+                )
+        parts.append("\n".join(ta_lines))
+
+    # Map view
+    mv = state.get("map_view")
+    if isinstance(mv, dict):
+        try:
+            z = int(mv.get("zoom"))
+            lat = float(mv.get("lat"))
+            lon = float(mv.get("lon"))
+            parts.append(
+                f"Map view: zoom {z}, center {lat:.2f}°N {lon:.2f}°W"
+            )
+        except (TypeError, ValueError):
+            pass
+
+    if not parts:
+        return ""
+    return "<session_state>\n" + "\n\n".join(parts) + "\n</session_state>\n\n"
+
+
 def is_exploratory(question: str) -> bool:
     if not question:
         return False
@@ -440,6 +648,7 @@ def run_pilot(
     model: str = MODEL,
     history: Optional[List[Dict[str, Any]]] = None,
     thesis_context: Optional[Dict[str, Any]] = None,
+    session_state: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Run one question through the agent. Returns full transcript."""
     started = datetime.utcnow()
@@ -457,10 +666,16 @@ def run_pilot(
     from openai import OpenAI
     client = OpenAI()  # reads OPENAI_API_KEY from env
 
-    # SPEC_082 — thesis block is prepended to system prompt when populated.
+    # SPEC_095 — session-state block sits at the very front so the agent
+    # sees the user's current view before everything else.
+    # SPEC_082 — thesis block prepended to system prompt.
     # SPEC_081 — prepend conversation history so multi-turn guided tours
     # share context (prior tool calls, narrations, chosen options).
-    sys_content = _format_thesis_block(thesis_context) + SYSTEM_PROMPT
+    sys_content = (
+        _format_session_state_block(session_state)
+        + _format_thesis_block(thesis_context)
+        + SYSTEM_PROMPT
+    )
     messages: List[Dict[str, Any]] = [{"role": "system", "content": sys_content}]
     if history:
         # Sanitize: only role + content; cap to last 6 turns
@@ -605,6 +820,7 @@ def run_pilot_streaming(
     model: str = MODEL,
     history: Optional[List[Dict[str, Any]]] = None,
     thesis_context: Optional[Dict[str, Any]] = None,
+    session_state: Optional[Dict[str, Any]] = None,
 ) -> Iterator[str]:
     """Generator that yields NDJSON events (one JSON object per line)
     describing the agent's progress. The frontend reads the stream and
@@ -626,10 +842,15 @@ def run_pilot_streaming(
     from openai import OpenAI
     client = OpenAI()
 
+    # SPEC_095 — session-state block at the very front (user's current view).
     # SPEC_082 — thesis block prepended to system prompt (only if populated).
     # SPEC_081 — prepend conversation history so multi-turn guided tours
     # share context (prior tool calls, narrations, chosen options).
-    sys_content = _format_thesis_block(thesis_context) + SYSTEM_PROMPT
+    sys_content = (
+        _format_session_state_block(session_state)
+        + _format_thesis_block(thesis_context)
+        + SYSTEM_PROMPT
+    )
     messages: List[Dict[str, Any]] = [{"role": "system", "content": sys_content}]
     if history:
         # Sanitize: only role + content; cap to last 6 turns

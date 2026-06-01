@@ -2156,6 +2156,10 @@
   // ═══════════════════════════════════════════════════════════════════════
   let TRADE_AREA_CIRCLE = null;
   let TRADE_AREA_STATE  = null;   // {geo_id, radius_mi}
+  // SPEC_095 — keep the last trade-area response around so the Pilot's
+  // session-state snapshot can reference focal stats + neighbour list
+  // without re-fetching.
+  let CURRENT_TRADE_AREA_DATA = null;
   // SPEC_091 — competition pins (Yelp Fusion, in-radius)
   let COMPETITION_LAYER = null;
   const COMPETITION_RADIUS_MI = 25;   // Yelp's hard cap
@@ -2181,6 +2185,7 @@
         return;
       }
       TRADE_AREA_STATE = { geo_id: geoId, radius_mi: radiusMi };
+      CURRENT_TRADE_AREA_DATA = r;     // SPEC_095 — cache for snapshot
       renderTradeAreaCard(r);
       // Zoom to focal + draw the radius circle (radius in meters)
       MAP.setView([r.focal.lat, r.focal.lon], 8);
@@ -2215,6 +2220,7 @@
     const card = document.getElementById('trade-area-card');
     if (card) card.hidden = true;
     TRADE_AREA_STATE = null;
+    CURRENT_TRADE_AREA_DATA = null;   // SPEC_095
     track('trade_area_exited', {});
   }
 
@@ -3392,6 +3398,10 @@
           // SPEC_082 — thesis context (only if populated)
           thesis_context: (typeof getThesisContext === 'function')
             ? getThesisContext() : null,
+          // SPEC_095 — Decision Map snapshot so the agent sees the user's
+          // current view (thesis, chips, top pins, trade area, map view).
+          session_state: (typeof gatherSessionState === 'function')
+            ? gatherSessionState() : null,
         }),
         signal: PILOT_ABORT.signal,
       });
@@ -4483,6 +4493,73 @@
     const nudge = document.getElementById('onboarding-nudge');
     if (nudge) nudge.classList.remove('show');
   }
+  // SPEC_095 — lookup a county's geo_name via the loaded boundary layer.
+  function nameForGeo(gid) {
+    if (!gid || !BOUNDARY_LAYER) return null;
+    let found = null;
+    try {
+      BOUNDARY_LAYER.eachLayer(fl => {
+        if (found) return;
+        const p = (fl.feature && fl.feature.properties) || {};
+        if (p.geo_id === gid) found = p.geo_name || null;
+      });
+    } catch (_) {}
+    return found;
+  }
+
+  // SPEC_095 — aggressive session snapshot for the Pilot prompt.
+  // Includes thesis, active chips, fit-score recipe/counters, top-10
+  // pins with names, current trade area (focal + summary + 5 closest
+  // neighbours), and the current map view.
+  function gatherSessionState() {
+    const out = {};
+    try {
+      const t = (typeof loadThesis === 'function') ? loadThesis() : null;
+      if (t && typeof thesisIsEmpty === 'function' && !thesisIsEmpty(t)) {
+        out.thesis = t;
+      }
+    } catch (_) {}
+    if (Array.isArray(CONSTRAINTS) && CONSTRAINTS.length) {
+      out.chips = CONSTRAINTS.map(c => ({
+        dimension: c.dimension, value: c.value, label: c.label,
+      }));
+    }
+    if (CURRENT_FIT_RESULT) {
+      out.fit_result = {
+        recipe: CURRENT_FIT_RESULT.recipe,
+        weights: CURRENT_FIT_RESULT.weights,
+        total_candidates: CURRENT_FIT_RESULT.total_candidates,
+        filtered_candidates: CURRENT_FIT_RESULT.filtered_candidates,
+      };
+      const top = (CURRENT_FIT_RESULT.top_n || []).slice(0, 10);
+      if (top.length) {
+        out.top_pins = top.map((p, i) => ({
+          rank: i + 1,
+          geo_id: p.geo_id,
+          name: nameForGeo(p.geo_id),
+          score: p.score,
+        }));
+      }
+    }
+    if (TRADE_AREA_STATE && CURRENT_TRADE_AREA_DATA) {
+      out.trade_area = {
+        radius_mi: TRADE_AREA_STATE.radius_mi,
+        focal:     CURRENT_TRADE_AREA_DATA.focal,
+        summary:   CURRENT_TRADE_AREA_DATA.summary,
+        neighbors: (CURRENT_TRADE_AREA_DATA.neighbors || []).slice(0, 5),
+      };
+    }
+    if (MAP) {
+      try {
+        const c = MAP.getCenter();
+        out.map_view = {
+          zoom: MAP.getZoom(), lat: c.lat, lon: c.lng,
+        };
+      } catch (_) {}
+    }
+    return out;
+  }
+
   function getThesisContext() {
     const t = loadThesis();
     return thesisIsEmpty(t) ? null : t;

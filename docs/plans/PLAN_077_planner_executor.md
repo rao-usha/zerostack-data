@@ -278,3 +278,11 @@ typed in.
 ## Open questions for the user
 
 See AskUserQuestion that follows.
+
+## Revisions
+
+- [PLAN_077 rev_01](./PLAN_077_planner_executor_rev_01.md) — pins
+  the b86bafb bug fixes (LatLng + planning UX) and flags the
+  bigger gap surfaced by user feedback: the Pilot has no session
+  context, so *"can you see what just happened?"* falls back to
+  generic recent-events tools. Hands off to PLAN_078. 2026-06-01.
