@@ -564,6 +564,36 @@ def _format_session_state_block(state: Optional[Dict[str, Any]]) -> str:
                 )
         parts.append("\n".join(ta_lines))
 
+    # SPEC_096 — recent actions (frontend ring buffer of user/pilot/planner)
+    actions = state.get("recent_actions") or []
+    if isinstance(actions, list) and actions:
+        import time as _time
+        now_ms = int(_time.time() * 1000)
+        action_lines = ["Recent actions (last 10):"]
+        for a in actions[-10:]:
+            if not isinstance(a, dict):
+                continue
+            ts = a.get("ts")
+            try:
+                age_s = max(0, (now_ms - int(ts)) // 1000)
+            except (TypeError, ValueError):
+                age_s = 0
+            if age_s < 60:
+                rel = f"T-{age_s}s"
+            elif age_s < 3600:
+                rel = f"T-{age_s // 60} min"
+            else:
+                rel = f"T-{age_s // 3600} hr"
+            actor = _cap(a.get("actor") or "?", 8)
+            kind  = _cap(a.get("kind")  or "?", 24)
+            detail = _cap(a.get("detail") or "", 120)
+            action_lines.append(
+                f"  {rel:<8} {actor:<8} {kind}"
+                + (f"  {detail}" if detail else "")
+            )
+        if len(action_lines) > 1:
+            parts.append("\n".join(action_lines))
+
     # Map view
     mv = state.get("map_view")
     if isinstance(mv, dict):

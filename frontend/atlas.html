@@ -2006,16 +2006,25 @@
     renderChips();
     applyChipsAndRefit();
     track('chip_added', { dimension, value: v });
+    // SPEC_096 — log to action history
+    logAction(window.__PLANNER_RUNNING ? 'planner'
+              : (window.__PILOT_DRIVING ? 'pilot' : 'user'),
+              'chip_added', chip.label);
   }
   function removeChip(id) {
+    const c = CONSTRAINTS.find(x => x.id === id);
     CONSTRAINTS = CONSTRAINTS.filter(c => c.id !== id);
     saveConstraints();
     renderChips();
     applyChipsAndRefit();
     track('chip_removed', { id });
+    logAction(window.__PLANNER_RUNNING ? 'planner'
+              : (window.__PILOT_DRIVING ? 'pilot' : 'user'),
+              'chip_removed', c ? c.label : id);
   }
   function clearAllChips() {
     CONSTRAINTS = []; saveConstraints(); renderChips();
+    logAction('user', 'chips_cleared', 'cleared all chips');
   }
   function deriveChipsFromThesis(t) {
     const chips = [];
@@ -2186,6 +2195,10 @@
       }
       TRADE_AREA_STATE = { geo_id: geoId, radius_mi: radiusMi };
       CURRENT_TRADE_AREA_DATA = r;     // SPEC_095 — cache for snapshot
+      logAction(window.__PLANNER_RUNNING ? 'planner'
+                : (window.__PILOT_DRIVING ? 'pilot' : 'user'),
+                'trade_area_entered',
+                `${(r.focal && r.focal.name) || geoId} · ${radiusMi} mi`);
       renderTradeAreaCard(r);
       // Zoom to focal + draw the radius circle (radius in meters)
       MAP.setView([r.focal.lat, r.focal.lon], 8);
@@ -2222,6 +2235,9 @@
     TRADE_AREA_STATE = null;
     CURRENT_TRADE_AREA_DATA = null;   // SPEC_095
     track('trade_area_exited', {});
+    logAction(window.__PLANNER_RUNNING ? 'planner'
+              : (window.__PILOT_DRIVING ? 'pilot' : 'user'),
+              'trade_area_exited', '');
   }
 
   function renderTradeAreaCard(r) {
@@ -3230,6 +3246,9 @@
     }
     const tok = { cancelled: false };
     RUNNING_STORY = tok;
+    window.__PLANNER_RUNNING = true;   // SPEC_096 — actions attributed to planner
+    logAction('planner', 'plan_started',
+              (plan.title || 'Walkthrough').slice(0, 80));
     openStoryBanner();
     // Append the plan summary once at the top of the chat run.
     if (plan.summary) appendStaticCoT('PLAN · ' + (plan.title || ''), plan.summary);
@@ -3275,6 +3294,8 @@
     }
     setTimeout(closeStoryBanner, 4000);
     if (RUNNING_STORY === tok) RUNNING_STORY = null;
+    window.__PLANNER_RUNNING = false;   // SPEC_096
+    logAction('planner', 'plan_completed', '');
   }
 
   async function fetchAndRunPlan(thesis, userPrompt) {
@@ -3365,6 +3386,8 @@
       question_chars: question.length,
       turn: Math.floor(PILOT_CONVERSATION.length / 2) + 1,
     });
+    logAction('user', 'pilot_asked',
+              question.slice(0, 120));   // SPEC_096
     // SPEC_082 — status bar feedback + reset Queries pane for new run
     if (typeof setPilotStatus === 'function') setPilotStatus('Pilot thinking…');
     const qpane = document.getElementById('queries-pane');
@@ -3740,6 +3763,13 @@
 
   async function applyOnePilotAction(a) {
     const args = a.args || {};
+    // SPEC_096 — attribute downstream state changes (chips/trade-area)
+    // to the pilot in the action log.
+    window.__PILOT_DRIVING = true;
+    try {
+      logAction('pilot', a.name || 'action',
+                JSON.stringify(args).slice(0, 80));
+    } catch (_) {}
     if (a.name === 'zoom_to') {
       MAP.setView([args.lat, args.lon], args.zoom_level || 12);
     }
@@ -3778,6 +3808,7 @@
     else if (a.name === 'exit_trade_area') {
       if (typeof exitTradeArea === 'function') exitTradeArea();
     }
+    window.__PILOT_DRIVING = false;   // SPEC_096
   }
 
   function plantFocalMarker(lat, lon, label, naics) {
@@ -4446,6 +4477,7 @@
     saveOpenState({});
     refreshThesisPreviews();
     track('thesis_reset', {});
+    logAction('user', 'thesis_reset', '');
     // Pilot status nudge so the user sees the action took effect
     if (typeof setPilotStatus === 'function')
       setPilotStatus('Thesis cleared');
@@ -4473,6 +4505,8 @@
     flash.classList.add('show');
     setTimeout(() => flash.classList.remove('show'), 1500);
     track('thesis_saved', { fields: Object.keys(t).filter(k => t[k] != null).length });
+    logAction('user', 'thesis_saved',
+              t.industry_label || '(thesis updated)');
     // SPEC_084 — refresh preview text on the collapsed blocks
     if (typeof refreshThesisPreviews === 'function') refreshThesisPreviews();
     // SPEC_088 — seed chips from the thesis when none are set yet, so the
@@ -4493,6 +4527,41 @@
     const nudge = document.getElementById('onboarding-nudge');
     if (nudge) nudge.classList.remove('show');
   }
+  // SPEC_096 — action history ring buffer (last 50). Includes user,
+  // pilot, and planner actions; the last 10 ride along inside the
+  // session-state block so the agent can recap timeline questions
+  // like "what did we do 2 minutes ago?".
+  const SESSION_ACTIONS_KEY = 'atlas_session_actions_v1';
+  const SESSION_ACTIONS_MAX = 50;
+  let SESSION_ACTIONS = [];
+  (function loadSessionActions() {
+    try {
+      const raw = localStorage.getItem(SESSION_ACTIONS_KEY);
+      SESSION_ACTIONS = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(SESSION_ACTIONS)) SESSION_ACTIONS = [];
+    } catch (_) { SESSION_ACTIONS = []; }
+  })();
+  function saveSessionActions() {
+    try {
+      localStorage.setItem(
+        SESSION_ACTIONS_KEY,
+        JSON.stringify(SESSION_ACTIONS.slice(-SESSION_ACTIONS_MAX))
+      );
+    } catch (_) {}
+  }
+  function logAction(actor, kind, detail) {
+    SESSION_ACTIONS.push({
+      ts: Date.now(),
+      actor: String(actor || 'user').slice(0, 8),
+      kind:  String(kind  || '?'   ).slice(0, 24),
+      detail: detail == null ? '' : String(detail).slice(0, 120),
+    });
+    if (SESSION_ACTIONS.length > SESSION_ACTIONS_MAX) {
+      SESSION_ACTIONS.splice(0, SESSION_ACTIONS.length - SESSION_ACTIONS_MAX);
+    }
+    saveSessionActions();
+  }
+
   // SPEC_095 — lookup a county's geo_name via the loaded boundary layer.
   function nameForGeo(gid) {
     if (!gid || !BOUNDARY_LAYER) return null;
@@ -4556,6 +4625,10 @@
           zoom: MAP.getZoom(), lat: c.lat, lon: c.lng,
         };
       } catch (_) {}
+    }
+    // SPEC_096 — recent action history (last 10) for timeline recap
+    if (Array.isArray(SESSION_ACTIONS) && SESSION_ACTIONS.length) {
+      out.recent_actions = SESSION_ACTIONS.slice(-10);
     }
     return out;
   }
