@@ -73,9 +73,19 @@ class TestSpec092StoryDemo:
         assert beats == 6, beats
 
     def test_demo_button_invokes_story(self, html):
-        """T4: thesis-demo onClick now wires to runFurnitureStoryDemo
-        (not the silent loadFurnitureDemo path)."""
-        assert "thesis-demo').onclick = runFurnitureStoryDemo" in html
+        """T4: thesis-demo onClick triggers a storytelling walkthrough.
+        SPEC_094 rerouted this through fetchAndRunPlan (which falls back
+        to runFurnitureStoryDemo on /plan failure), so both names are
+        valid signals that the storytelling path is wired."""
+        import re as _re
+        m = _re.search(
+            r"getElementById\('thesis-demo'\)\.onclick\s*=.{0,400}",
+            html, _re.DOTALL,
+        )
+        assert m, "thesis-demo onClick wiring not found"
+        wiring = m.group(0)
+        assert ("fetchAndRunPlan" in wiring
+                or "runFurnitureStoryDemo" in wiring), wiring[:200]
         # Skip button wired
         assert "#story-banner .skip" in html
         assert "skipStory" in html

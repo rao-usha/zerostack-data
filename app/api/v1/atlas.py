@@ -321,6 +321,24 @@ def atlas_fit_score(body: FitScoreBody, db: Session = Depends(get_db)):
                               constraints=body.constraints)
 
 
+class PlanBody(BaseModel):
+    # SPEC_094 — Planner request. Either thesis_context or prompt (or
+    # both) provides the LLM with enough context to author a plan; if
+    # neither is set, the planner returns a generic site-selection plan.
+    thesis_context: Optional[Dict[str, Any]] = None
+    prompt: Optional[str] = Field(None, max_length=2000)
+
+
+@router.post("/plan")
+def atlas_plan(body: PlanBody, db: Session = Depends(get_db)):
+    """SPEC_094 — return a Plan (4-8 beat walkthrough) the frontend
+    executor can run for any thesis. Always 200; on any failure path
+    the response includes a frozen fallback plan + an error string."""
+    from app.services.atlas.planner import generate_plan
+    plan, err, cache_hit = generate_plan(db, body.thesis_context, body.prompt)
+    return {"plan": plan, "error": err, "cache_hit": cache_hit}
+
+
 class ExplainBody(BaseModel):
     # SPEC_093 — chain-of-thought streaming for the storytelling demo.
     # Lightweight LLM call: 2-3 sentence rationale for a single beat.

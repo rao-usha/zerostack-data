@@ -3096,6 +3096,214 @@
     }
   }
 
+  // SPEC_094 — Static (non-streaming) CoT helper. Used by the planner
+  // executor to surface pre-baked rationales in the chat thread without
+  // a fresh LLM call.
+  function appendStaticCoT(label, text) {
+    const thread = document.getElementById('pilot-thread');
+    if (!thread) return;
+    const empty = document.getElementById('pilot-empty');
+    if (empty) empty.remove();
+    const msg = document.createElement('div');
+    msg.className = 'msg assistant cot';
+    if (label) {
+      const tag = document.createElement('div');
+      tag.className = 'cot-beat';
+      tag.textContent = label;
+      msg.appendChild(tag);
+    }
+    const narr = document.createElement('div');
+    narr.className = 'narration';
+    narr.textContent = text || '';
+    msg.appendChild(narr);
+    thread.appendChild(msg);
+    scrollThreadToBottom();
+  }
+
+  // SPEC_094 — Plan executor. Dispatches each beat's tool to the
+  // existing Decision Map helpers. enter_trade_area + find_competition
+  // accept top_pick:true as a shorthand for "use the current top
+  // fit-score candidate."
+  async function applyPlanBeat(beat) {
+    const t = beat && beat.tool;
+    const args = (beat && beat.args) || {};
+    if (!t || t === 'no_op') return;
+    if (t === 'setup_thesis') {
+      // Make sure the user is on the Thesis view; fill the form +
+      // expand the entry blocks so the saved thesis is visible.
+      if (typeof setLeftView === 'function') setLeftView('thesis');
+      try { fillThesisForm(); } catch (_) {}
+      try { refreshThesisPreviews(); } catch (_) {}
+      document.querySelectorAll('#view-thesis details.block').forEach(d => {
+        d.open = ['industry', 'demographics'].includes(d.dataset.block);
+      });
+      return;
+    }
+    if (t === 'add_constraint') {
+      if (typeof addChip === 'function')
+        addChip(args.dimension, args.value);
+      return;
+    }
+    if (t === 'remove_constraint') {
+      if (Array.isArray(CONSTRAINTS) && typeof removeChip === 'function') {
+        const c = CONSTRAINTS.find(x => x.dimension === args.dimension);
+        if (c) removeChip(c.id);
+      }
+      return;
+    }
+    if (t === 'recommend_candidates') {
+      const thesis = (typeof loadThesis === 'function') ? loadThesis() : null;
+      if (typeof fetchAndPaintFitScore === 'function')
+        await fetchAndPaintFitScore(thesis);
+      return;
+    }
+    if (t === 'enter_trade_area') {
+      let gid = args.geo_id;
+      if (args.top_pick && CURRENT_FIT_RESULT
+          && Array.isArray(CURRENT_FIT_RESULT.top_n)
+          && CURRENT_FIT_RESULT.top_n.length) {
+        gid = CURRENT_FIT_RESULT.top_n[0].geo_id;
+      }
+      if (gid && typeof enterTradeArea === 'function')
+        await enterTradeArea(gid, args.radius_mi || 50);
+      return;
+    }
+    if (t === 'exit_trade_area') {
+      if (typeof exitTradeArea === 'function') exitTradeArea();
+      return;
+    }
+    if (t === 'find_competition') {
+      let gid = args.geo_id;
+      if (args.top_pick && CURRENT_FIT_RESULT
+          && Array.isArray(CURRENT_FIT_RESULT.top_n)
+          && CURRENT_FIT_RESULT.top_n.length) {
+        gid = CURRENT_FIT_RESULT.top_n[0].geo_id;
+      }
+      // Resolve geo → centroid via the trade-area card state if open;
+      // otherwise call /competition with whatever lat/lon we can find.
+      try {
+        const r = await fetch(API + '/competition', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            // Best-effort: use the focal of the current trade area if available
+            lat: (window.TRADE_AREA_STATE && TRADE_AREA_STATE.focal_lat) || 0,
+            lon: (window.TRADE_AREA_STATE && TRADE_AREA_STATE.focal_lon) || 0,
+            radius_mi: Math.min(25, args.radius_mi || 10),
+            term: args.term || ((typeof loadThesis === 'function'
+                                  && (loadThesis() || {}).industry_label) || ''),
+            limit: 15,
+          }),
+        }).then(x => x.json());
+        appendStaticCoT(
+          'Competition',
+          (r.count != null)
+            ? `${r.count} ${args.term || 'competing'} businesses within ${r.radius_mi || ''} mi.`
+            : '(competition unavailable)'
+        );
+      } catch (e) { /* silent */ }
+      return;
+    }
+  }
+
+  async function runStoryFromPlan(plan) {
+    cancelAnyRunningStory();
+    if (!plan || !Array.isArray(plan.beats) || !plan.beats.length) {
+      toast('Plan was empty'); return;
+    }
+    const tok = { cancelled: false };
+    RUNNING_STORY = tok;
+    openStoryBanner();
+    // Append the plan summary once at the top of the chat run.
+    if (plan.summary) appendStaticCoT('PLAN · ' + (plan.title || ''), plan.summary);
+
+    const total = plan.beats.length;
+    // Repaint dots with the actual beat count for this plan.
+    const dots = document.querySelectorAll('#story-banner .dots .d');
+    if (dots.length !== total) {
+      const wrap = document.querySelector('#story-banner .dots');
+      if (wrap) {
+        wrap.innerHTML = '';
+        for (let i = 0; i < total; i++) {
+          const d = document.createElement('span');
+          d.className = 'd'; wrap.appendChild(d);
+        }
+      }
+    }
+
+    for (let i = 0; i < total; i++) {
+      if (tok.cancelled) return;
+      const beat = plan.beats[i];
+      const stepN = i + 1;
+      // Banner: show the beat's title.
+      const b = document.getElementById('story-banner');
+      if (b) {
+        b.querySelector('.step').textContent = `Step ${stepN} / ${total}`;
+        b.querySelector('.msg').textContent = beat.title || '';
+      }
+      // Paint dots.
+      const ds = document.querySelectorAll('#story-banner .dots .d');
+      ds.forEach((d, idx) => {
+        d.classList.toggle('done', idx < stepN - 1);
+        d.classList.toggle('on',   idx === stepN - 1);
+      });
+      // Chat: append the pre-baked rationale.
+      if (beat.rationale)
+        appendStaticCoT(`Step ${stepN} · ${beat.title || ''}`, beat.rationale);
+      // Execute.
+      try { await applyPlanBeat(beat); }
+      catch (e) { console.warn('plan beat threw', e); }
+      // Pause.
+      await sleep(beat.wait_ms || STORY_DELAY_MS, tok);
+    }
+    setTimeout(closeStoryBanner, 4000);
+    if (RUNNING_STORY === tok) RUNNING_STORY = null;
+  }
+
+  async function fetchAndRunPlan(thesis, userPrompt) {
+    // Pre-state: show the banner immediately so the planner latency
+    // doesn't read as a hang. If the user has no thesis saved AND
+    // they clicked ⚡ Demo, fall back to the furniture preset.
+    cancelAnyRunningStory();
+    if (!thesis || (typeof thesisIsEmpty === 'function' && thesisIsEmpty(thesis))) {
+      thesis = FURNITURE_DEMO;
+      // Persist so the plan executor's setup_thesis beat can read it
+      localStorage.setItem(THESIS_LS_KEY, JSON.stringify(thesis));
+    }
+    openStoryBanner();
+    const b = document.getElementById('story-banner');
+    if (b) {
+      b.querySelector('.step').textContent = 'Planning…';
+      b.querySelector('.msg').textContent  = 'Planning your walkthrough…';
+    }
+    let resp;
+    try {
+      resp = await fetch(API + '/plan', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          thesis_context: thesis || null,
+          prompt: userPrompt || null,
+        }),
+      }).then(x => x.json());
+    } catch (e) {
+      console.warn('plan fetch failed', e);
+      toast('Plan fetch failed — running fallback walkthrough');
+      return runFurnitureStoryDemo();
+    }
+    if (!resp || !resp.plan) {
+      toast('Plan empty — running fallback walkthrough');
+      return runFurnitureStoryDemo();
+    }
+    if (resp.error) {
+      toast('Plan fell back to default: ' + resp.error);
+    }
+    track('plan_run', {
+      cache_hit: !!resp.cache_hit,
+      n_beats: (resp.plan.beats || []).length,
+      had_error: !!resp.error,
+    });
+    return runStoryFromPlan(resp.plan);
+  }
+
   async function askPilot(question, opts) {
     opts = opts || {};
     // SPEC_081 — if not continuing a guided tour, reset conversation
@@ -4406,7 +4614,15 @@
     document.getElementById('thesis-save').onclick = saveThesis;
     // SPEC_092 — Demo button now kicks off a storytelling walkthrough
     // instead of a silent fit-score paint. The user wanted visible beats.
-    document.getElementById('thesis-demo').onclick = runFurnitureStoryDemo;
+    // SPEC_094 — ⚡ Demo now routes through the planner. fetchAndRunPlan
+    // falls back to runFurnitureStoryDemo internally on any /plan failure
+    // so the user always gets a walkthrough.
+    document.getElementById('thesis-demo').onclick = () =>
+      fetchAndRunPlan(
+        ((typeof loadThesis === 'function') && !thesisIsEmpty(loadThesis()))
+          ? loadThesis() : FURNITURE_DEMO,
+        null,
+      );
     // Skip button on the story banner
     const skip = document.querySelector('#story-banner .skip');
     if (skip) skip.onclick = skipStory;
