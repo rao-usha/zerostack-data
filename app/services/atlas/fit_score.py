@@ -233,16 +233,24 @@ def compute_fit_score(
         # Clamp and scale to 0..100
         scores[gid] = int(round(max(0.0, min(1.0, s)) * 100))
 
-    # SPEC_088 — apply the constraint funnel. Surviving geo_ids keep
-    # their scores; the rest drop out of the response so the frontend
-    # paints them as "no data".
+    # SPEC_088 follow-up — constraint chips now narrow only the
+    # CANDIDATE set (top-N pins + filtered_candidates counter), not the
+    # choropleth visibility. Earlier behaviour dropped non-survivors
+    # from `scores`; users perceived that as "no colors on the map"
+    # because even a modest chip removed 70%+ of the country, leaving
+    # most counties painted as "no data" gray. The map now always shows
+    # the full fit landscape; the chips' effect surfaces in the counter
+    # and the pin set.
     total_candidates = len(scores)
+    filtered_candidates = total_candidates
     if constraints:
         survivors = _apply_constraints(db, constraints, scores.keys())
-        scores = {gid: s for gid, s in scores.items() if gid in survivors}
-    filtered_candidates = len(scores)
+        filtered_candidates = len(survivors)
+        top_pool = ((g, s) for g, s in scores.items() if g in survivors)
+    else:
+        top_pool = scores.items()
 
-    top = sorted(scores.items(), key=lambda kv: -kv[1])[:top_n]
+    top = sorted(top_pool, key=lambda kv: -kv[1])[:top_n]
 
     return {
         "scores": scores,

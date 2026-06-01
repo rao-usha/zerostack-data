@@ -94,7 +94,12 @@ class TestSpec088Backend:
         assert survivors == {"A", "B", "C", "D"}
 
     def test_compute_fit_score_with_constraints_returns_filtered(self):
-        """T4: counts match the filtered set; top_n drawn from filtered."""
+        """T4 (revised): constraint chips narrow `top_n` and the
+        `filtered_candidates` counter, but `scores` keeps ALL geos so
+        the choropleth still shows the full fit landscape. (Earlier
+        behaviour dropped non-survivors from scores; users perceived
+        that as 'no colors on the map' once a chip filtered out most
+        of the country.)"""
         from app.services.atlas import fit_score as fs
         with patch.object(fs, "build_layer", side_effect=_fake_build_layer):
             result = fs.compute_fit_score(
@@ -105,6 +110,9 @@ class TestSpec088Backend:
             )
         assert result["total_candidates"] == 4
         assert result["filtered_candidates"] == 2
+        # scores dict still contains all 4 geos (choropleth paints fully)
+        assert set(result["scores"].keys()) == {"A", "B", "C", "D"}
+        # top_n is drawn only from the survivor set
         survivors = {t["geo_id"] for t in result["top_n"]}
         assert survivors <= {"B", "C"}
 
