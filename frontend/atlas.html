@@ -3338,6 +3338,66 @@
     logAction('planner', 'plan_completed', '');
   }
 
+  // SPEC_099 — Pilot-driven walkthrough. ⚡ Demo (and any "demo this
+  // thesis" affordance) routes through the Pilot's normal streaming
+  // pipeline so the chat *is* the walkthrough: live narration, thinking
+  // chips, receipts, tool calls firing one at a time. Replaces the
+  // banner-driven planner orchestration as the default demo path.
+  const WALKTHROUGH_PROMPT = (
+    "Walk me through this thesis like a site-selection consultant. " +
+    "Work through it step by step, ONE TOOL AT A TIME with 1-2 sentences " +
+    "of reasoning BEFORE each tool call:\n\n" +
+    "  1. Add the must-have constraints from my thesis with " +
+    "add_constraint (HHI floor, hazard exclusion if appropriate) — " +
+    "explain each threshold's logic before the chip drops.\n" +
+    "  2. Score the candidates (recommend_candidates) — narrate what " +
+    "the top picks have in common.\n" +
+    "  3. Open the trade area around the top candidate " +
+    "(enter_trade_area, top_pick:true) — explain what the neighbour " +
+    "summary tells us.\n" +
+    "  4. Check competition (find_competition, top_pick:true) — " +
+    "quote the count if Yelp is reachable.\n\n" +
+    "End with present_options offering 2-3 concrete next moves."
+  );
+
+  async function runPilotWalkthrough(thesis, customPrompt) {
+    // Persist the thesis so the session_state snapshot the Pilot sees
+    // on its very first turn already reflects it.
+    try {
+      if (thesis && typeof thesis === 'object') {
+        localStorage.setItem(THESIS_LS_KEY, JSON.stringify(thesis));
+      }
+    } catch (_) {}
+    // Make the seeding visible: switch to the Thesis view, refill the
+    // form, expand the entry blocks so the user sees what the agent
+    // is reasoning against.
+    if (typeof setLeftView === 'function') setLeftView('thesis');
+    try { fillThesisForm(); } catch (_) {}
+    try { refreshThesisPreviews(); } catch (_) {}
+    document.querySelectorAll('#view-thesis details.block').forEach(d => {
+      d.open = ['industry', 'demographics'].includes(d.dataset.block);
+    });
+    // Make sure the chat panel is visible (right column always-on in
+    // the SPEC_086 shell, but force the .show class for resilience).
+    const panel = document.getElementById('pilot-panel');
+    if (panel) panel.classList.add('show');
+    // SPEC_096 — log the walkthrough kickoff so it shows in the
+    // session-state's recent_actions block on the next turn.
+    if (typeof logAction === 'function') {
+      logAction('user', 'walkthrough_requested',
+                 (thesis && thesis.industry_label)
+                   ? `demo: ${thesis.industry_label}` : 'demo');
+    }
+    track('walkthrough_started', {
+      industry: (thesis && thesis.industry_label) || 'unknown',
+    });
+    // Submit as a Pilot question. askPilot handles streaming, the
+    // session_state snapshot is gathered fresh per call (includes the
+    // thesis we just persisted), and SPEC_098 thinking chips + receipts
+    // fire automatically as the agent calls tools.
+    return askPilot(customPrompt || WALKTHROUGH_PROMPT);
+  }
+
   async function fetchAndRunPlan(thesis, userPrompt) {
     // Pre-state: show the banner immediately so the planner latency
     // doesn't read as a hang. If the user has no thesis saved AND
@@ -4928,11 +4988,14 @@
     document.getElementById('thesis-save').onclick = saveThesis;
     // SPEC_092 — Demo button now kicks off a storytelling walkthrough
     // instead of a silent fit-score paint. The user wanted visible beats.
-    // SPEC_094 — ⚡ Demo now routes through the planner. fetchAndRunPlan
-    // falls back to runFurnitureStoryDemo internally on any /plan failure
-    // so the user always gets a walkthrough.
+    // SPEC_099 — ⚡ Demo routes through the Pilot itself. The Pilot
+    // streams narration + calls tools (add_constraint,
+    // recommend_candidates, enter_trade_area, find_competition) one
+    // at a time, with SPEC_098 thinking chips + receipts firing per
+    // call. The earlier SPEC_094 fetchAndRunPlan path is kept in code
+    // (still callable) as a fallback for non-chat surfaces.
     document.getElementById('thesis-demo').onclick = () =>
-      fetchAndRunPlan(
+      runPilotWalkthrough(
         ((typeof loadThesis === 'function') && !thesisIsEmpty(loadThesis()))
           ? loadThesis() : FURNITURE_DEMO,
         null,

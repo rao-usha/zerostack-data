@@ -211,14 +211,23 @@ class TestSpec094Frontend:
         assert "/plan" in html
 
     def test_demo_wired_to_planner(self, html):
-        """⚡ Demo onClick now routes through fetchAndRunPlan."""
+        """⚡ Demo originally routed through fetchAndRunPlan (SPEC_094).
+        SPEC_099 re-routed it through the Pilot itself (runPilotWalkthrough),
+        but fetchAndRunPlan + runStoryFromPlan stay in the codebase as a
+        fallback for non-chat surfaces. So the planner module must still
+        exist; the ⚡ Demo wiring may point to either."""
         # Grab a generous window after the onclick assignment.
         m = re.search(
             r"getElementById\('thesis-demo'\)\.onclick\s*=.{0,400}",
             html, re.DOTALL,
         )
         assert m, "thesis-demo wiring not found"
-        assert "fetchAndRunPlan" in m.group(0), m.group(0)[:200]
+        wiring = m.group(0)
+        assert ("fetchAndRunPlan" in wiring
+                or "runPilotWalkthrough" in wiring), wiring[:200]
+        # Planner module remains present in the codebase
+        assert "async function fetchAndRunPlan" in html
+        assert "async function runStoryFromPlan" in html
 
     def test_apply_plan_beat_dispatches_every_tool(self, html):
         """applyPlanBeat must handle every whitelisted tool name."""

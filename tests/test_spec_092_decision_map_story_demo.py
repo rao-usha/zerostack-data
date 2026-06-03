@@ -74,9 +74,12 @@ class TestSpec092StoryDemo:
 
     def test_demo_button_invokes_story(self, html):
         """T4: thesis-demo onClick triggers a storytelling walkthrough.
-        SPEC_094 rerouted this through fetchAndRunPlan (which falls back
-        to runFurnitureStoryDemo on /plan failure), so both names are
-        valid signals that the storytelling path is wired."""
+        Lineage:
+          SPEC_092 — runFurnitureStoryDemo (hardcoded story banner)
+          SPEC_094 — fetchAndRunPlan (planner-driven story banner)
+          SPEC_099 — runPilotWalkthrough (Pilot-driven, in chat)
+        All three remain present in code as fallbacks; the wiring may
+        point to any of them."""
         import re as _re
         m = _re.search(
             r"getElementById\('thesis-demo'\)\.onclick\s*=.{0,400}",
@@ -84,9 +87,10 @@ class TestSpec092StoryDemo:
         )
         assert m, "thesis-demo onClick wiring not found"
         wiring = m.group(0)
-        assert ("fetchAndRunPlan" in wiring
+        assert ("runPilotWalkthrough" in wiring
+                or "fetchAndRunPlan" in wiring
                 or "runFurnitureStoryDemo" in wiring), wiring[:200]
-        # Skip button wired
+        # Skip button wired (still part of the fallback story banner)
         assert "#story-banner .skip" in html
         assert "skipStory" in html
 
