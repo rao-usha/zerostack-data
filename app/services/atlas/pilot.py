@@ -284,8 +284,51 @@ _NUMERIC_PATTERNS = [
 ]
 
 
+_FIPS_RE = _re.compile(r"\b(\d{2}|\d{5}|\d{11})\b")
+
+
+def _harvest_fips_from_tool_calls(
+    tool_calls: Optional[List[Dict[str, Any]]],
+) -> set:
+    """Walk every tool-call args dict and result dict and pull out every
+    FIPS-shaped token (2/5/11 digits). FIPS codes that the agent
+    surfaces via tools are identifiers, not numerical claims — the
+    Pilot will repeat them in the narration ("Top picks: 51107, 06037
+    …") without wrapping them in cite(), and the unlinked-claims check
+    should not flag them. We harvest from both args (e.g.
+    highlight_place({"geo_id":"51107"})) and results (e.g.
+    recommend_candidates → candidates[*].geo_id)."""
+    if not tool_calls:
+        return set()
+    found: set = set()
+
+    def _walk(obj: Any) -> None:
+        if isinstance(obj, str):
+            for m in _FIPS_RE.findall(obj):
+                found.add(m)
+        elif isinstance(obj, dict):
+            for v in obj.values():
+                _walk(v)
+        elif isinstance(obj, list):
+            for v in obj:
+                _walk(v)
+        elif isinstance(obj, (int, float)):
+            # ints surface as raw numbers in tool args (top_n etc.) —
+            # those aren't FIPS, but a stringified int could happen to
+            # match the FIPS shape. Stringify and re-test.
+            for m in _FIPS_RE.findall(str(obj)):
+                found.add(m)
+
+    for tc in tool_calls:
+        _walk(tc.get("args"))
+        _walk(tc.get("result"))
+    return found
+
+
 def find_unlinked_claims(narration: str, citations: List[Dict[str, str]],
-                          question: str = "") -> List[str]:
+                          question: str = "",
+                          tool_calls: Optional[List[Dict[str, Any]]] = None,
+                          ) -> List[str]:
     """Return list of specific numeric strings present in the narration
     that don't appear in any cited claim or source.
 
@@ -293,6 +336,10 @@ def find_unlinked_claims(narration: str, citations: List[Dict[str, str]],
       - plausible years 1900-2099
       - 5-digit county FIPS / 2-digit state FIPS / 11-digit tract FIPS
         that appear in the cited sources (e.g. "for 48201")
+      - SPEC_100: any FIPS-shaped token that appears in a tool call's
+        args or result (e.g. highlight_place({"geo_id":"51107"}) or a
+        recommend_candidates candidate list) — those are identifiers
+        the agent surfaced, not numerical claims to cite.
       - any number explicitly cited in claim/source text
       - SPEC_085: any numeric token the USER typed in their question
         (e.g. "income > $150K") — echoing a threshold the user gave is
@@ -331,6 +378,11 @@ def find_unlinked_claims(narration: str, citations: List[Dict[str, str]],
     # Also pull bare FIPS that appear elsewhere in the narration as identifiers
     # (parenthetical FIPS callouts are not claims).
     paren_fips = set(_re.findall(r"\((\d{2}|\d{5}|\d{11})\)", narration or ""))
+    # SPEC_100 — every FIPS the Pilot referenced via a tool call (args
+    # or result). The agent will inevitably repeat those ids in the
+    # narration ("Top picks: 51107, 06037, …") and they should never be
+    # flagged as numerical claims.
+    tool_fips = _harvest_fips_from_tool_calls(tool_calls)
 
     found = set()
     for pat in _NUMERIC_PATTERNS:
@@ -339,7 +391,9 @@ def find_unlinked_claims(narration: str, citations: List[Dict[str, str]],
             try:
                 if "%" not in m and "$" not in m:
                     n_str = m.replace(",", "").replace(".", "")
-                    if n_str in fips_in_sources or n_str in paren_fips:
+                    if (n_str in fips_in_sources
+                            or n_str in paren_fips
+                            or n_str in tool_fips):
                         continue
                     n = int(n_str)
                     if 1900 <= n <= 2099:
@@ -868,7 +922,8 @@ def run_pilot(
     # and skip question-echoed numbers when flagging unlinked claims.
     final_narration = _strip_options_block(final_narration)
     unlinked = find_unlinked_claims(final_narration or "", citations,
-                                     question=question)
+                                     question=question,
+                                     tool_calls=tool_calls_log)
     return {
         "narration": final_narration or "",
         "tool_calls": tool_calls_log,
@@ -1025,7 +1080,8 @@ def run_pilot_streaming(
                 tool_calls_log.append(forced_log)
 
     unlinked = find_unlinked_claims(final_narration, citations,
-                                     question=question)
+                                     question=question,
+                                     tool_calls=tool_calls_log)
     yield event("done",
                  loops_used=loop_n,
                  tool_count=len(tool_calls_log),
