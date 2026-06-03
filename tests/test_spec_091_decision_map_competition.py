@@ -1,14 +1,19 @@
 """
-Tests for SPEC 091 — Decision Map real competition data (Yelp Fusion).
+Tests for SPEC 091 — Decision Map competition lookup.
 
-Backend: radius clamp, response shape, soft-fail when YELP_API_KEY is
-missing, body schema. Frontend: parse atlas.html for the competition
-helpers + CSS. Pilot tool: registration + dispatch.
+History:
+  SPEC_091 — Yelp Fusion (deprecated 2026-06-03, trial expired)
+  SPEC_100 — Census CBP backfill (current backend)
+
+These tests pin the *current* CBP-backed shape. The original Yelp-shape
+assertions (rating, review_count, .competition-pin CSS, Yelp `businesses`
+list) have been rewritten to the CBP shape. The radius/meters helpers
+are gone (no more Yelp 25-mi cap). Frontend assertions check the new
+per-county breakdown markup instead of the orange Yelp pin layer.
 """
-import os
 import re
 from pathlib import Path
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch
 
 import pytest
 
@@ -20,120 +25,90 @@ def html():
     return ATLAS_HTML.read_text(encoding="utf-8")
 
 
-# A minimal fake Yelp search response covering the fields we care about.
-def _fake_yelp_response():
-    return {
-        "total": 3,
-        "businesses": [
-            {"id": "a", "name": "Asher Furniture",
-             "coordinates": {"latitude": 39.10, "longitude": -77.55},
-             "rating": 4.5, "review_count": 80,
-             "url": "https://yelp.com/biz/a",
-             "location": {"display_address": ["1 Main St", "Leesburg, VA"]}},
-            {"id": "b", "name": "Bardstown Modern",
-             "coordinates": {"latitude": 39.20, "longitude": -77.40},
-             "rating": 4.0, "review_count": 120,
-             "url": "https://yelp.com/biz/b",
-             "location": {"display_address": ["2 Elm Ave", "Hamilton, VA"]}},
-            # One bad row: missing coordinates → must be dropped, not crash
-            {"id": "c", "name": "No Location",
-             "coordinates": {}, "rating": 4.7, "review_count": 5,
-             "location": {"display_address": []}},
-        ],
-    }
-
-
-class _FakeYelpClient:
-    """Async-context manager fake for app.sources.yelp.client.YelpClient."""
-    def __init__(self, *a, **kw): pass
-    async def __aenter__(self): return self
-    async def __aexit__(self, *a): return None
-    search_businesses = AsyncMock(return_value=_fake_yelp_response())
-
-
 class TestSpec091Backend:
-
-    def setup_method(self):
-        # Tests assume YELP_API_KEY is set so the network path executes;
-        # the test for missing-key flips it off explicitly.
-        os.environ.setdefault("YELP_API_KEY", "test-stub")
-
-    def test_radius_capped_at_25mi(self):
-        """T1: radius_mi > 25 caps to 25."""
-        from app.services.atlas.competition import _cap_radius
-        assert _cap_radius(50) == 25.0
-        assert _cap_radius(1000) == 25.0
-        assert _cap_radius(0.1) == 0.5
-        assert _cap_radius(12) == 12.0
-        assert _cap_radius(None) == 5.0
-
-    def test_meters_conversion(self):
-        """T2: miles → integer meters."""
-        from app.services.atlas.competition import _miles_to_meters
-        assert _miles_to_meters(1) == 1609
-        assert _miles_to_meters(5) == 8047
-        assert _miles_to_meters(25) == 40234
+    """Backend assertions kept from SPEC_091 but mapped onto SPEC_100."""
 
     def test_response_shape(self):
-        """T3: returned dict has count, businesses, term_used, radius_mi."""
+        """T3: returned dict has count, per_county, naics_used,
+        radius_mi (the CBP shape, not the Yelp shape)."""
         from app.services.atlas import competition as comp
-        with patch.object(comp, "YelpClient", _FakeYelpClient, create=True):
-            # The lazy import inside _do_search reads `from app.sources.yelp.client import YelpClient`,
-            # so we patch THAT module's symbol instead:
-            pass
-        with patch("app.sources.yelp.client.YelpClient", _FakeYelpClient):
+        # SPEC_100 — the lookup is now SQL-only. Build a minimal fake
+        # DB session so the test stays a unit test.
+        class _Row:
+            def __init__(self, geo_id, n):
+                self.geo_id = geo_id; self.establishments = n
+        class _DB:
+            def execute(self, *a, **kw):
+                class _R:
+                    def all(self_): return [_Row("51107", 183)]
+                    def scalar(self_): return None
+                return _R()
+            def close(self): pass
+        fake_centroids = {"51107": (39.09, -77.64, "Loudoun")}
+        with patch("app.services.atlas.trade_area.county_centroids",
+                    return_value=fake_centroids):
             r = comp.find_competition(
-                lat=39.0, lon=-77.6, radius_mi=10, term="furniture", limit=5)
-        for k in ("count", "businesses", "term_used", "radius_mi"):
+                lat=39.09, lon=-77.64, radius_mi=10,
+                term="furniture", db=_DB())
+        for k in ("count", "per_county", "naics_used", "radius_mi",
+                   "year"):
             assert k in r, f"missing key {k}"
-        # Bad rows (no coords) dropped
-        assert r["count"] == 2
-        assert all("distance_mi" in b for b in r["businesses"])
+        # CBP shape — count is establishments, per_county is a list
+        assert r["count"] == 183
+        assert isinstance(r["per_county"], list)
+        # NO Yelp-specific fields leak through
+        assert "businesses" not in r
+        assert "rating" not in str(r)
 
-    def test_business_distance_field_computed(self):
-        """T5: each business gets a distance_mi field (haversine)."""
+    def test_returns_empty_when_db_empty_soft_fails(self):
+        """T4 (was: YELP_API_KEY missing; now: empty CBP rowset).
+        Soft-fail: count=0, no exception, no error string."""
         from app.services.atlas import competition as comp
-        with patch("app.sources.yelp.client.YelpClient", _FakeYelpClient):
+        class _DB:
+            def execute(self, *a, **kw):
+                class _R:
+                    def all(self_): return []
+                    def scalar(self_): return None
+                return _R()
+            def close(self): pass
+        with patch("app.services.atlas.trade_area.county_centroids",
+                    return_value={"51107": (39.0, -77.6, "Loudoun")}):
             r = comp.find_competition(
-                lat=39.0, lon=-77.6, radius_mi=10, term="furniture")
-        for b in r["businesses"]:
-            assert isinstance(b["distance_mi"], (int, float))
-            assert b["distance_mi"] >= 0
-        # And the list is sorted by distance ascending
-        ds = [b["distance_mi"] for b in r["businesses"]]
-        assert ds == sorted(ds)
-
-    def test_returns_empty_when_yelp_key_missing(self, monkeypatch):
-        """T4: YELP_API_KEY absent → soft fail, no exception."""
-        from app.services.atlas.competition import find_competition
-        monkeypatch.delenv("YELP_API_KEY", raising=False)
-        r = find_competition(lat=39.0, lon=-77.6,
-                              radius_mi=10, term="furniture")
+                lat=39.0, lon=-77.6, radius_mi=10,
+                term="furniture", db=_DB())
         assert r["count"] == 0
-        assert r["businesses"] == []
-        assert "YELP_API_KEY" in (r.get("error") or "")
+        assert r["per_county"] == [{
+            "geo_id": "51107", "name": "Loudoun",
+            "establishments": 0, "distance_mi": 0.0, "is_focal": True,
+        }] or r["per_county"] == []  # either shape acceptable for empty rowset
 
     def test_competition_body_schema(self):
-        """T6: CompetitionBody requires lat/lon; defaults radius_mi=5."""
+        """T6 — body shape: SPEC_100 supports both legacy (lat/lon)
+        and new (focal_geo_id) — both optional, but the endpoint
+        complains if neither is supplied."""
         from app.api.v1.atlas import CompetitionBody
-        b = CompetitionBody(lat=39.0, lon=-77.6)
+        # Either lat/lon OR focal_geo_id is accepted at construction;
+        # the endpoint enforces the requirement.
+        b = CompetitionBody(focal_geo_id="51107")
+        assert b.focal_geo_id == "51107"
         assert b.radius_mi == 5.0
-        assert b.limit == 20
-        with pytest.raises(Exception):
-            CompetitionBody(lat=39.0)  # missing lon
+        b2 = CompetitionBody(lat=39.0, lon=-77.6)
+        assert b2.lat == 39.0 and b2.lon == -77.6
 
 
 class TestSpec091Frontend:
+    """Frontend assertions — the orange Yelp pins layer is gone;
+    fetchCompetition + updateCompetitionCardRow stay."""
 
-    def test_competition_pin_class(self, html):
-        """T7: .competition-pin CSS + render helpers present."""
-        assert ".competition-pin" in html
-        assert "function renderCompetitionPins" in html
-        assert "function clearCompetitionPins" in html
+    def test_competition_helpers_still_present(self, html):
+        """T7: the trade-area card still calls a competition fetcher
+        and renders the result into the .ta-comp row."""
         assert "function fetchCompetition" in html
+        assert "function updateCompetitionCardRow" in html
 
     def test_enter_trade_area_calls_competition(self, html):
-        """T8: enterTradeArea calls fetchCompetition when industry_label set."""
+        """T8: enterTradeArea still triggers a competition fetch when
+        a thesis industry_label is set."""
         m = re.search(r"async function enterTradeArea.*?\n  \}",
                       html, re.DOTALL)
         assert m, "enterTradeArea not found"
@@ -142,51 +117,56 @@ class TestSpec091Frontend:
         assert "industry_label" in body
 
     def test_competition_card_row_markup(self, html):
-        """Trade Area card has a .ta-comp row inserted (the regex for the
-        nested card block is fragile; we just check the row exists and
-        the helper that writes into it is defined)."""
+        """The .ta-comp row markup + the helper that writes into it
+        still exist."""
         assert 'class="ta-comp"' in html
         assert "function updateCompetitionCardRow" in html
-        # Style for the row exists
         assert "#trade-area-card .ta-comp" in html
 
 
 class TestSpec091PilotTool:
+    """Pilot tool registration + dispatch — same surface, new shape."""
 
     def test_tool_find_competition_registered(self):
-        """T9: pilot_tools TOOL_CALLABLES contains find_competition (read)."""
+        """T9: pilot_tools TOOL_CALLABLES still contains find_competition."""
         from app.services.atlas.pilot_tools import TOOL_CALLABLES, TOOL_KINDS
         assert "find_competition" in TOOL_CALLABLES
         assert TOOL_KINDS["find_competition"] == "read"
 
     def test_tool_find_competition_returns_count(self):
-        """T10: dispatch with mocked centroids + competition → count + top."""
+        """T10: dispatch returns count + name + top (per_county)."""
         from app.services.atlas import pilot_tools
         fake_centroids = {"51107": (39.09, -77.64, "Loudoun")}
-        fake_comp = {
-            "count": 7, "total": 7, "businesses": [
-                {"name": f"Shop {i}", "rating": 4.0,
-                 "distance_mi": i, "lat": 39, "lon": -77}
-                for i in range(10)
+        fake_cbp = {
+            "count": 183, "focal_count": 183, "neighbours_count": 0,
+            "per_county": [
+                {"geo_id": "51107", "name": "Loudoun",
+                 "establishments": 183, "distance_mi": 0.0,
+                 "is_focal": True},
             ],
-            "term_used": "furniture", "radius_mi": 10.0,
+            "naics_used": "442", "naics_label": "Retail trade",
+            "year": 2022, "error": None,
         }
         with patch("app.services.atlas.trade_area.county_centroids",
-                   return_value=fake_centroids), \
-             patch("app.services.atlas.competition.find_competition",
-                   return_value=fake_comp):
+                    return_value=fake_centroids), \
+             patch("app.services.atlas.competition.find_competition_cbp",
+                    return_value=fake_cbp), \
+             patch("app.services.atlas.competition._neighbor_geo_ids_for",
+                    return_value=[]):
             r = pilot_tools.dispatch(
                 None, "find_competition",
                 {"geo_id": "51107", "radius_mi": 10, "term": "furniture"})
-        assert r["count"] == 7
+        assert r["count"] == 183
         assert r["name"] == "Loudoun"
-        assert len(r["top"]) == 5
         assert r["term_used"] == "furniture"
+        # `top` is per_county now (max 5)
+        assert len(r["top"]) <= 5
+        assert r["top"][0]["geo_id"] == "51107"
 
     def test_tool_find_competition_unknown_geo(self):
         from app.services.atlas import pilot_tools
         with patch("app.services.atlas.trade_area.county_centroids",
-                   return_value={}):
+                    return_value={}):
             r = pilot_tools.dispatch(None, "find_competition",
                                       {"geo_id": "99999", "term": "x"})
         assert "error" in r

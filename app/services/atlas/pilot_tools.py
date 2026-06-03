@@ -394,25 +394,47 @@ def _tool_find_competition(db: Session, geo_id: str,
                             radius_mi: float = 5.0,
                             term: Optional[str] = None,
                             ) -> Dict[str, Any]:
-    """SPEC_091 — count competing businesses near a county's centroid.
-    Read tool. Resolves geo_id → centroid via county_centroids, then
-    calls Yelp Fusion via the competition service. Returns a count + top 5.
-    Honest about Yelp's hard 25-mi cap and YELP_API_KEY soft-fail."""
+    """SPEC_100 — count competing establishments at the thesis NAICS
+    across a county and its trade-area neighbours, using Census CBP.
+
+    Read tool. Replaces the SPEC_091 Yelp lookup. Resolves the focal
+    geo_id, sweeps neighbour counties by haversine, maps the thesis
+    `term` to a NAICS code via industry_naics, and aggregates from
+    `census_cbp_county_yearly`.
+
+    Returns a `per_county` breakdown (focal + sorted neighbours by
+    establishments desc, top 5) in place of the old Yelp `top`
+    businesses. No ratings/reviews — that's a separate spec.
+    """
     from app.services.atlas.trade_area import county_centroids
-    from app.services.atlas.competition import find_competition
+    from app.services.atlas.competition import (
+        find_competition_cbp, _neighbor_geo_ids_for,
+    )
+    from app.services.atlas.industry_naics import industry_to_naics
     centroids = county_centroids(db)
     c = centroids.get(str(geo_id))
     if not c:
         return {"error": f"unknown geo_id {geo_id!r}"}
-    lat, lon, name = c
-    r = find_competition(lat=lat, lon=lon,
-                          radius_mi=radius_mi, term=term, limit=20)
+    _lat, _lon, name = c
+    neighbours = _neighbor_geo_ids_for(db, str(geo_id), float(radius_mi))
+    naics = industry_to_naics(term)
+    r = find_competition_cbp(
+        db, focal_geo_id=str(geo_id),
+        neighbor_geo_ids=neighbours, naics=naics,
+    )
     return {
         "geo_id": geo_id, "name": name,
-        "count": r.get("count", 0), "total": r.get("total", 0),
-        "term_used": r.get("term_used"),
-        "radius_mi": r.get("radius_mi"),
-        "top": (r.get("businesses") or [])[:5],
+        "count": r.get("count", 0),
+        "focal_count": r.get("focal_count", 0),
+        "neighbours_count": r.get("neighbours_count", 0),
+        "term_used": term,
+        "naics_used": r.get("naics_used"),
+        "naics_label": r.get("naics_label"),
+        "radius_mi": float(radius_mi),
+        "year": r.get("year"),
+        # `top` keeps its meaning ("the top entries") — now top counties
+        # by establishment count rather than top Yelp businesses.
+        "top": (r.get("per_county") or [])[:5],
         "error": r.get("error"),
     }
 

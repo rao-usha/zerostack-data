@@ -367,28 +367,65 @@ def atlas_explain(body: ExplainBody, db: Session = Depends(get_db)):
 
 
 class CompetitionBody(BaseModel):
-    # SPEC_091 — Yelp-backed in-radius competition lookup. Used by the
-    # Trade Area panel and the Pilot's find_competition tool. radius_mi
-    # is capped server-side (Yelp's hard 40 km / ~25 mi limit).
-    lat: float
-    lon: float
+    # SPEC_100 — CBP-backed in-radius competition lookup. Replaces the
+    # SPEC_091 Yelp source. lat/lon + term kept for back-compat; the
+    # cleaner new-shape body is (focal_geo_id, neighbor_geo_ids, naics).
+    # Either shape works; the endpoint normalizes them.
+    lat: Optional[float] = None
+    lon: Optional[float] = None
     radius_mi: Optional[float] = 5.0
     term: Optional[str] = None
-    categories: Optional[str] = None
-    limit: Optional[int] = 20
+    categories: Optional[str] = None    # ignored; kept for shape
+    limit: Optional[int] = 20           # ignored; kept for shape
+    # SPEC_100 new-shape fields
+    focal_geo_id: Optional[str] = None
+    neighbor_geo_ids: Optional[List[str]] = None
+    naics: Optional[str] = None
+    year: Optional[int] = None
 
 
 @router.post("/competition")
 def atlas_competition(body: CompetitionBody, db: Session = Depends(get_db)):
-    """SPEC_091 — return competing businesses within radius (Yelp Fusion).
-    Soft-fails (200 with error string + empty list) when Yelp is
-    unconfigured or unavailable, so the trade-area UI keeps working."""
+    """SPEC_100 — return competing establishments within a trade-area
+    aggregated from Census CBP (federal establishment census). Replaces
+    the SPEC_091 Yelp Fusion path. Soft-fails (200 with error string +
+    empty per_county) when the CBP rowset is empty.
+
+    Body shape — either:
+      - new: {focal_geo_id, neighbor_geo_ids?, naics?, year?, radius_mi?}
+      - legacy: {lat, lon, radius_mi, term} — resolved via
+        nearest-centroid + industry_to_naics. Kept so the old Pilot
+        path and the Trade Area card don't have to change in lockstep.
+    """
+    if body.focal_geo_id:
+        from app.services.atlas.competition import (
+            find_competition_cbp, _neighbor_geo_ids_for,
+        )
+        neighbours = body.neighbor_geo_ids
+        if neighbours is None and body.radius_mi:
+            neighbours = _neighbor_geo_ids_for(
+                db, body.focal_geo_id, float(body.radius_mi))
+        result = find_competition_cbp(
+            db, focal_geo_id=body.focal_geo_id,
+            neighbor_geo_ids=neighbours,
+            naics=body.naics, year=body.year or 2022,
+        )
+        result["radius_mi"] = float(body.radius_mi or 0)
+        result["term_used"] = body.term
+        return result
+    # Legacy shape — delegate to the back-compat adaptor.
     from app.services.atlas.competition import find_competition
+    if body.lat is None or body.lon is None:
+        return {
+            "count": 0, "per_county": [],
+            "error": "either focal_geo_id or (lat, lon) is required",
+            "radius_mi": body.radius_mi,
+        }
     return find_competition(
         lat=body.lat, lon=body.lon,
         radius_mi=body.radius_mi,
         term=body.term, categories=body.categories,
-        limit=body.limit,
+        limit=body.limit, db=db, naics_hint=body.naics,
     )
 
 

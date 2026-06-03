@@ -616,6 +616,26 @@
     .competition-pin .dot:hover { transform:scale(1.25); background:#fb923c; }
 
     /* SPEC_091 — competition row inside Trade Area card */
+    /* SPEC_100 — CBP per-county breakdown rendered inside .ta-comp.
+       Replaces the SPEC_091 Yelp pin-list look. */
+    #trade-area-card .ta-comp-naics { display:inline-block;
+      font-size:10px; padding:1px 6px; border-radius:8px;
+      background:rgba(124,131,255,.20); color:var(--primary-hover);
+      border:1px solid rgba(124,131,255,.40); margin-left:6px;
+      letter-spacing:.04em; }
+    #trade-area-card .ta-comp-source { font-size:10px; color:var(--dim);
+      margin-top:4px; letter-spacing:.02em; }
+    #trade-area-card .ta-comp-percounty { margin-top:8px;
+      display:grid; grid-template-columns:1fr auto; gap:4px 10px;
+      border-top:1px dashed var(--border); padding-top:6px; }
+    #trade-area-card .ta-comp-county { display:contents; }
+    #trade-area-card .ta-comp-county .nm { color:var(--text); font-size:11px;
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #trade-area-card .ta-comp-county .nm em { color:var(--accent);
+      font-style:normal; font-size:9px; letter-spacing:.06em; }
+    #trade-area-card .ta-comp-county .n { color:var(--muted);
+      font-variant-numeric:tabular-nums; font-size:11px; text-align:right; }
+
     #trade-area-card .ta-comp { font-size:11px; margin-bottom:10px;
       padding:6px 8px; background:rgba(249,115,22,.10);
       border:1px solid rgba(249,115,22,.30); border-radius:6px;
@@ -2267,7 +2287,10 @@
   let CURRENT_TRADE_AREA_DATA = null;
   // SPEC_091 — competition pins (Yelp Fusion, in-radius)
   let COMPETITION_LAYER = null;
-  const COMPETITION_RADIUS_MI = 25;   // Yelp's hard cap
+  // SPEC_100 — CBP replaces Yelp. The old 25-mi Yelp cap is gone; CBP
+  // serves any radius. We keep the constant so existing call sites
+  // compile; the value just no longer constrains anything.
+  const COMPETITION_RADIUS_MI = 50;
 
   function fmtNum(n, opts) {
     if (n === null || n === undefined || !Number.isFinite(Number(n))) return '—';
@@ -2310,9 +2333,12 @@
       try {
         const t = (typeof loadThesis === 'function') ? loadThesis() : null;
         const term = (t && t.industry_label) ? String(t.industry_label).trim() : '';
-        if (term && r.focal && Number.isFinite(r.focal.lat) && Number.isFinite(r.focal.lon)) {
-          fetchCompetition(r.focal.lat, r.focal.lon,
-                             Math.min(COMPETITION_RADIUS_MI, radiusMi), term);
+        if (r.focal && (term || r.focal.geo_id)) {
+          // SPEC_100 — pass focal_geo_id so the backend uses the exact
+          // FIPS instead of nearest-centroid resolution. Falls back to
+          // the no-term branch when the thesis lacks an industry.
+          fetchCompetition(r.focal.lat, r.focal.lon, radiusMi,
+                            term || '', r.focal.geo_id);
         } else {
           clearCompetitionPins();
         }
@@ -2389,77 +2415,94 @@
     card.hidden = false;
   }
 
-  // ─── SPEC_091 — Competition pins (Yelp Fusion) ─────────────────────────
+  // ─── SPEC_100 — Competition aggregates (Census CBP) ────────────────────
+  // Replaced the Yelp-Fusion pin layer with a CBP-derived count + per-
+  // county breakdown. CBP gives federal establishment counts at NAICS
+  // by county, which is more authoritative than Yelp's opt-in directory
+  // for the "is this a competitive trade area?" question. Ratings /
+  // reviews are out of scope — that needs a paid source (SPEC_101).
+  //
+  // renderCompetitionPins is kept as a no-op so any old caller that
+  // still references it doesn't blow up; the orange pin layer is gone.
   function clearCompetitionPins() {
+    // No-op for pin layer (CBP has no pins). Still clear the .ta-comp
+    // row so re-entering trade-area mode starts clean.
     if (COMPETITION_LAYER) { MAP.removeLayer(COMPETITION_LAYER); COMPETITION_LAYER = null; }
     const row = document.querySelector('#trade-area-card .ta-comp');
     if (row) { row.classList.remove('show'); row.innerHTML = ''; }
   }
 
-  function renderCompetitionPins(r) {
-    clearCompetitionPins();
-    const bs = (r && r.businesses) || [];
-    if (!bs.length) return;
-    COMPETITION_LAYER = L.layerGroup();
-    bs.forEach((b, i) => {
-      const icon = L.divIcon({
-        className: 'competition-pin',
-        iconSize: [20, 20], iconAnchor: [10, 10],
-        html: `<div class="dot" title="${escapeHtml(b.name)}">${i + 1}</div>`,
-      });
-      const m = L.marker([b.lat, b.lon], { icon, zIndexOffset: 800 });
-      const rating = (b.rating != null) ? `★ ${b.rating}` : '';
-      const revs   = (b.review_count != null) ? `· ${b.review_count} reviews` : '';
-      m.bindTooltip(
-        `<b>${escapeHtml(b.name)}</b><br>${rating} ${revs}<br>` +
-        `${escapeHtml(b.address || '')}<br>${b.distance_mi} mi`,
-        { sticky: true }
-      );
-      m.on('click', () => {
-        if (b.url) window.open(b.url, '_blank', 'noopener,noreferrer');
-        track('competition_pin_clicked', { name: b.name, distance_mi: b.distance_mi });
-      });
-      COMPETITION_LAYER.addLayer(m);
-    });
-    COMPETITION_LAYER.addTo(MAP);
+  function renderCompetitionPins(_r) {
+    // SPEC_100 — CBP has no individual business lat/lons. The "pins"
+    // function is retained as a no-op so existing call sites stay
+    // valid. The new visual is the per-county breakdown rendered into
+    // the .ta-comp card row by updateCompetitionCardRow.
   }
 
   function updateCompetitionCardRow(r) {
     const row = document.querySelector('#trade-area-card .ta-comp');
     if (!row) return;
-    const n = (r && r.count) || 0;
-    const term = (r && r.term_used) || '';
     if (r && r.error) {
       row.innerHTML = `<i>Competition data unavailable (${escapeHtml(r.error)})</i>`;
       row.classList.add('show');
       return;
     }
-    if (!n) {
-      row.innerHTML = `<i>No ${escapeHtml(term || 'competing')} businesses found within ${r.radius_mi} mi.</i>`;
-      row.classList.add('show'); return;
+    const total = (r && r.count) || 0;
+    const focal = (r && r.focal_count) || 0;
+    const nbr   = (r && r.neighbours_count) || 0;
+    const lbl   = (r && r.naics_label) || 'establishment';
+    const yr    = (r && r.year) || '';
+    const term  = (r && r.term_used) || '';
+    const code  = (r && r.naics_used) || '';
+    if (!total) {
+      const naicsHint = code && code !== '00'
+        ? ` at NAICS ${escapeHtml(code)}` : '';
+      row.innerHTML =
+        `<i>No ${escapeHtml(term || lbl)} establishments` +
+        `${naicsHint} in this trade area (CBP ${yr}).</i>`;
+      row.classList.add('show');
+      return;
     }
+    const naicsTag = code && code !== '00'
+      ? ` <span class="ta-comp-naics">NAICS ${escapeHtml(code)}</span>` : '';
+    const perCounty = (r.per_county || []).slice(0, 5);
+    const perCountyHtml = perCounty.length
+      ? '<div class="ta-comp-percounty">' + perCounty.map(c =>
+          `<div class="ta-comp-county" title="${escapeHtml(c.name)}">` +
+          `<span class="nm">${escapeHtml(c.name)}` +
+          (c.is_focal ? ' <em>(focal)</em>' : '') + '</span>' +
+          `<span class="n">${fmtNum(c.establishments)}</span></div>`
+        ).join('') + '</div>'
+      : '';
     row.innerHTML =
-      `<b>${n}</b> ${escapeHtml(term ? '"' + term + '"' : 'competing')} ` +
-      `businesses within <b>${r.radius_mi} mi</b>. ` +
-      `Click an orange pin to open it on Yelp.`;
+      `<b>${fmtNum(focal)}</b> ${escapeHtml(lbl)} establishments in this county` +
+      (nbr ? `; <b>${fmtNum(nbr)}</b> across ${(r.per_county || []).length - 1} ` +
+              `neighbouring counties.` : '.') +
+      `${naicsTag}` +
+      `<div class="ta-comp-source">Source: Census CBP ${yr}.</div>` +
+      perCountyHtml;
     row.classList.add('show');
   }
 
-  async function fetchCompetition(lat, lon, radiusMi, term) {
-    if (!term) { clearCompetitionPins(); return; }
+  async function fetchCompetition(lat, lon, radiusMi, term, focalGeoId) {
+    // SPEC_100 — prefer focal_geo_id when available (Trade Area knows
+    // it). lat/lon path still works via the back-compat adaptor that
+    // resolves nearest-centroid server-side.
+    if (!term && !focalGeoId) { clearCompetitionPins(); return; }
     try {
+      const body = focalGeoId
+        ? { focal_geo_id: String(focalGeoId),
+            radius_mi: radiusMi || COMPETITION_RADIUS_MI, term }
+        : { lat, lon,
+            radius_mi: radiusMi || COMPETITION_RADIUS_MI, term };
       const r = await fetch(API + '/competition', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          lat, lon,
-          radius_mi: Math.min(COMPETITION_RADIUS_MI, radiusMi || COMPETITION_RADIUS_MI),
-          term, limit: 30,
-        }),
+        body: JSON.stringify(body),
       }).then(x => x.json());
-      renderCompetitionPins(r);
       updateCompetitionCardRow(r);
       track('competition_fetched', {
-        count: r.count || 0, term, radius_mi: r.radius_mi });
+        count: r.count || 0, term, radius_mi: r.radius_mi,
+        naics: r.naics_used });
     } catch (e) {
       console.warn('competition fetch failed', e);
     }
