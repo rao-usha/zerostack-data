@@ -1815,6 +1815,27 @@
         }
       }
     });
+    // Bug fix — every overlay panel that lives INSIDE the Leaflet
+    // container (#trade-area-card, #chip-strip, #chip-menu,
+    // #story-banner, #legend, #map-actions, #recent-overlay,
+    // #scatter-overlay) needs Leaflet's click/scroll propagation
+    // disabled. Without this, clicks inside the cards (rows, ×,
+    // chips, copy text selections, scroll-wheel) bubble up to the
+    // map handler and pan/zoom the basemap instead of doing what
+    // the user expected. The "Falls Church analysis sitting on top
+    // of the map but I can't touch it" symptom was exactly this.
+    [
+      'trade-area-card', 'chip-strip', 'chip-menu', 'story-banner',
+      'legend', 'bivariate-legend', 'map-actions',
+      'recent-overlay', 'scatter-overlay',
+    ].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      try {
+        L.DomEvent.disableClickPropagation(el);
+        L.DomEvent.disableScrollPropagation(el);
+      } catch (_) {}
+    });
   }
 
   function computeCentroids(geojson) {
