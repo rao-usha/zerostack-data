@@ -1619,9 +1619,19 @@
   }
 
   // ── URL state ───────────────────────────────────────────────────────────
+  // Layer ids that are SYNTHETIC — they don't correspond to a row in the
+  // backend layer registry, so GET /atlas/layer/<id> returns 404. They
+  // must not be persisted in the URL (otherwise a reload triggers the
+  // 404) and must not trigger the `url-layer` entry mode on load.
+  //   - fit_score: thesis-derived choropleth; data comes from
+  //     POST /atlas/fit-score, not GET /atlas/layer/<id>.
+  const SYNTHETIC_LAYER_IDS = new Set(['fit_score']);
+
   function syncURL() {
     const p = new URLSearchParams();
-    if (state.layerId) p.set('layer', state.layerId);
+    if (state.layerId && !SYNTHETIC_LAYER_IDS.has(state.layerId)) {
+      p.set('layer', state.layerId);
+    }
     if (state.overlayId) p.set('overlay', state.overlayId);
     if (state.compareLayerId) p.set('compare', state.compareLayerId);
     if (state.placeId) p.set('place', state.placeId);
@@ -1646,7 +1656,14 @@
     // got baked into shared/bookmarked URLs via syncURL(). Ignore it on load
     // so the thesis-derived default (median income) wins; otherwise NRI keeps
     // coming back on every refresh. NRI is still selectable from the layer list.
-    if (p.get('layer') && p.get('layer') !== 'disaster_nri') {
+    // `disaster_nri` was the OLD hardcoded default and got baked into
+    // shared URLs; `fit_score` is synthetic (see SYNTHETIC_LAYER_IDS) and
+    // older builds wrote it via syncURL — both should be discarded on
+    // load so the thesis-derived default wins and we don't 404 on
+    // GET /atlas/layer/fit_score.
+    if (p.get('layer')
+        && p.get('layer') !== 'disaster_nri'
+        && !SYNTHETIC_LAYER_IDS.has(p.get('layer'))) {
       state.layerId = p.get('layer');
     }
     if (p.get('overlay')) state.overlayId = p.get('overlay');
@@ -1697,7 +1714,12 @@
     //   'fit-score'  → no URL layer + saved thesis → paint thesis fit
     //   'blank'      → no URL layer + no thesis    → blank basemap + prompt
     const urlLayer = new URLSearchParams(location.search).get('layer');
-    const urlHasLayer = !!urlLayer && urlLayer !== 'disaster_nri';
+    // Synthetic ids (fit_score) + the historical default (disaster_nri)
+    // do NOT count as a real URL layer — they would 404 on the generic
+    // GET /atlas/layer/<id> fetch a few lines below.
+    const urlHasLayer = !!urlLayer
+      && urlLayer !== 'disaster_nri'
+      && !SYNTHETIC_LAYER_IDS.has(urlLayer);
     const savedThesis = (() => {
       try { return JSON.parse(localStorage.getItem('atlas_thesis_v1') || '{}'); }
       catch (_) { return {}; }
