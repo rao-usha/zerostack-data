@@ -101,9 +101,37 @@ def find_competition(
         return asyncio.run(_do_search(
             float(lat), float(lon), rm, term, categories, limit))
     except Exception as exc:  # noqa: BLE001
-        logger.warning("find_competition failed: %s", exc)
+        # Keep the raw exception in logs but show users a short,
+        # human message — the UI was rendering the full Yelp 400
+        # payload (URLs + emails + HTTP codes) verbatim, which is
+        # both ugly and slightly leaky.
+        raw = str(exc)
+        logger.warning("find_competition failed: %s", raw)
+        msg = _friendly_yelp_error(raw)
         return {
             "count": 0, "total": 0, "businesses": [],
-            "error": str(exc),
+            "error": msg,
+            "error_detail": raw,  # kept for debugging / API consumers
             "term_used": term, "radius_mi": rm,
         }
+
+
+def _friendly_yelp_error(raw: str) -> str:
+    """Map a raw Yelp exception string to a short human message.
+    Order matters — check the specific Yelp Fusion error codes
+    before the generic HTTP-status buckets.
+    """
+    s = (raw or "").lower()
+    if "trial_expired" in s or "trial has expired" in s:
+        return "Yelp competition lookup unavailable (free trial expired)."
+    if "validation_error" in s or "invalid_parameter" in s:
+        return "Yelp competition lookup couldn't run with these parameters."
+    if "access_limit_reached" in s or "429" in s or "rate limit" in s:
+        return "Yelp competition lookup rate-limited — try again shortly."
+    if "401" in s or "unauthorized" in s or "invalid_api_key" in s:
+        return "Yelp competition lookup unauthorized (check API key)."
+    if "404" in s or "not found" in s:
+        return "Yelp returned no result for this area."
+    if "timeout" in s or "timed out" in s:
+        return "Yelp competition lookup timed out."
+    return "Competition data temporarily unavailable."

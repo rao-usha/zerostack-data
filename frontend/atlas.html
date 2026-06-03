@@ -529,6 +529,22 @@
       align-self:center; max-width:80px; line-height:1.2; }
     #bivariate-legend .grid-wrap { display:flex; align-items:center; }
 
+    /* Overlay panels live inside the Leaflet container, which sets
+       cursor:grab. Without this override the hand-cursor leaks into
+       every card body and looks like the whole card is draggable.
+       Buttons + .ta-row inside these panels already declare their
+       own cursor:pointer (ID-scoped, so they keep winning on
+       specificity). */
+    #trade-area-card, #chip-strip, #chip-menu, #story-banner,
+    #legend, #bivariate-legend, #map-actions,
+    #recent-overlay, #scatter-overlay { cursor: default; }
+    /* Allow native text selection inside the cards — Leaflet
+       otherwise sets user-select:none on .leaflet-container. */
+    #trade-area-card, #story-banner, #legend, #recent-overlay,
+    #scatter-overlay {
+      -webkit-user-select: text; user-select: text;
+    }
+
     #map-actions { position:absolute; top:60px; right:12px; z-index:500; display:flex;
       flex-direction:column; gap:6px; }
     #map-actions button { background:rgba(20,27,45,.95); border:1px solid var(--border);
