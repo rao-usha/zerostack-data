@@ -203,11 +203,13 @@ class TestSpec100Endpoint:
             term="Furniture stores",   # NO naics — endpoint must resolve
         )
         captured = {}
-        def fake_cbp(db, focal_geo_id, neighbor_geo_ids, naics, year):
+        def fake_cbp(db, focal_geo_id, neighbor_geo_ids, naics, year, **kw):
+            # **kw absorbs the SPEC_102 `live_fallback` kwarg.
             captured["naics"] = naics
             return {"count": 70, "focal_count": 70, "neighbours_count": 0,
                     "per_county": [], "naics_used": naics or "00",
-                    "naics_label": "x", "year": year, "error": None}
+                    "naics_label": "x", "year": year,
+                    "live_fetched": 0, "error": None}
         with patch("app.services.atlas.competition.find_competition_cbp",
                     side_effect=fake_cbp), \
              patch("app.services.atlas.competition._neighbor_geo_ids_for",

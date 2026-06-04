@@ -382,6 +382,9 @@ class CompetitionBody(BaseModel):
     neighbor_geo_ids: Optional[List[str]] = None
     naics: Optional[str] = None
     year: Optional[int] = None
+    # SPEC_102 — opt out of the live Census fallback (defaults on).
+    # Useful for tests + when the caller knows the DB row exists.
+    live_fallback: Optional[bool] = None
 
 
 @router.post("/competition")
@@ -416,9 +419,21 @@ def atlas_competition(body: CompetitionBody, db: Session = Depends(get_db)):
             db, focal_geo_id=body.focal_geo_id,
             neighbor_geo_ids=neighbours,
             naics=naics, year=body.year or 2022,
+            live_fallback=(True if body.live_fallback is None
+                            else bool(body.live_fallback)),
         )
         result["radius_mi"] = float(body.radius_mi or 0)
         result["term_used"] = body.term
+        # SPEC_101 — augment with Google Places ratings for the focal
+        # county. Soft-fails to None (no key / no mapping / quota); the
+        # frontend hides the ratings strip when this is null.
+        try:
+            from app.services.atlas.ratings import fetch_ratings
+            summary = fetch_ratings(db, body.focal_geo_id, naics)
+            result["ratings"] = (summary.to_response()
+                                  if summary is not None else None)
+        except Exception:  # noqa: BLE001
+            result["ratings"] = None
         return result
     # Legacy shape — delegate to the back-compat adaptor.
     from app.services.atlas.competition import find_competition

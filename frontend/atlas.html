@@ -636,6 +636,20 @@
     #trade-area-card .ta-comp-county .n { color:var(--muted);
       font-variant-numeric:tabular-nums; font-size:11px; text-align:right; }
 
+    /* SPEC_101 — Google Places ratings strip + ToS-required
+       "Powered by Google" attribution. Hidden when r.ratings is null. */
+    #trade-area-card .ta-comp-ratings { margin-top:8px;
+      border-top:1px dashed var(--border); padding-top:6px;
+      font-size:11px; color:var(--text); line-height:1.5; }
+    #trade-area-card .ta-comp-ratings .g-stars { color:#fbbf24;
+      font-weight:700; font-variant-numeric:tabular-nums;
+      margin-right:4px; }
+    #trade-area-card .ta-comp-ratings .g-meta { color:var(--muted); }
+    #trade-area-card .ta-comp-ratings .g-meta b { color:var(--text); }
+    #trade-area-card .ta-comp-attribution { font-size:9px;
+      color:var(--dim); letter-spacing:.06em; text-transform:uppercase;
+      margin-top:4px; }
+
     #trade-area-card .ta-comp { font-size:11px; margin-bottom:10px;
       padding:6px 8px; background:rgba(249,115,22,.10);
       border:1px solid rgba(249,115,22,.30); border-radius:6px;
@@ -2474,13 +2488,33 @@
           `<span class="n">${fmtNum(c.establishments)}</span></div>`
         ).join('') + '</div>'
       : '';
+    // SPEC_101 — Google Places ratings strip. Hidden when r.ratings is
+    // null (no key / no NAICS mapping / quota). ToS-mandated "Powered
+    // by Google" attribution attached to the strip.
+    let ratingsHtml = '';
+    if (r && r.ratings) {
+      const g = r.ratings;
+      const stars = (g.mean_rating != null) ? `★ ${g.mean_rating.toFixed(1)}` : '—';
+      const med   = (g.median_rating != null) ? `median ${g.median_rating.toFixed(1)}` : '';
+      const reviews = g.total_user_ratings || 0;
+      ratingsHtml =
+        '<div class="ta-comp-ratings">' +
+        `<span class="g-stars">${stars}</span> ` +
+        `<span class="g-meta">average across <b>${g.count}</b> rated locations` +
+        (reviews ? ` · ${fmtNum(reviews)} reviews` : '') +
+        (med ? ` · ${med}` : '') +
+        '</span>' +
+        '<div class="ta-comp-attribution">Powered by Google</div>' +
+        '</div>';
+    }
     row.innerHTML =
       `<b>${fmtNum(focal)}</b> ${escapeHtml(lbl)} establishments in this county` +
       (nbr ? `; <b>${fmtNum(nbr)}</b> across ${(r.per_county || []).length - 1} ` +
               `neighbouring counties.` : '.') +
       `${naicsTag}` +
       `<div class="ta-comp-source">Source: Census CBP ${yr}.</div>` +
-      perCountyHtml;
+      perCountyHtml +
+      ratingsHtml;
     row.classList.add('show');
   }
 

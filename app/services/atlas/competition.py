@@ -50,6 +50,8 @@ def find_competition_cbp(
     neighbor_geo_ids: Optional[List[str]] = None,
     naics: Optional[str] = None,
     year: int = _DEFAULT_YEAR,
+    live_fallback: bool = False,
+    live_fallback_cap: int = 30,
 ) -> Dict[str, Any]:
     """SPEC_100 — aggregate CBP establishment counts at NAICS across
     the focal county + its trade-area neighbours.
@@ -112,13 +114,38 @@ def find_competition_cbp(
         "naics": code,
     }).all()
 
+    by_geo = {r.geo_id: int(r.establishments or 0) for r in rows}
+
+    # SPEC_102 — live Census fallback for any (county, NAICS) tuple
+    # that isn't in the DB. NAICS='00' is always-present from the
+    # backfill, so we only spend the API budget on real industry
+    # codes. The cap is enforced inside fetch_cbp_cells so a single
+    # request can't blow the rate limit even when the trade-area has
+    # 100+ neighbour misses.
+    live_fetched = 0
+    if live_fallback and code != "00":
+        from app.services.atlas.cbp_live import fetch_cbp_cells
+        misses = [g for g in ordered if g not in by_geo]
+        if misses:
+            fetched_map = fetch_cbp_cells(
+                db, [(g, code) for g in misses],
+                year=year, per_request_cap=live_fallback_cap,
+            )
+            for (g, _n), value in fetched_map.items():
+                # value is None when Census also had nothing OR when
+                # we exceeded the per-request cap. We keep the entry
+                # out of by_geo for the None case (so per_county shows
+                # establishments=0 below). Only count actual fetches.
+                if value is not None:
+                    by_geo[g] = value
+                    live_fetched += 1
+
     # Build the per-county breakdown. Names + centroids come from the
     # county_centroids cache so we can compute distance_mi from focal.
     from app.services.atlas.trade_area import county_centroids
     centroids = county_centroids(db)
     focal_centroid = centroids.get(focal)
 
-    by_geo = {r.geo_id: int(r.establishments or 0) for r in rows}
     name_lookup: Dict[str, str] = {}
 
     per_county: List[Dict[str, Any]] = []
@@ -161,6 +188,7 @@ def find_competition_cbp(
         "naics_label": naics_label_short(code) if code != "00"
                        else "All establishments",
         "year": year,
+        "live_fetched": live_fetched,
         "error": None,
     }
 
@@ -177,6 +205,7 @@ def _empty_response(naics: Optional[str], year: int,
         "naics_label": naics_label_short(code) if code != "00"
                        else "All establishments",
         "year": year,
+        "live_fetched": 0,
         "error": error,
     }
 
@@ -266,10 +295,20 @@ def find_competition(
             db, focal_geo_id=focal_geo_id,
             neighbor_geo_ids=neighbours,
             naics=naics, year=_DEFAULT_YEAR,
+            live_fallback=True,
         )
         # Add the radius so the caller can echo it back to the UI
         result["radius_mi"] = rm
         result["term_used"] = term
+        # SPEC_101 — augment with Google Places ratings (soft-fails
+        # to None when no key is configured).
+        try:
+            from app.services.atlas.ratings import fetch_ratings
+            summary = fetch_ratings(db, focal_geo_id, naics)
+            result["ratings"] = (summary.to_response()
+                                  if summary is not None else None)
+        except Exception:  # noqa: BLE001
+            result["ratings"] = None
         return result
     except Exception as exc:  # noqa: BLE001
         logger.warning("find_competition (CBP) failed: %s", exc)

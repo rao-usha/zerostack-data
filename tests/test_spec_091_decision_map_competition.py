@@ -56,9 +56,13 @@ class TestSpec091Backend:
         # CBP shape — count is establishments, per_county is a list
         assert r["count"] == 183
         assert isinstance(r["per_county"], list)
-        # NO Yelp-specific fields leak through
+        # NO Yelp-specific fields leak through. (SPEC_101 may add a
+        # `ratings` key from Google Places — that's expected when
+        # GOOGLE_PLACES_API_KEY is set; here we only assert the Yelp-
+        # specific `review_count` / `url` / `businesses` are absent.)
         assert "businesses" not in r
-        assert "rating" not in str(r)
+        assert "review_count" not in str(r)
+        assert "yelp" not in str(r).lower()
 
     def test_returns_empty_when_db_empty_soft_fails(self):
         """T4 (was: YELP_API_KEY missing; now: empty CBP rowset).
@@ -71,8 +75,12 @@ class TestSpec091Backend:
                     def scalar(self_): return None
                 return _R()
             def close(self): pass
+        # SPEC_102 — find_competition now defaults live_fallback=True; we
+        # patch the Census fetcher so the test stays a unit test.
         with patch("app.services.atlas.trade_area.county_centroids",
-                    return_value={"51107": (39.0, -77.6, "Loudoun")}):
+                    return_value={"51107": (39.0, -77.6, "Loudoun")}), \
+             patch("app.services.atlas.cbp_live.fetch_cbp_cells",
+                    return_value={}):
             r = comp.find_competition(
                 lat=39.0, lon=-77.6, radius_mi=10,
                 term="furniture", db=_DB())
