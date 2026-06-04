@@ -401,14 +401,21 @@ def atlas_competition(body: CompetitionBody, db: Session = Depends(get_db)):
         from app.services.atlas.competition import (
             find_competition_cbp, _neighbor_geo_ids_for,
         )
+        from app.services.atlas.industry_naics import industry_to_naics
         neighbours = body.neighbor_geo_ids
         if neighbours is None and body.radius_mi:
             neighbours = _neighbor_geo_ids_for(
                 db, body.focal_geo_id, float(body.radius_mi))
+        # Resolve term → NAICS when the caller passed a label instead of
+        # the explicit code. The new-shape path was previously dropping
+        # `term` on the floor when `naics` was absent, which silently
+        # fell back to NAICS='00' (all-establishments total) — making
+        # the card show the same number as the focal county's total.
+        naics = body.naics or industry_to_naics(body.term)
         result = find_competition_cbp(
             db, focal_geo_id=body.focal_geo_id,
             neighbor_geo_ids=neighbours,
-            naics=body.naics, year=body.year or 2022,
+            naics=naics, year=body.year or 2022,
         )
         result["radius_mi"] = float(body.radius_mi or 0)
         result["term_used"] = body.term

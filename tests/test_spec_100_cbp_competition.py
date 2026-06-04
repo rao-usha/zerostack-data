@@ -185,6 +185,39 @@ class TestSpec100CBPLookup:
         assert r["error"] is None  # soft-success on empty
 
 
+class TestSpec100Endpoint:
+    """T8b — /competition endpoint resolves term → NAICS in new-shape body.
+
+    Regression for a bug shipped in the first SPEC_100 commit: when the
+    caller hit /competition with {focal_geo_id, term} but no `naics`,
+    the new-shape branch dropped `term` on the floor and silently used
+    NAICS='00' (all-establishments total), making the Trade Area card
+    show the focal county's TOTAL instead of the term-specific count.
+    """
+
+    def test_new_shape_endpoint_resolves_term_to_naics(self):
+        from unittest.mock import patch
+        from app.api.v1.atlas import CompetitionBody, atlas_competition
+        body = CompetitionBody(
+            focal_geo_id="51107", radius_mi=50,
+            term="Furniture stores",   # NO naics — endpoint must resolve
+        )
+        captured = {}
+        def fake_cbp(db, focal_geo_id, neighbor_geo_ids, naics, year):
+            captured["naics"] = naics
+            return {"count": 70, "focal_count": 70, "neighbours_count": 0,
+                    "per_county": [], "naics_used": naics or "00",
+                    "naics_label": "x", "year": year, "error": None}
+        with patch("app.services.atlas.competition.find_competition_cbp",
+                    side_effect=fake_cbp), \
+             patch("app.services.atlas.competition._neighbor_geo_ids_for",
+                    return_value=[]):
+            atlas_competition(body, db=None)
+        # "Furniture stores" → industry_to_naics → "442"
+        assert captured["naics"] == "442", (
+            f"endpoint should resolve term → NAICS, got {captured['naics']!r}")
+
+
 class TestSpec100LegacyAdaptor:
     """T8 — old find_competition(lat,lon,term) still works."""
 
