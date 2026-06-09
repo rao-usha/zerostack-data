@@ -107,3 +107,7 @@ frontend/node_modules/
 # Claude Code local state
 .claude/worktrees/
 .claude/settings.local.json
+
+# One-off DB / API diagnostic scripts (PLAN_067-era). Useful as
+# reference while debugging; not part of the source tree.
+scripts/probe_*.py
