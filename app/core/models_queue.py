@@ -46,6 +46,7 @@ class QueueJobType(str, enum.Enum):
     FOOT_TRAFFIC = "foot_traffic"
     INGESTION = "ingestion"
     BULK_INGEST = "bulk_ingest"
+    ENTITY_RESOLVE = "entity_resolve"
 
 
 class JobQueue(Base):
