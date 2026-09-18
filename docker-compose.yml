@@ -127,6 +127,7 @@ services:
       - ./data/seeds:/app/data/seeds
       - ./data/reports:/app/data/reports
       - ./data/reference:/app/data/reference
+      - ./data/raw:/app/data/raw
       - ./scripts:/app/scripts
       - ./.kaggle:/home/appuser/.kaggle:ro
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
@@ -150,10 +151,16 @@ services:
         condition: service_healthy
     volumes:
       - ./app:/app/app
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
       - ./data/seeds:/app/data/seeds
+      - ./data/raw:/app/data/raw
     dns:
       - 8.8.8.8
       - 8.8.4.4
+    # Reach the host's cloud-sql-proxy (127.0.0.1:5435) like the api service does
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     command: python -m app.worker.main
     # 6 workers × 6 concurrent = 36 slots for parallel split jobs
     deploy:

@@ -46,6 +46,7 @@ from app.api.v1 import (
     agentic_research,
     foot_traffic,
     prediction_markets,
+    bulk,
     schedules,
     webhooks,
     chains,
@@ -243,6 +244,10 @@ async def lifespan(app: FastAPI):
     logger.info("Starting External Data Ingestion Service")
     logger.info(f"Log level: {settings.log_level}")
     logger.info(f"Max concurrency: {settings.max_concurrency}")
+
+    # Apply Alembic migrations first (advisory-locked; never blocks startup)
+    from app.core.migrate import run_migrations
+    run_migrations()
 
     # Ensure all tables exist (create_all is idempotent — skips existing tables)
     try:
@@ -1366,6 +1371,7 @@ Browse the endpoint sections below to see what's available:
         {"name": "benchmarks", "description": "📊 **Financial Benchmarks** - Industry multiples, valuation comps, and financial benchmarks"},
         {"name": "13F Analysis", "description": "📊 **13F Quarterly Analysis** - Quarter-over-quarter holding diffs and cross-investor convergence detection"},
         # ── PE Intelligence ────────────────────────────────────────────
+        {"name": "Bulk Ingestion", "description": "Bulk publisher files (SEC data sets) loaded via raw.source_release manifest (PLAN_082)"},
         {"name": "PE Intelligence - Firms", "description": "🏢 **PE Firms** - Private equity firm profiles, fund data, and investment strategies"},
         {"name": "PE Intelligence - Portfolio Companies", "description": "🏭 **PE Portfolio Companies** - Track portfolio companies across PE firms"},
         {"name": "PE Intelligence - People", "description": "👥 **PE People** - Investment professionals, operating partners, and advisory boards"},
@@ -1569,6 +1575,7 @@ app.include_router(census_cbp.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(foot_traffic.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(dunl.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(prediction_markets.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(bulk.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(schedules.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(webhooks.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(chains.router, prefix="/api/v1", dependencies=_auth)

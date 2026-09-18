@@ -181,6 +181,18 @@ class Settings(BaseSettings):
         description="Google Data Commons API key - optional but recommended for higher rate limits",
     )
 
+    # SEC fair-access policy: identify the client with a monitored contact
+    sec_user_agent: str = Field(
+        default="Nexdata research alexiusmichael@gmail.com",
+        description="User-Agent for all SEC requests (must include a real contact)",
+    )
+
+    # Bulk file ingestion (PLAN_082): where downloaded publisher files are kept
+    bulk_raw_dir: str = Field(
+        default="data/raw",
+        description="Directory for raw bulk downloads (raw.source_release local_path)",
+    )
+
     # Yelp Fusion API Configuration (REQUIRED for Yelp ingestion)
     yelp_api_key: Optional[str] = Field(
         default=None,

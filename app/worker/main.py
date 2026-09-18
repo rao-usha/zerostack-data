@@ -21,6 +21,7 @@ import logging
 import os
 import signal
 import socket
+import time
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -29,6 +30,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.database import get_session_factory
+from app.core.job_queue_service import record_worker_heartbeat, remove_worker_heartbeat
 from app.core.models_queue import JobQueue, QueueJobStatus, QueueJobType
 from app.core.pg_notify import send_job_event
 
@@ -77,6 +79,7 @@ def _load_executors():
     from app.worker.executors.agentic import execute as agentic_exec
     from app.worker.executors.foot_traffic import execute as foot_traffic_exec
     from app.worker.executors.ingestion import execute as ingestion_exec
+    from app.worker.executors.bulk_ingest import execute as bulk_ingest_exec
 
     EXECUTORS.update(
         {
@@ -88,6 +91,7 @@ def _load_executors():
             QueueJobType.AGENTIC: agentic_exec,
             QueueJobType.FOOT_TRAFFIC: foot_traffic_exec,
             QueueJobType.INGESTION: ingestion_exec,
+            QueueJobType.BULK_INGEST: bulk_ingest_exec,
         }
     )
 
@@ -401,6 +405,21 @@ async def execute_job(job: JobQueue, db: Session):
                     pass
 
 
+LIVENESS_INTERVAL = 30.0  # seconds between worker_heartbeats upserts
+
+
+def _record_liveness(SessionLocal) -> None:
+    """Upsert this worker's worker_heartbeats row; never raises."""
+    db = SessionLocal()
+    try:
+        record_worker_heartbeat(db, WORKER_ID, socket.gethostname())
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"Worker liveness heartbeat failed: {e}")
+    finally:
+        db.close()
+
+
 async def _run_slot(semaphore: asyncio.Semaphore, job: JobQueue, db: Session):
     """Execute a job in a semaphore-bounded slot, then release."""
     try:
@@ -422,6 +441,7 @@ async def poll_loop():
     SessionLocal = get_session_factory()
     semaphore = asyncio.Semaphore(MAX_CONCURRENT)
     active_tasks: set = set()
+    last_liveness = 0.0
 
     logger.info(
         f"Worker {WORKER_ID} starting poll loop "
@@ -429,6 +449,11 @@ async def poll_loop():
     )
 
     while not _shutdown.is_set():
+        # Liveness heartbeat (also while idle) so batches can check for a worker
+        if time.monotonic() - last_liveness >= LIVENESS_INTERVAL:
+            last_liveness = time.monotonic()
+            _record_liveness(SessionLocal)
+
         # If all slots are full, wait briefly before checking again
         if semaphore._value == 0:
             await asyncio.sleep(0.5)
@@ -488,14 +513,25 @@ async def poll_loop():
             except Exception as e:
                 logger.error(f"Drain cleanup failed: {e}")
 
+    try:
+        hb_db = SessionLocal()
+        try:
+            remove_worker_heartbeat(hb_db, WORKER_ID)
+        finally:
+            hb_db.close()
+    except Exception as e:
+        logger.warning(f"Could not remove worker heartbeat: {e}")
+
     logger.info(f"Worker {WORKER_ID} shut down cleanly")
 
 
 def main():
     """Entrypoint for python -m app.worker.main."""
-    # Ensure tables exist (worker might start before API)
+    # Apply migrations, then ensure tables exist (worker might start before API)
     from app.core.database import create_tables
+    from app.core.migrate import run_migrations
 
+    run_migrations()
     create_tables()
 
     asyncio.run(poll_loop())
