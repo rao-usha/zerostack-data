@@ -31,8 +31,12 @@ from app.core.models import (
 )
 from app.core.config import get_settings
 from app.core.database import get_session_factory
+from app.core.job_queue_service import submit_job
 
 logger = logging.getLogger(__name__)
+
+# Schedules whose source carries this prefix run as worker bulk_ingest jobs
+BULK_SOURCE_PREFIX = "bulk:"
 
 # =============================================================================
 # Incremental Loading — Source-specific date parameter mapping
@@ -190,6 +194,12 @@ async def run_scheduled_job(schedule_id: int):
             )
             return
 
+        # Bulk sources ("bulk:<name>") run as worker bulk_ingest jobs, not
+        # through SOURCE_DISPATCH (PLAN_082 / SPEC_114).
+        if (schedule.source or "").startswith(BULK_SOURCE_PREFIX):
+            await _run_bulk_schedule(db, schedule)
+            return
+
         # Inject incremental start params if configured
         effective_config = _inject_incremental_params(
             config=schedule.config or {},
@@ -242,6 +252,35 @@ async def run_scheduled_job(schedule_id: int):
         db.close()
 
 
+async def _run_bulk_schedule(db: Session, schedule: IngestionSchedule) -> None:
+    """Queue a bulk_ingest worker job for a ``bulk:<source>`` schedule."""
+    bulk_source = schedule.source[len(BULK_SOURCE_PREFIX):]
+    config = schedule.config or {}
+
+    job = IngestionJob(
+        source=schedule.source,
+        status=JobStatus.PENDING,
+        config=config,
+        schedule_id=schedule.id,
+        trigger="scheduled",
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+
+    payload = {"bulk_source": bulk_source, "ingestion_job_id": job.id}
+    for key in ("since", "max_releases", "release_keys"):
+        if config.get(key) is not None:
+            payload[key] = config[key]
+
+    result = submit_job(db=db, job_type="bulk_ingest", payload=payload, job_table_id=job.id)
+
+    schedule.last_job_id = job.id
+    schedule.next_run_at = _calculate_next_run(schedule)
+    db.commit()
+    logger.info(f"Queued bulk job for {schedule.name}: ingestion_job={job.id}, queue={result}")
+
+
 async def _execute_ingestion_job(db: Session, job: IngestionJob):
     """Execute an ingestion job based on its source."""
     from app.api.v1.jobs import run_ingestion_job
@@ -256,6 +295,17 @@ async def _execute_ingestion_job(db: Session, job: IngestionJob):
 def _calculate_next_run(schedule: IngestionSchedule) -> datetime:
     """Calculate the next run time for a schedule."""
     now = datetime.utcnow()
+
+    if schedule.frequency == ScheduleFrequency.CUSTOM and schedule.cron_expression:
+        # Ask the same trigger APScheduler fires on, so next_run_at is honest
+        try:
+            from apscheduler.triggers.cron import CronTrigger as _CronTrigger
+
+            fire = _CronTrigger.from_crontab(schedule.cron_expression).get_next_fire_time(None, now)
+            if fire is not None:
+                return fire.replace(tzinfo=None)
+        except Exception as e:
+            logger.warning(f"Could not read cron {schedule.cron_expression!r}: {e}")
 
     if schedule.frequency == ScheduleFrequency.HOURLY:
         return now + timedelta(hours=1)
@@ -1671,3 +1721,81 @@ def register_rule_evaluation(hour: int = 4) -> bool:
     except Exception as e:
         logger.error(f"Failed to register rule evaluation: {e}")
         return False
+
+
+# ---------------------------------------------------------------------------
+# Default schedules for the Phase 1 bulk SEC sources (SPEC_114)
+# ---------------------------------------------------------------------------
+
+DEFAULT_BULK_SCHEDULES = [
+    {
+        "name": "SEC IAPD compilation feed (daily)",
+        "source": "bulk:sec_iapd_feed",
+        "cron_expression": "10 5 * * *",
+        "description": "SEC publishes only the latest edition; a missed day cannot be recovered.",
+    },
+    {
+        "name": "SEC EDGAR submissions (daily)",
+        "source": "bulk:sec_edgar_submissions",
+        "cron_expression": "20 6 * * *",
+        "description": "submissions.zip is rebuilt nightly: filers, former names, 3y of 8-Ks.",
+    },
+    {
+        "name": "SEC XBRL companyfacts (weekly)",
+        "source": "bulk:sec_companyfacts",
+        "cron_expression": "0 7 * * 0",
+        "description": "1.2 GB download; financial statements change slowly.",
+    },
+    {
+        "name": "SEC Form ADV rosters (monthly)",
+        "source": "bulk:sec_adv_roster",
+        "cron_expression": "0 8 5 * *",
+        "description": "Monthly RIA + ERA roster files.",
+    },
+    {
+        "name": "SEC Form D data sets (monthly check)",
+        "source": "bulk:sec_form_d",
+        "cron_expression": "30 8 8 * *",
+        "description": "Quarterly zips appear weeks after quarter end; loaded releases are skipped.",
+    },
+    {
+        "name": "SEC insider transactions data sets (monthly check)",
+        "source": "bulk:sec_insider",
+        "cron_expression": "0 9 8 * *",
+        "description": "Quarterly Forms 3/4/5 data sets; footnotes stay opt-in.",
+    },
+    {
+        "name": "SEC 13F data sets (monthly check)",
+        "source": "bulk:sec_13f",
+        "cron_expression": "30 9 9 * *",
+        "description": "Quarterly data sets; holdings only for the newest release.",
+    },
+]
+
+
+def install_default_bulk_schedules(db: Session) -> Dict[str, Any]:
+    """Create any missing bulk schedules. Existing ones (even paused) are left alone."""
+    names = [d["name"] for d in DEFAULT_BULK_SCHEDULES]
+    existing = {
+        s.name
+        for s in db.query(IngestionSchedule).filter(IngestionSchedule.name.in_(names)).all()
+    }
+
+    created = []
+    for spec in DEFAULT_BULK_SCHEDULES:
+        if spec["name"] in existing:
+            continue
+        create_schedule(
+            db=db,
+            name=spec["name"],
+            source=spec["source"],
+            config={},
+            frequency=ScheduleFrequency.CUSTOM,
+            cron_expression=spec["cron_expression"],
+            description=spec["description"],
+            priority=5,
+        )
+        created.append(spec["name"])
+
+    logger.info(f"Bulk schedules installed: {len(created)} created, {len(existing)} already present")
+    return {"created": created, "existing": sorted(existing)}
