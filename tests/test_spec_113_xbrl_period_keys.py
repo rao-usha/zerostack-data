@@ -421,7 +421,7 @@ def test_bulk_load_fixture_zip_twice_pg(pg_engine, tmp_path):
     with pg_engine.begin() as conn:
         second = src.load(conn, rel, path)
     assert snapshot() == s1
-    assert second == first  # same rows touched (updated, not inserted)
+    assert all(v == 0 for v in second.values())  # unchanged rows are not rewritten (SPEC_115)
 
 
 @pg

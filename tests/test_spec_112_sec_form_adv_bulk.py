@@ -440,7 +440,10 @@ def test_roster_load_idempotent_and_form_adv_null_preserving_pg(pg_engine, tmp_p
         out1 = src.load(conn, rel, zpath)
     with pg_engine.begin() as conn:
         out2 = src.load(conn, rel, zpath)
-    assert out1 == out2 == {"sec_adv_roster_snapshots": 2, "sec_form_adv": 2}
+    assert out1 == {"sec_adv_roster_snapshots": 2, "sec_form_adv": 2}
+    # snapshots are unchanged (SPEC_115); sec_form_adv uses the NULL-preserving
+    # COALESCE upsert, which always touches its (small) row set
+    assert out2 == {"sec_adv_roster_snapshots": 0, "sec_form_adv": 2}
 
     with pg_engine.connect() as conn:
         assert conn.execute(text("SELECT COUNT(*) FROM sec_adv_roster_snapshots")).scalar() == 2
@@ -501,7 +504,8 @@ def test_iapd_load_idempotent_pg(pg_engine, tmp_path):
         out1 = src.load(conn, rel, gz)
     with pg_engine.begin() as conn:
         out2 = src.load(conn, rel, gz)
-    assert out1 == out2 == {"sec_adv_feed_firm_state": 2}
+    assert out1 == {"sec_adv_feed_firm_state": 2}
+    assert out2 == {"sec_adv_feed_firm_state": 0}  # unchanged (SPEC_115)
     with pg_engine.connect() as conn:
         assert conn.execute(text("SELECT COUNT(*) FROM sec_adv_feed_firm_state")).scalar() == 2
         row = conn.execute(text(

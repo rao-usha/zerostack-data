@@ -36,8 +36,18 @@ from app.core.copy_loader import copy_rows, create_staging, drop_staging, merge_
 from app.ingest.bulk.base import BulkSource, Release
 from app.ingest.bulk.registry import register_bulk_source
 from app.sources.sec.ingest_xbrl import STATEMENT_CONFLICT_COLUMNS
-from app.sources.sec.models import SECBalanceSheet, SECCashFlowStatement, SECIncomeStatement
-from app.sources.sec.xbrl_parser import build_financial_statements, three_year_cutoff
+from app.sources.sec.models import (
+    SECBalanceSheet,
+    SECCashFlowStatement,
+    SECFinancialFact,
+    SECIncomeStatement,
+)
+from app.sources.sec.xbrl_parser import (
+    FACT_CONCEPTS,
+    build_financial_facts,
+    build_financial_statements,
+    three_year_cutoff,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +83,15 @@ class TableSpec:
 
     @property
     def key_columns(self) -> List[str]:
-        return STATEMENT_CONFLICT_COLUMNS[self.model]
+        keys = STATEMENT_CONFLICT_COLUMNS.get(self.model)
+        if keys:
+            return keys
+        from sqlalchemy import UniqueConstraint
+
+        constraint = next(
+            c for c in self.model.__table__.constraints if isinstance(c, UniqueConstraint)
+        )
+        return [c.name for c in constraint.columns]
 
     @property
     def unique_constraint(self) -> str:
@@ -105,6 +123,8 @@ TABLES: Dict[str, TableSpec] = {
         TableSpec(SECIncomeStatement, "income_statement"),
         TableSpec(SECBalanceSheet, "balance_sheet"),
         TableSpec(SECCashFlowStatement, "cash_flow"),
+        # Narrow allowlist: the view reads depreciation from here (SPEC_115)
+        TableSpec(SECFinancialFact, "financial_facts"),
     )
 }
 
@@ -142,7 +162,11 @@ class SecCompanyFactsSource(BulkSource):
         return stmts
 
     def _check_keys(self, conn) -> None:
-        wanted = {spec.unique_constraint: spec.table for spec in TABLES.values()}
+        wanted = {
+            spec.unique_constraint: spec.table
+            for spec in TABLES.values()
+            if spec.model in STATEMENT_CONFLICT_COLUMNS
+        }
         found = set(
             conn.execute(
                 text("SELECT conname FROM pg_constraint WHERE contype = 'u' AND conname = ANY(:names)"),
@@ -186,6 +210,9 @@ class SecCompanyFactsSource(BulkSource):
                     with zf.open(info) as fh:
                         data = json.load(fh)
                     parsed = build_financial_statements(data, cik, min_period_end=cutoff)
+                    parsed["financial_facts"] = build_financial_facts(
+                        data, cik, FACT_CONCEPTS, min_period_end=cutoff
+                    )
                 except Exception as e:  # one bad company must not fail the snapshot
                     skipped += 1
                     logger.warning(f"[bulk:{self.name}] skipping {info.filename}: {type(e).__name__}: {e}")

@@ -316,7 +316,8 @@ def test_load_fixture_zip_twice_pg(pg_engine, tmp_path):
     rel2 = Release("snapshot:2026-09-17", SUBMISSIONS_URL)
     with pg_engine.begin() as conn:
         out2 = src.load(conn, rel2, _zip(tmp_path, apple=apple2, name="s2.zip"))
-    assert out2 == out1
+    # only the renamed filer is rewritten (SPEC_115)
+    assert out2 == {"sec_filers": 1, "sec_filer_former_names": 0, "sec_8k_index": 0}
     with pg_engine.connect() as conn:
         assert conn.execute(text("SELECT count(*) FROM sec_filers")).scalar() == 3
         assert conn.execute(text("SELECT count(*) FROM sec_filer_former_names")).scalar() == 2

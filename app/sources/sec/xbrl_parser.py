@@ -12,7 +12,7 @@ import re
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -562,6 +562,67 @@ def build_financial_statements(
     doc_ends = _document_period_ends(facts_data)
     entries = list(_iter_entries(facts_data, ("us-gaap",), _STATEMENT_NAMES, min_period_end))
     return _build_statements_from_entries(entries, doc_ends, cik, company_name)
+
+
+# Concepts materialized into sec_financial_facts by the bulk loader. The
+# public_company_financials view reads depreciation from here; loading every
+# us-gaap + dei fact would add ~2M rows for a 3-year window (SPEC_115).
+FACT_CONCEPTS = (
+    "DepreciationDepletionAndAmortization",
+    "DepreciationAndAmortization",
+    "Depreciation",
+)
+
+
+def build_financial_facts(
+    facts_data: Dict[str, Any],
+    cik: str,
+    names: Optional[Sequence[str]] = None,
+    min_period_end: Optional[date] = None,
+) -> List[Dict[str, Any]]:
+    """Fact rows for an allowlist of concepts, keyed on their own period.
+
+    Same period logic as the statements: one row per (concept, unit, period),
+    latest filed wins, labels derived from the period rather than the filing.
+    """
+    names = set(names or FACT_CONCEPTS)
+    company_name = facts_data.get("entityName", "")
+    doc_ends = _document_period_ends(facts_data)
+    entries = list(_iter_entries(facts_data, ("us-gaap",), names, min_period_end))
+    if not entries:
+        return []
+
+    labeler = _PeriodLabeler(doc_ends, entries)
+    best: Dict[Tuple[str, str, Optional[date], date], Any] = {}
+    for e in entries:
+        k = (e.name, e.unit, e.start, e.end)
+        cur = best.get(k)
+        if cur is None or e.rank > cur.rank:
+            best[k] = e
+
+    rows = []
+    for e in best.values():
+        labels = labeler.label(e.start, e.end)
+        rows.append(
+            {
+                "cik": cik,
+                "company_name": company_name,
+                "fact_name": e.name,
+                "fact_label": e.label,
+                "namespace": e.ns,
+                "value": e.val,
+                "unit": e.unit,
+                "period_end_date": e.end,
+                "period_start_date": e.start,
+                "fiscal_year": labels["fiscal_year"],
+                "fiscal_period": labels["fiscal_period"],
+                "form_type": e.form,
+                "accession_number": e.accn,
+                "filing_date": e.filed,
+                "frame": e.frame,
+            }
+        )
+    return rows
 
 
 def parse_company_facts(

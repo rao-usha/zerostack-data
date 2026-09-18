@@ -104,12 +104,17 @@ def copy_rows(conn: Connection, name: str, columns: Sequence[str], rows: Iterabl
     return stream.count
 
 
+# Bookkeeping columns: rewriting them alone is not a real change
+NON_COMPARED_COLUMNS = ("loaded_at", "ingested_at", "updated_at", "source_release_key")
+
+
 def build_merge_sql(
     stg_name: str,
     target: str,
     columns: Sequence[str],
     key_columns: Sequence[str],
     update_columns: Optional[Sequence[str]] = None,
+    skip_unchanged: bool = True,
 ) -> str:
     cols = ", ".join(qi(c) for c in columns)
     keys = ", ".join(qi(c) for c in key_columns)
@@ -118,6 +123,13 @@ def build_merge_sql(
     if update_columns:
         sets = ", ".join(f"{qi(c)} = EXCLUDED.{qi(c)}" for c in update_columns)
         conflict = f"ON CONFLICT ({keys}) DO UPDATE SET {sets}"
+        if skip_unchanged:
+            compared = [c for c in update_columns if c not in NON_COMPARED_COLUMNS] or list(update_columns)
+            alias = qi(target.split(".")[-1])
+            current = ", ".join(f"{alias}.{qi(c)}" for c in compared)
+            incoming = ", ".join(f"EXCLUDED.{qi(c)}" for c in compared)
+            # Leave identical rows completely untouched: no dead tuples, no disk churn
+            conflict += f" WHERE ({current}) IS DISTINCT FROM ({incoming})"
     else:
         conflict = f"ON CONFLICT ({keys}) DO NOTHING"
     return f"""
@@ -144,9 +156,16 @@ def merge_staging(
     columns: Sequence[str],
     key_columns: Sequence[str],
     update_columns: Optional[Sequence[str]] = None,
+    skip_unchanged: bool = True,
 ) -> Tuple[int, int]:
-    """Upsert stg.<stg_name> into target. Returns (inserted, updated)."""
-    row = conn.execute(text(build_merge_sql(stg_name, target, columns, key_columns, update_columns))).one()
+    """Upsert stg.<stg_name> into target. Returns (inserted, updated).
+
+    Rows whose non-key columns already match are skipped, so ``updated`` counts
+    real changes only.
+    """
+    row = conn.execute(
+        text(build_merge_sql(stg_name, target, columns, key_columns, update_columns, skip_unchanged))
+    ).one()
     return int(row[0] or 0), int(row[1] or 0)
 
 

@@ -448,10 +448,11 @@ def test_load_idempotent_pg(pg_engine, tmp_path):
                                {"a": A1}).scalar()
         assert conn.execute(text("SELECT to_regclass('stg.sec_form_d_filings')")).scalar() is None
 
-    # second load: idempotent
+    # second load: idempotent, and unchanged rows are not rewritten (SPEC_115)
     with pg_engine.begin() as conn:
         rows2 = src.load(conn, rel, z)
-    assert rows2 == rows
+    assert set(rows2) == set(rows)
+    assert all(v == 0 for v in rows2.values())
     assert all(ins == 0 for ins, _ in src.last_stats.values())
     with pg_engine.connect() as conn:
         counts = [conn.execute(text(f"SELECT COUNT(*) FROM {t}")).scalar()

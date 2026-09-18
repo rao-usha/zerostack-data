@@ -364,7 +364,7 @@ def test_load_fixture_twice_idempotent_pg(pg_engine, fixture_zip, monkeypatch):
     assert _counts(pg_engine) == expected
     with pg_engine.begin() as conn:
         out2 = src.load(conn, rel, fixture_zip)
-    assert out2 == expected
+    assert all(v == 0 for v in out2.values())  # unchanged rows are not rewritten (SPEC_115)
     assert _counts(pg_engine) == expected
     with pg_engine.connect() as conn:
         row = conn.execute(text(
@@ -400,7 +400,9 @@ def test_republish_removes_stale_children_pg(pg_engine, fixture_zip, tmp_path):
     republished = build_fixture_zip(tmp_path / "republished" / "2025q4_form345.zip", drop_nonderiv_sk="8835099")
     with pg_engine.begin() as conn:
         out = src.load(conn, rel, republished)
-    assert out["sec_insider_transactions"] == 4
+    # the 4 surviving rows are unchanged, so nothing is rewritten (SPEC_115);
+    # the stale row is still deleted below
+    assert out["sec_insider_transactions"] == 0
     with pg_engine.connect() as conn:
         sks = {r[0] for r in conn.execute(text("SELECT trans_sk FROM public.sec_insider_transactions"))}
     assert 8835099 not in sks and 8835098 in sks and 1 in sks

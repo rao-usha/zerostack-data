@@ -351,10 +351,14 @@ def test_load_idempotent_with_and_without_holdings_pg(pg_engine, tmp_path, monke
         assert _count(conn, "sec_13f_holdings") == 0
 
     rel = Release(key, "https://www.sec.gov/x.zip", dict(meta, load_holdings=True))
-    for _ in range(2):
-        with pg_engine.begin() as conn:
-            out = src.load(conn, rel, path)
-        assert out == {"sec_13f_filings": 3, "sec_13f_other_managers": 2, "sec_13f_holdings": 3}
+    with pg_engine.begin() as conn:
+        out = src.load(conn, rel, path)
+    # filings/managers were already loaded above and are unchanged (SPEC_115)
+    assert out == {"sec_13f_filings": 0, "sec_13f_other_managers": 0, "sec_13f_holdings": 3}
+    # reload: same data, so nothing is rewritten (SPEC_115)
+    with pg_engine.begin() as conn:
+        out = src.load(conn, rel, path)
+    assert out == {"sec_13f_filings": 0, "sec_13f_other_managers": 0, "sec_13f_holdings": 0}
     with pg_engine.connect() as conn:
         assert _count(conn, "sec_13f_filings") == 3
         assert _count(conn, "sec_13f_holdings") == 3

@@ -39,6 +39,10 @@ STG_FORMER = "sec_edgar_former_names"
 STG_8K = "sec_edgar_8k_index"
 
 
+# One 8-K can be filed for several companies; each keeps its own row (SPEC_115)
+EIGHT_K_KEY = ["accession_number", "cik"]
+
+
 def _table_ddl(table: str, columns: List[str], types: Dict[str, str], pk: List[str]) -> str:
     cols = []
     for c in columns:
@@ -83,7 +87,7 @@ class EdgarSubmissionsBulk(BulkSource):
             "CREATE INDEX IF NOT EXISTS ix_sec_filer_former_names_lower_name "
             "ON public.sec_filer_former_names (lower(name))",
             _table_ddl("public.sec_8k_index", parse.EIGHT_K_COLUMNS, parse.EIGHT_K_TYPES,
-                       ["accession_number"]),
+                       EIGHT_K_KEY),
             "CREATE INDEX IF NOT EXISTS ix_sec_8k_index_cik_filing_date ON public.sec_8k_index (cik, filing_date)",
             "CREATE INDEX IF NOT EXISTS ix_sec_8k_index_filing_date ON public.sec_8k_index (filing_date)",
         ]
@@ -100,7 +104,8 @@ class EdgarSubmissionsBulk(BulkSource):
             (STG_FILERS, "public.sec_filers", parse.FILER_COLUMNS, parse.FILER_TYPES, ["cik"]),
             (STG_FORMER, "public.sec_filer_former_names", parse.FORMER_NAME_COLUMNS,
              parse.FORMER_NAME_TYPES, ["cik", "name", "from_date"]),
-            (STG_8K, "public.sec_8k_index", parse.EIGHT_K_COLUMNS, parse.EIGHT_K_TYPES, ["accession_number"]),
+            (STG_8K, "public.sec_8k_index", parse.EIGHT_K_COLUMNS, parse.EIGHT_K_TYPES,
+             EIGHT_K_KEY),
         ]
         for stg, _target, cols, types, _keys in specs:
             create_staging(conn, stg, [(c, types[c]) for c in cols])
