@@ -512,7 +512,8 @@ class TestPersistDeal:
 
 
 class TestPersist13FHolding:
-    def test_creates_company_fund_and_investment(self, persister, pe_db):
+    def test_13f_holding_is_not_persisted(self, persister, pe_db):
+        """13F positions are not portfolio companies (SPEC_104)."""
         item = _make_item("13f_holding", {
             "issuer_name": "Apple Inc",
             "security_class": "AAPL",
@@ -522,22 +523,10 @@ class TestPersist13FHolding:
         results = persister.persist_results([
             _make_result(1, "Blackstone", [item])
         ])
-        assert results["persisted"] >= 1
-
-        company = pe_db.query(PEPortfolioCompany).filter_by(name="Apple Inc").first()
-        assert company is not None
-
-        fund = pe_db.query(PEFund).filter_by(
-            firm_id=1, strategy="13F Reported Holdings"
-        ).first()
-        assert fund is not None
-
-        inv = pe_db.query(PEFundInvestment).filter_by(
-            fund_id=fund.id, company_id=company.id
-        ).first()
-        assert inv is not None
-        assert inv.invested_amount_usd == Decimal("50000000")
-        assert inv.investment_type == "13F Holding"
+        assert results["persisted"] == 0
+        assert results["skipped"] == 1
+        assert pe_db.query(PEPortfolioCompany).filter_by(name="Apple Inc").first() is None
+        assert pe_db.query(PEFund).filter_by(strategy="13F Reported Holdings").first() is None
 
 
 # ===================================================================
@@ -578,7 +567,11 @@ class TestPersistResultsOrchestration:
         assert stats["skipped"] >= 1
 
     def test_item_failure_isolation(self, persister, pe_db):
-        """One bad item doesn't block processing of subsequent items."""
+        """One bad item doesn't block processing of subsequent items.
+
+        A handler that actually raises is covered in
+        tests/test_spec_103_pe_silent_data_loss_hotfixes.py (TestD2PersisterSavepoints).
+        """
         # related_person with no name -> will be skipped inside handler
         bad_item = _make_item("related_person", {})  # missing "name"
         good_item = _make_item("team_member", {

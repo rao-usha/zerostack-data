@@ -199,10 +199,9 @@ class UsdaTruckCollector(BaseCollector):
                 socrata_records = await self._collect_from_socrata(config)
                 all_records.extend(socrata_records)
 
-            # If still no data, generate sample rates for major lanes
+            # No sample/random fallback: fabricated rows must never be stored (PLAN_082).
             if not all_records:
-                logger.info("Using sample agricultural truck rate data")
-                all_records = self._get_sample_rates()
+                raise RuntimeError("No data returned from source; refusing to substitute sample data")
 
             return {"records": all_records}
 
@@ -280,132 +279,6 @@ class UsdaTruckCollector(BaseCollector):
         except Exception as e:
             logger.warning(f"Socrata fallback failed: {e}")
             return []
-
-    def _get_sample_rates(self) -> List[Dict[str, Any]]:
-        """Generate sample agricultural truck rates for major lanes."""
-        today = date.today()
-
-        # Major agricultural shipping lanes
-        lanes = [
-            # California produce
-            (
-                "Central Valley, CA",
-                "CA",
-                "Los Angeles",
-                "CA",
-                "Produce",
-                250,
-                2.85,
-                850,
-            ),
-            ("Central Valley, CA", "CA", "Chicago", "IL", "Produce", 2100, 2.45, 5145),
-            ("Central Valley, CA", "CA", "New York", "NY", "Produce", 2800, 2.55, 7140),
-            ("Central Valley, CA", "CA", "Dallas", "TX", "Produce", 1500, 2.50, 3750),
-            (
-                "Imperial Valley, CA",
-                "CA",
-                "Phoenix",
-                "AZ",
-                "Vegetables",
-                180,
-                3.00,
-                540,
-            ),
-            ("Salinas Valley, CA", "CA", "Denver", "CO", "Lettuce", 1200, 2.60, 3120),
-            # Florida citrus
-            ("Central Florida", "FL", "Atlanta", "GA", "Citrus", 450, 2.70, 1215),
-            ("Central Florida", "FL", "Chicago", "IL", "Citrus", 1200, 2.50, 3000),
-            ("Central Florida", "FL", "New York", "NY", "Citrus", 1100, 2.55, 2805),
-            ("South Florida", "FL", "Boston", "MA", "Produce", 1500, 2.60, 3900),
-            # Texas/Mexico border
-            ("Rio Grande Valley, TX", "TX", "Dallas", "TX", "Produce", 500, 2.65, 1325),
-            (
-                "Rio Grande Valley, TX",
-                "TX",
-                "Chicago",
-                "IL",
-                "Produce",
-                1700,
-                2.45,
-                4165,
-            ),
-            ("Nogales, AZ", "AZ", "Los Angeles", "CA", "Produce", 500, 2.80, 1400),
-            ("Nogales, AZ", "AZ", "Phoenix", "AZ", "Vegetables", 180, 3.10, 558),
-            # Pacific Northwest
-            ("Yakima Valley, WA", "WA", "Seattle", "WA", "Apples", 150, 3.20, 480),
-            ("Yakima Valley, WA", "WA", "Portland", "OR", "Apples", 200, 3.00, 600),
-            (
-                "Columbia Basin, WA",
-                "WA",
-                "Los Angeles",
-                "CA",
-                "Potatoes",
-                1100,
-                2.55,
-                2805,
-            ),
-            # Midwest
-            (
-                "San Joaquin Valley, CA",
-                "CA",
-                "Kansas City",
-                "MO",
-                "Produce",
-                1700,
-                2.48,
-                4216,
-            ),
-            ("Vidalia, GA", "GA", "Atlanta", "GA", "Onions", 200, 2.90, 580),
-            (
-                "Eastern Shore, MD",
-                "MD",
-                "Philadelphia",
-                "PA",
-                "Produce",
-                120,
-                3.30,
-                396,
-            ),
-        ]
-
-        records = []
-        for (
-            origin,
-            origin_st,
-            dest,
-            dest_st,
-            commodity,
-            mileage,
-            rate_mi,
-            rate_tl,
-        ) in lanes:
-            # Determine mileage band
-            if mileage < 200:
-                mileage_band = "local"
-            elif mileage < 500:
-                mileage_band = "short"
-            elif mileage < 1000:
-                mileage_band = "medium"
-            else:
-                mileage_band = "long"
-
-            records.append(
-                {
-                    "origin_region": origin,
-                    "origin_state": origin_st,
-                    "destination_city": dest,
-                    "destination_state": dest_st,
-                    "commodity": commodity,
-                    "mileage": mileage,
-                    "mileage_band": mileage_band,
-                    "rate_per_mile": rate_mi,
-                    "rate_per_truckload": rate_tl,
-                    "fuel_price": 3.85,  # Current approximate diesel price
-                    "report_date": today.isoformat(),
-                }
-            )
-
-        return records
 
     def _transform_rate(self, rate: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Transform raw rate data to database format."""

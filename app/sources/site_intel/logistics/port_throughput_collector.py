@@ -109,10 +109,9 @@ class PortThroughputCollector(BaseCollector):
             throughput_result = await self._collect_throughput(config)
             all_throughput.extend(throughput_result.get("records", []))
 
-            # If no data from API, use sample data
+            # No sample/random fallback: fabricated rows must never be stored (PLAN_082).
             if not all_throughput:
-                logger.info("Using sample port throughput data")
-                all_throughput = self._get_sample_throughput()
+                raise RuntimeError("No data returned from source; refusing to substitute sample data")
 
             # Transform and insert records
             records = []
@@ -228,99 +227,6 @@ class PortThroughputCollector(BaseCollector):
         except Exception as e:
             logger.error(f"Failed to collect throughput: {e}", exc_info=True)
             return {"records": [], "error": str(e)}
-
-    def _get_sample_throughput(self) -> List[Dict[str, Any]]:
-        """Generate sample port throughput data."""
-        today = date.today()
-        current_year = today.year
-        current_month = today.month
-
-        # Annual TEU volumes (approximate) for major ports
-        annual_teu = {
-            "USLAX": 9200000,
-            "USLGB": 9100000,
-            "USNYC": 8600000,
-            "USSAV": 5500000,
-            "USHOU": 3500000,
-            "USSEA": 3300000,
-            "USTIW": 2300000,
-            "USORF": 3200000,
-            "USCHA": 2700000,
-            "USJAX": 1400000,
-            "USBAL": 1100000,
-            "USOAK": 2500000,
-            "USMIA": 1100000,
-            "USPHF": 650000,
-            "USMOB": 450000,
-            "USNOL": 600000,
-            "USBOS": 280000,
-            "USPDX": 350000,
-            "USDET": 180000,
-        }
-
-        records = []
-
-        # Generate 12 months of data
-        for month_offset in range(12):
-            if current_month - month_offset <= 0:
-                year = current_year - 1
-                month = 12 + (current_month - month_offset)
-            else:
-                year = current_year
-                month = current_month - month_offset
-
-            for port_code, annual_vol in annual_teu.items():
-                port_info = self.MAJOR_PORTS.get(port_code, {})
-
-                # Monthly TEU (with seasonal variation)
-                import random
-
-                seasonal_factor = 1.0 + 0.15 * (1 if month in [8, 9, 10, 11] else -0.1)
-                monthly_teu = int(
-                    (annual_vol / 12) * seasonal_factor * random.uniform(0.9, 1.1)
-                )
-
-                # Split into loaded/empty, import/export
-                loaded_import = int(monthly_teu * 0.42)
-                loaded_export = int(monthly_teu * 0.28)
-                empty_import = int(monthly_teu * 0.08)
-                empty_export = int(monthly_teu * 0.22)
-
-                # Vessel calls (roughly 1 call per 2000-3000 TEU)
-                vessel_calls = max(10, monthly_teu // random.randint(2000, 3000))
-
-                # Berthing hours
-                avg_berthing = round(random.uniform(18, 36), 1)
-                avg_turnaround = round(random.uniform(24, 48), 1)
-
-                # Tonnage (approximate: 14 tons per TEU)
-                tonnage_import = int(loaded_import * 14 * 1000)
-                tonnage_export = int(loaded_export * 14 * 1000)
-
-                records.append(
-                    {
-                        "port_code": port_code,
-                        "port_name": port_info.get("name"),
-                        "period_year": year,
-                        "period_month": month,
-                        "teu_loaded_import": loaded_import,
-                        "teu_loaded_export": loaded_export,
-                        "teu_empty_import": empty_import,
-                        "teu_empty_export": empty_export,
-                        "teu_total": monthly_teu,
-                        "container_vessel_calls": vessel_calls,
-                        "avg_berthing_hours": avg_berthing,
-                        "avg_vessel_turnaround_hours": avg_turnaround,
-                        "tonnage_import": tonnage_import,
-                        "tonnage_export": tonnage_export,
-                        "tonnage_total": tonnage_import + tonnage_export,
-                        "bulk_tonnage": int(random.randint(50000, 500000)),
-                        "breakbulk_tonnage": int(random.randint(10000, 100000)),
-                        "roro_units": int(random.randint(1000, 20000)),
-                    }
-                )
-
-        return records
 
     def _transform_throughput(self, record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Transform raw throughput data to database format."""

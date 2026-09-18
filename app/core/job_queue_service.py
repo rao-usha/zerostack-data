@@ -177,21 +177,44 @@ def cancel_stale_pending_jobs(max_age_hours: int = 4) -> int:
             .all()
         )
 
+        from app.core.models import IngestionJob, JobStatus
+
+        reason = "no_worker_available: job pending too long with no worker"
         count = 0
+        batch_ids = set()
         for job in stale:
             logger.warning(
                 f"Auto-cancelling stale job {job.id} (type={job.job_type}, "
                 f"status={job.status}, created={job.created_at}, "
                 f"age_hours={(datetime.utcnow() - job.created_at).total_seconds() / 3600:.1f})"
             )
+            now = datetime.utcnow()
             job.status = QueueJobStatus.FAILED
-            job.error_message = "no_worker_available: job pending too long with no worker"
-            job.completed_at = datetime.utcnow()
+            job.error_message = reason
+            job.completed_at = now
+            # Keep the linked ingestion_jobs row in sync, or it stays
+            # pending/blocked forever (zombie).
+            if job.job_table_id:
+                ing = db.get(IngestionJob, job.job_table_id)
+                if ing is not None:
+                    ing.status = JobStatus.FAILED
+                    ing.error_message = reason
+                    ing.completed_at = now
+            payload = job.payload if isinstance(job.payload, dict) else {}
+            batch_id = payload.get("batch_id")
+            if isinstance(batch_id, str) and batch_id:
+                batch_ids.add(batch_id)
             count += 1
 
         if count:
             db.commit()
             logger.info(f"Auto-cancelled {count} stale pending/blocked job(s)")
+            # Failed lower tiers must unblock higher tiers of the same batch.
+            for batch_id in sorted(batch_ids):
+                try:
+                    promote_blocked_jobs(db, batch_id)
+                except Exception as e:
+                    logger.error(f"Promotion after stale cleanup failed for {batch_id}: {e}")
 
         return count
     except Exception as e:
@@ -294,3 +317,48 @@ def promote_blocked_jobs(db: Session, batch_id: str) -> int:
         logger.info(f"Promoted {promoted} blocked jobs in batch {batch_id}")
 
     return promoted
+
+
+# ---------------------------------------------------------------------------
+# Worker liveness (SPEC_106)
+# ---------------------------------------------------------------------------
+
+def record_worker_heartbeat(db: Session, worker_id: str, hostname: Optional[str] = None) -> None:
+    """Upsert this worker's liveness row."""
+    from sqlalchemy import text
+
+    db.execute(
+        text(
+            """
+            INSERT INTO worker_heartbeats (worker_id, hostname, started_at, last_seen_at)
+            VALUES (:worker_id, :hostname, NOW(), NOW())
+            ON CONFLICT (worker_id) DO UPDATE SET last_seen_at = NOW()
+            """
+        ),
+        {"worker_id": worker_id, "hostname": hostname},
+    )
+    db.commit()
+
+
+def remove_worker_heartbeat(db: Session, worker_id: str) -> None:
+    """Delete this worker's liveness row (graceful shutdown)."""
+    from sqlalchemy import text
+
+    db.execute(
+        text("DELETE FROM worker_heartbeats WHERE worker_id = :worker_id"),
+        {"worker_id": worker_id},
+    )
+    db.commit()
+
+
+def has_live_worker(db: Session, within_minutes: int = 5) -> bool:
+    """True if any worker heartbeat is newer than ``within_minutes``."""
+    from app.core.models_queue import WorkerHeartbeat
+
+    cutoff = datetime.utcnow() - timedelta(minutes=within_minutes)
+    return (
+        db.query(WorkerHeartbeat.worker_id)
+        .filter(WorkerHeartbeat.last_seen_at >= cutoff)
+        .first()
+        is not None
+    )

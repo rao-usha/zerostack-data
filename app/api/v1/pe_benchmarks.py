@@ -9,6 +9,7 @@ Endpoints for:
 """
 
 import logging
+import os
 from datetime import date
 from typing import Any, Dict, List, Optional
 
@@ -199,7 +200,12 @@ async def seed_demo_data(db: Session = Depends(get_db)):
     """
     Seed PE demo data (3 firms, 6 funds, 24 companies, financials, people, deals).
     Idempotent — safe to run multiple times.
+
+    Disabled unless ALLOW_DEMO_SEED=1: demo rows must never land in the live
+    PE tables that analytics read (PLAN_082).
     """
+    if os.getenv("ALLOW_DEMO_SEED") != "1":
+        raise HTTPException(status_code=403, detail="Demo seeding disabled (set ALLOW_DEMO_SEED=1)")
     from app.sources.pe.demo_seeder import seed_pe_demo_data
 
     try:

@@ -7,7 +7,7 @@ records using the existing LLMExtractor.parse_bio() pipeline.
 
 import asyncio
 import logging
-from typing import Optional
+from typing import Callable, Optional
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -114,6 +114,7 @@ class BioParserService:
         db: Session,
         limit: Optional[int] = None,
         overwrite: bool = False,
+        session_factory: Optional[Callable[[], Session]] = None,
     ) -> dict:
         """
         Parse bios for all people with bio text.
@@ -150,23 +151,35 @@ class BioParserService:
         semaphore = asyncio.Semaphore(4)
         stats = {"parsed": 0, "experience_created": 0, "education_created": 0, "errors": 0}
 
-        async def _parse_one(person, company_id):
-            company_name = "Unknown"
-            if company_id:
-                from app.core.people_models import IndustrialCompany
-                company = db.query(IndustrialCompany).filter(IndustrialCompany.id == company_id).first()
-                if company:
-                    company_name = company.name
+        if session_factory is None:
+            from app.core.database import get_session_factory
+            session_factory = get_session_factory()
 
+        async def _parse_one(person, company_id):
             async with semaphore:
-                result = await self.parse_person(
-                    person_id=person.id,
-                    person_name=person.full_name,
-                    company_name=company_name,
-                    bio=person.bio,
-                    db=db,
-                )
-            return result
+                # Own session per person: concurrent coroutines must not share
+                # one Session (interleaved commits/rollbacks corrupt each other).
+                task_db = session_factory()
+                try:
+                    company_name = "Unknown"
+                    if company_id:
+                        from app.core.people_models import IndustrialCompany
+                        company = task_db.query(IndustrialCompany).filter(IndustrialCompany.id == company_id).first()
+                        if company:
+                            company_name = company.name
+
+                    return await self.parse_person(
+                        person_id=person.id,
+                        person_name=person.full_name,
+                        company_name=company_name,
+                        bio=person.bio,
+                        db=task_db,
+                    )
+                except Exception:
+                    task_db.rollback()
+                    raise
+                finally:
+                    task_db.close()
 
         tasks = [_parse_one(p, cid) for p, cid in candidates]
         results = await asyncio.gather(*tasks, return_exceptions=True)

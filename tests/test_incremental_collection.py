@@ -127,7 +127,7 @@ class TestGroupFiltering:
     @patch("app.core.batch_service.resolve_effective_tiers")
     @patch("app.core.batch_service.submit_job")
     async def test_group_filters_to_matching_sources(self, mock_submit, mock_resolve):
-        """group_name='critical' should only launch treasury, fred, prediction_markets."""
+        """group_name='critical' should only launch treasury and fred (prediction_markets removed, SPEC_104)."""
         from app.core.batch_service import launch_batch_collection, Tier, SourceDef
 
         tier1 = Tier(level=1, priority=10, name="Test", sources=[
@@ -146,8 +146,8 @@ class TestGroupFiltering:
         with patch("app.core.job_splitter.get_split_config", return_value=None):
             result = await launch_batch_collection(db, group_name="critical")
 
-        # Only tier 1 sources should be launched (treasury, fred, prediction_markets)
-        assert result["total_jobs"] == 3
+        # Only the critical group's sources are launched (treasury, fred)
+        assert result["total_jobs"] == 2
 
     @pytest.mark.asyncio
     @patch("app.core.batch_service.WORKER_MODE", True)

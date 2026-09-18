@@ -90,39 +90,6 @@ class FormADVIngestionService:
             logger.warning(f"Table creation warning: {e}")
             self.db.rollback()
 
-    def ingest_sample_data(self) -> Dict[str, Any]:
-        """
-        Ingest sample adviser data for testing.
-
-        Returns:
-            Ingestion result summary
-        """
-        result = {
-            "advisers_found": 0,
-            "advisers_ingested": 0,
-            "advisers_skipped": 0,
-            "errors": [],
-        }
-
-        sample_advisers = self.client.get_sample_advisers()
-        result["advisers_found"] = len(sample_advisers)
-
-        for adviser in sample_advisers:
-            try:
-                if self._adviser_exists(adviser["crd_number"]):
-                    result["advisers_skipped"] += 1
-                    continue
-
-                self._store_adviser(adviser)
-                result["advisers_ingested"] += 1
-
-            except Exception as e:
-                result["errors"].append(
-                    f"Error storing {adviser.get('legal_name')}: {str(e)}"
-                )
-
-        return result
-
     def _adviser_exists(self, crd_number: str) -> bool:
         """Check if adviser already exists in database."""
         query = text("SELECT 1 FROM form_adv_advisers WHERE crd_number = :crd LIMIT 1")

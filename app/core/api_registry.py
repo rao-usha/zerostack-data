@@ -144,7 +144,7 @@ API_REGISTRY: Dict[str, APIConfig] = {
         config_key="",  # No key required
         signup_url="",
         max_concurrency=2,
-        rate_limit_per_minute=10,  # SEC is strict
+        rate_limit_per_minute=480,  # 8 req/s, under SEC's 10 req/s fair-access cap
         timeout_seconds=60.0,
         notes="No key required. 10 req/sec max. Must set User-Agent.",
     ),

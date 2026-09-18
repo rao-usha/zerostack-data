@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 
 from app.core.models import IngestionJob, JobStatus
 from app.core.models_queue import QueueJobStatus
-from app.core.job_queue_service import submit_job, WORKER_MODE
+from app.core.job_queue_service import has_live_worker, submit_job, WORKER_MODE
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,6 @@ TIER_1 = Tier(
     sources=[
         SourceDef("treasury", {"incremental": True}),
         SourceDef("fred", {"category": "interest_rates", "incremental": True}),
-        SourceDef("prediction_markets", {"sources": ["kalshi", "polymarket"]}),
     ],
 )
 
@@ -205,7 +204,7 @@ def resolve_effective_tiers(db) -> list:
 # Default groups seeded from current tier definitions
 DEFAULT_COLLECTION_GROUPS = [
     {"name": "critical", "description": "Daily fast APIs — rates, treasury, markets", "priority": 1, "max_concurrent": 2,
-     "sources": ["treasury", "fred", "prediction_markets"]},
+     "sources": ["treasury", "fred"]},
     {"name": "economic", "description": "Weekly energy, trade, and weather data", "priority": 3, "max_concurrent": 3,
      "sources": ["eia", "cftc_cot", "noaa"]},
     {"name": "government", "description": "Monthly government releases and regulatory filings", "priority": 5, "max_concurrent": 4,
@@ -364,6 +363,7 @@ async def launch_batch_collection(
     sources: Optional[List[str]] = None,
     group_name: Optional[str] = None,
     mode: str = "full",
+    force: bool = False,
 ) -> Dict:
     """
     Launch a batch collection.
@@ -387,6 +387,12 @@ async def launch_batch_collection(
         raise RuntimeError(
             "Batch collection requires WORKER_MODE=1. "
             "Set WORKER_MODE=1 in docker-compose.yml and start at least one worker."
+        )
+    if not force and not has_live_worker(db):
+        # Without a live worker every job stays pending/blocked (zombie jobs).
+        raise RuntimeError(
+            "No live worker heartbeat in the last 5 minutes. "
+            "Start a worker (docker-compose up -d worker) or pass force=True."
         )
 
     config = config or {}

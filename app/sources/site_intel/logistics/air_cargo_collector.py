@@ -175,10 +175,9 @@ class AirCargoCollector(BaseCollector):
             cargo_result = await self._collect_air_cargo(config)
             all_cargo.extend(cargo_result.get("records", []))
 
-            # If no data from API, use sample data
+            # No sample/random fallback: fabricated rows must never be stored (PLAN_082).
             if not all_cargo:
-                logger.info("Using sample air cargo data")
-                all_cargo = self._get_sample_cargo()
+                raise RuntimeError("No data returned from source; refusing to substitute sample data")
 
             # Transform and insert records
             records = []
@@ -271,127 +270,6 @@ class AirCargoCollector(BaseCollector):
         except Exception as e:
             logger.error(f"Failed to collect air cargo: {e}", exc_info=True)
             return {"records": [], "error": str(e)}
-
-    def _get_sample_cargo(self) -> List[Dict[str, Any]]:
-        """Generate sample air cargo data for major cargo airports."""
-        today = date.today()
-        current_year = today.year
-        current_month = today.month
-
-        # Annual cargo tons (approximate) for major cargo airports
-        annual_tons = {
-            "MEM": 4800000,  # FedEx hub
-            "ANC": 2900000,  # Alaska hub for Asia cargo
-            "SDF": 3200000,  # UPS hub
-            "MIA": 2500000,  # Latin America gateway
-            "LAX": 2200000,  # Pacific gateway
-            "JFK": 1600000,  # International hub
-            "ORD": 1800000,  # Central US hub
-            "IND": 1500000,  # FedEx secondary hub
-            "CVG": 1100000,  # DHL hub
-            "EWR": 1000000,  # East coast hub
-            "DFW": 900000,
-            "ATL": 750000,
-            "ONT": 800000,
-            "OAK": 750000,
-            "SFO": 600000,
-            "SEA": 500000,
-            "PHX": 300000,
-            "IAH": 450000,
-            "BOS": 300000,
-            "PHL": 400000,
-            "RFD": 350000,
-            "HSV": 200000,
-            "AFW": 550000,  # Amazon hub
-        }
-
-        records = []
-
-        # Generate 12 months of data
-        for month_offset in range(12):
-            if current_month - month_offset <= 0:
-                year = current_year - 1
-                month = 12 + (current_month - month_offset)
-            else:
-                year = current_year
-                month = current_month - month_offset
-
-            for airport_code, annual_vol in annual_tons.items():
-                airport_info = self.MAJOR_CARGO_AIRPORTS.get(airport_code, {})
-
-                import random
-
-                # Seasonal factor (Q4 higher for holiday shipping)
-                seasonal_factor = 1.0 + (0.2 if month in [10, 11, 12] else -0.05)
-                monthly_tons = (
-                    (annual_vol / 12) * seasonal_factor * random.uniform(0.9, 1.1)
-                )
-
-                # Split inbound/outbound
-                enplaned = monthly_tons * random.uniform(0.45, 0.55)
-                deplaned = monthly_tons - enplaned
-
-                # Domestic vs international (varies by airport)
-                if airport_code in ["MIA", "JFK", "ANC", "LAX"]:
-                    intl_pct = random.uniform(0.50, 0.70)
-                else:
-                    intl_pct = random.uniform(0.10, 0.30)
-
-                domestic = monthly_tons * (1 - intl_pct)
-                international = monthly_tons * intl_pct
-
-                # Carrier breakdown
-                carriers = {}
-                if airport_code == "MEM":
-                    carriers = {"FX": 0.85, "AA": 0.05, "UPS": 0.05, "Other": 0.05}
-                elif airport_code == "SDF":
-                    carriers = {"UPS": 0.90, "FX": 0.03, "Other": 0.07}
-                elif airport_code == "CVG":
-                    carriers = {"DHL": 0.75, "UPS": 0.10, "FX": 0.08, "Other": 0.07}
-                elif airport_code == "AFW":
-                    carriers = {
-                        "5Y": 0.80,
-                        "FX": 0.10,
-                        "Other": 0.10,
-                    }  # 5Y = Atlas (Amazon)
-                else:
-                    carriers = {
-                        "FX": 0.30,
-                        "UPS": 0.25,
-                        "AA": 0.15,
-                        "UA": 0.10,
-                        "Other": 0.20,
-                    }
-
-                carrier_tons = {
-                    k: round(monthly_tons * v, 2) for k, v in carriers.items()
-                }
-
-                # Aircraft movements (roughly 50-100 tons per flight)
-                avg_tons_per_flight = random.uniform(50, 100)
-                total_flights = int(monthly_tons / avg_tons_per_flight)
-
-                records.append(
-                    {
-                        "airport_code": airport_code,
-                        "airport_name": airport_info.get("name"),
-                        "period_year": year,
-                        "period_month": month,
-                        "freight_tons_enplaned": round(enplaned, 2),
-                        "freight_tons_deplaned": round(deplaned, 2),
-                        "freight_tons_total": round(monthly_tons, 2),
-                        "freight_domestic": round(domestic, 2),
-                        "freight_international": round(international, 2),
-                        "mail_tons": round(
-                            monthly_tons * random.uniform(0.02, 0.05), 2
-                        ),
-                        "carrier_breakdown": carrier_tons,
-                        "cargo_aircraft_departures": total_flights // 2,
-                        "cargo_aircraft_arrivals": total_flights // 2,
-                    }
-                )
-
-        return records
 
     def _transform_cargo(self, record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Transform raw cargo data to database format."""

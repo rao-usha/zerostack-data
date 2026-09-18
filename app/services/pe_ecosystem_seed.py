@@ -236,9 +236,11 @@ class PEEcosystemSeeder:
         n = self.db.query(PEPortfolioCompany).filter_by(data_source=DATA_SOURCE).delete()
         counts["pe_portfolio_companies"] = n
 
-        # Firms: delete by known seed names
-        seed_names = [t[0] for t in FIRM_TEMPLATES]
-        n = self.db.query(PEFirm).filter(PEFirm.name.in_(seed_names)).delete()
+        # Firms: delete by seed marker only — never by name, which would also
+        # delete real firms that share a template name.
+        n = self.db.query(PEFirm).filter(
+            PEFirm.data_sources.cast(SAString).like('%pe_ecosystem_seed%')
+        ).delete(synchronize_session=False)
         counts["pe_firms"] = n
 
         self.db.commit()

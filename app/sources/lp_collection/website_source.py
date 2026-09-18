@@ -139,12 +139,8 @@ class WebsiteCollector(BaseCollector):
             )
             logger.debug(f"Found {len(team_links)} potential team page links")
 
-            # Collect contacts from team pages
-            for team_url in team_links[:3]:  # Limit to 3 pages
-                contact_items = await self._extract_contacts_from_page(
-                    team_url, lp_id, lp_name
-                )
-                items.extend(contact_items)
+            # Contact extraction from team pages is disabled (PLAN_082): the
+            # case-insensitive regex over raw HTML produced ~89% junk names.
 
             # Find investment/strategy pages
             investment_links = self._find_matching_links(
@@ -223,101 +219,6 @@ class WebsiteCollector(BaseCollector):
                     break
 
         return links
-
-    async def _extract_contacts_from_page(
-        self,
-        page_url: str,
-        lp_id: int,
-        lp_name: str,
-    ) -> List[CollectedItem]:
-        """Extract contact information from a page."""
-        items = []
-
-        response = await self._fetch_url(page_url)
-        if not response or response.status_code != 200:
-            return items
-
-        html = response.text
-
-        # Extract emails
-        emails = EMAIL_PATTERN.findall(html)
-        emails = list(set(emails))  # Dedupe
-
-        # Extract phones
-        phones = PHONE_PATTERN.findall(html)
-        phones = list(set(phones))  # Dedupe
-
-        # Try to extract structured contact info
-        # This is a simplified extraction - in production, would use
-        # more sophisticated HTML parsing (BeautifulSoup, etc.)
-
-        contacts = self._parse_contact_blocks(html, emails, phones)
-
-        for contact in contacts:
-            item = CollectedItem(
-                item_type="contact",
-                data={
-                    "lp_id": lp_id,
-                    "full_name": contact.get("name", "Unknown"),
-                    "title": contact.get("title"),
-                    "role_category": contact.get("role_category"),
-                    "email": contact.get("email"),
-                    "phone": contact.get("phone"),
-                    "source_type": "website",
-                },
-                source_url=page_url,
-                confidence="medium" if contact.get("name") else "low",
-            )
-            items.append(item)
-
-        return items
-
-    def _parse_contact_blocks(
-        self,
-        html: str,
-        emails: List[str],
-        phones: List[str],
-    ) -> List[Dict[str, Any]]:
-        """
-        Parse contact blocks from HTML.
-
-        This is a simplified implementation. In production, would use
-        proper HTML parsing and potentially ML-based extraction.
-        """
-        contacts = []
-
-        # Look for name patterns near titles
-        # Pattern: Name followed by title keywords
-        name_title_pattern = re.compile(
-            r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s*[,\-]?\s*"
-            r"((?:Chief|Director|Managing|Vice|Senior|Executive|Board|Trustee)[^<\n]{5,60})",
-            re.IGNORECASE,
-        )
-
-        for match in name_title_pattern.finditer(html):
-            name = match.group(1).strip()
-            title = match.group(2).strip()
-
-            # Determine role category
-            role_category = self._categorize_role(title)
-
-            contact = {
-                "name": name,
-                "title": title,
-                "role_category": role_category,
-            }
-
-            # Try to associate an email
-            name_parts = name.lower().split()
-            for email in emails:
-                email_lower = email.lower()
-                if any(part in email_lower for part in name_parts):
-                    contact["email"] = email
-                    break
-
-            contacts.append(contact)
-
-        return contacts[:20]  # Limit to avoid noise
 
     def _categorize_role(self, title: str) -> Optional[str]:
         """Categorize a job title into standard role categories."""

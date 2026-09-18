@@ -46,10 +46,8 @@ PHASE_1_TYPES = {
     "company_update",
 }
 PHASE_2_TYPES = {
-    "13f_holding",
     "13d_stake",
     "form_d_filing",
-    "deal_8k_filing",
     "deal_press_release",
     "deal",
     "firm_news",
@@ -101,7 +99,10 @@ class PEPersister:
         # Pre-warm caches
         self._warm_caches()
 
-        # Flatten all items, keeping entity_id from each result
+        # Flatten all items, keeping entity_id from each result.
+        # "13f_holding" and "deal_8k_filing" are intentionally unhandled (PLAN_082):
+        # 13F positions are not portfolio companies and 8-K search hits are not
+        # deals. They fall through as unknown types and are counted as skipped.
         phase1_items: List[tuple] = []
         phase2_items: List[tuple] = []
 
@@ -158,10 +159,8 @@ class PEPersister:
         "team_member": "_persist_team_member",
         "person": "_persist_person",
         "related_person": "_persist_related_person",
-        "13f_holding": "_persist_13f_holding",
         "13d_stake": "_persist_13d_stake",
         "form_d_filing": "_persist_form_d_filing",
-        "deal_8k_filing": "_persist_deal_8k_filing",
         "deal_press_release": "_persist_deal_press_release",
         "deal": "_persist_deal",
         "firm_news": "_persist_firm_news",
@@ -177,16 +176,22 @@ class PEPersister:
         if not handler_name:
             self.stats["skipped"] += 1
             return
+        # Handlers bump counters before flushing; snapshot so a failed item
+        # isn't reported as persisted/updated.
+        counters = {k: v for k, v in self.stats.items() if isinstance(v, int)}
         try:
             handler = getattr(self, handler_name)
-            handler(entity_id, entity_name, item)
-            self.db.flush()
+            # SAVEPOINT per item: a failure rolls back only this item, not
+            # every uncommitted item in the phase.
+            with self.db.begin_nested():
+                handler(entity_id, entity_name, item)
+                self.db.flush()
         except Exception as e:
             logger.error(
                 f"Failed to persist {item.item_type} for entity {entity_id}: {e}"
             )
-            self.db.rollback()
-            # Clear caches — rollback may have removed objects they reference
+            self.stats.update(counters)
+            # Clear caches — the savepoint rollback may have removed objects they reference
             self._fund_cache.clear()
             self._company_cache.clear()
             self._person_cache.clear()
@@ -213,13 +218,6 @@ class PEPersister:
             self._person_cache[p.full_name.lower()] = p.id
             if p.linkedin_url:
                 self._person_cache[p.linkedin_url] = p.id
-
-        for fund in (
-            self.db.query(PEFund.id, PEFund.firm_id)
-            .filter(PEFund.strategy == "13F Reported Holdings")
-            .all()
-        ):
-            self._fund_cache[fund.firm_id] = fund.id
 
     # ------------------------------------------------------------------
     # Helper methods
@@ -293,34 +291,6 @@ class PEPersister:
         if linkedin_url:
             self._person_cache[linkedin_url] = person.id
         return person.id
-
-    def _find_or_create_holdings_fund(self, firm_id: int, firm_name: str) -> int:
-        """Get or create synthetic '13F Holdings' fund for a firm. Returns fund id."""
-        if firm_id in self._fund_cache:
-            return self._fund_cache[firm_id]
-
-        existing = (
-            self.db.query(PEFund)
-            .filter(
-                PEFund.firm_id == firm_id,
-                PEFund.strategy == "13F Reported Holdings",
-            )
-            .first()
-        )
-        if existing:
-            self._fund_cache[firm_id] = existing.id
-            return existing.id
-
-        fund = PEFund(
-            firm_id=firm_id,
-            name=f"{firm_name} - 13F Holdings",
-            strategy="13F Reported Holdings",
-            status="Active",
-        )
-        self.db.add(fund)
-        self.db.flush()
-        self._fund_cache[firm_id] = fund.id
-        return fund.id
 
     def _should_update(
         self, new_confidence: str, existing_confidence: Optional[str]
@@ -769,59 +739,6 @@ class PEPersister:
     # Phase 2 handlers — relationships, transactions, financials
     # ------------------------------------------------------------------
 
-    def _persist_13f_holding(
-        self, entity_id: int, entity_name: str, item: PECollectedItem
-    ) -> None:
-        """Create portfolio company + fund investment from 13F holding."""
-        data = item.data
-        issuer_name = data.get("issuer_name")
-        if not issuer_name:
-            self.stats["skipped"] += 1
-            return
-
-        company_id = self._find_or_create_company(
-            issuer_name,
-            ownership_status="13F Reported",
-            ticker=data.get("security_class"),
-        )
-
-        firm_id = data.get("firm_id") or entity_id
-        firm_name = data.get("firm_name") or entity_name
-        fund_id = self._find_or_create_holdings_fund(firm_id, firm_name)
-
-        report_date = self._parse_date(data.get("report_date"))
-
-        # Dedup: same fund, company, and quarter
-        existing = (
-            self.db.query(PEFundInvestment)
-            .filter(
-                PEFundInvestment.fund_id == fund_id,
-                PEFundInvestment.company_id == company_id,
-                PEFundInvestment.investment_date == report_date,
-            )
-            .first()
-        )
-        if existing:
-            # Update value if changed
-            new_val = self._to_decimal(data.get("value_usd"))
-            if new_val and new_val != existing.invested_amount_usd:
-                existing.invested_amount_usd = new_val
-                self.stats["updated"] += 1
-            else:
-                self.stats["skipped"] += 1
-            return
-
-        investment = PEFundInvestment(
-            fund_id=fund_id,
-            company_id=company_id,
-            investment_date=report_date,
-            investment_type="13F Holding",
-            invested_amount_usd=self._to_decimal(data.get("value_usd")),
-            status="Active",
-        )
-        self.db.add(investment)
-        self.stats["persisted"] += 1
-
     def _persist_13d_stake(
         self, entity_id: int, entity_name: str, item: PECollectedItem
     ) -> None:
@@ -901,39 +818,6 @@ class PEPersister:
             buyer_name=entity_name,
             status="Filed",
             data_source="SEC Form D",
-            source_url=source_url,
-        )
-        self.db.add(deal)
-        self.stats["persisted"] += 1
-
-    def _persist_deal_8k_filing(
-        self, entity_id: int, entity_name: str, item: PECollectedItem
-    ) -> None:
-        """Create deal record from 8-K filing."""
-        data = item.data
-        source_url = item.source_url
-        if not source_url:
-            source_url = data.get("url", "")
-
-        if source_url:
-            existing = (
-                self.db.query(PEDeal).filter(PEDeal.source_url == source_url).first()
-            )
-            if existing:
-                self.stats["skipped"] += 1
-                return
-
-        company_name = data.get("company_name") or data.get("title", "Unknown")
-        company_id = self._find_or_create_company(company_name)
-
-        deal = PEDeal(
-            company_id=company_id,
-            deal_type="8-K Event",
-            deal_name=data.get("title", f"{company_name} - 8-K"),
-            announced_date=self._parse_date(data.get("filing_date")),
-            buyer_name=data.get("firm_name") or entity_name,
-            status="Filed",
-            data_source="SEC 8-K",
             source_url=source_url,
         )
         self.db.add(deal)

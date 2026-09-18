@@ -146,10 +146,9 @@ class FreightosCollector(BaseCollector):
             rates_result = await self._collect_fbx_rates(config)
             all_rates.extend(rates_result.get("records", []))
 
-            # If no data from API, use sample rates
+            # No sample/random fallback: fabricated rows must never be stored (PLAN_082).
             if not all_rates:
-                logger.info("Using sample FBX rate data")
-                all_rates = self._get_sample_fbx_rates()
+                raise RuntimeError("No data returned from source; refusing to substitute sample data")
 
             # Transform and insert records
             records = []
@@ -240,63 +239,6 @@ class FreightosCollector(BaseCollector):
         except Exception as e:
             logger.error(f"Failed to collect FBX rates: {e}", exc_info=True)
             return {"records": [], "error": str(e)}
-
-    def _get_sample_fbx_rates(self) -> List[Dict[str, Any]]:
-        """Generate sample FBX rate data for major trade lanes."""
-        today = date.today()
-
-        # Generate rates for the past 4 weeks
-        rates = []
-
-        # Current approximate FBX rates (as of 2024)
-        base_rates = {
-            "FBX01": 2150,  # China to US West Coast
-            "FBX02": 3450,  # China to US East Coast
-            "FBX03": 1850,  # China to North Europe
-            "FBX04": 1950,  # China to Mediterranean
-            "FBX11": 1250,  # Europe to US East Coast
-            "FBX12": 1650,  # Europe to South America
-            "FBX13": 750,  # US to Europe (backhaul, lower)
-            "FBX_GLOBAL": 1950,  # Global composite
-        }
-
-        # Generate weekly data
-        for week_offset in range(4):
-            rate_date = today - timedelta(days=week_offset * 7)
-
-            for index_code, base_rate in base_rates.items():
-                route = self.FBX_ROUTES.get(index_code, {})
-
-                # Add some variation
-                import random
-
-                variation = random.uniform(-0.05, 0.05)
-                current_rate = base_rate * (1 + variation)
-
-                # Calculate changes
-                wow_change = random.uniform(-3, 3)
-                mom_change = random.uniform(-8, 8)
-                yoy_change = random.uniform(-20, 20)
-
-                rates.append(
-                    {
-                        "index_code": index_code,
-                        "provider": "freightos",
-                        "index_name": route.get("name", f"FBX {index_code}"),
-                        "route_origin_region": route.get("origin_region"),
-                        "route_origin_port": route.get("origin_port"),
-                        "route_destination_region": route.get("destination_region"),
-                        "route_destination_port": route.get("destination_port"),
-                        "container_type": route.get("container_type", "40ft"),
-                        "rate_value": round(current_rate, 2),
-                        "rate_date": rate_date.isoformat(),
-                        "change_pct_wow": round(wow_change, 2),
-                        "change_pct_mom": round(mom_change, 2),
-                        "change_pct_yoy": round(yoy_change, 2),
-                    }
-                )
-
-        return rates
 
     def _transform_rate(self, rate: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Transform raw rate data to database format."""

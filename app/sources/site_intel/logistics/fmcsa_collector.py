@@ -154,10 +154,9 @@ class FMCSACollector(BaseCollector):
                     logger.warning(f"Error fetching carriers for {state}: {e}")
                     continue
 
-            # If no carriers from API, use sample data for major carriers
+            # No sample fallback: fabricated rows must never be stored (PLAN_082).
             if not all_carriers:
-                logger.info("Using sample motor carrier data")
-                all_carriers = self._get_sample_carriers()
+                raise RuntimeError("No carriers returned from FMCSA; refusing to substitute sample data")
 
             # Transform and insert
             records = []
@@ -226,154 +225,6 @@ class FMCSACollector(BaseCollector):
         except Exception as e:
             logger.warning(f"FMCSA API request failed for {state}: {e}")
             return []
-
-    def _get_sample_carriers(self) -> List[Dict[str, Any]]:
-        """Generate sample carrier data for major trucking companies."""
-        # Top motor carriers by fleet size
-        carriers = [
-            {
-                "dot_number": "1234567",
-                "mc_number": "MC-123456",
-                "legal_name": "Swift Transportation Co LLC",
-                "dba_name": "Swift",
-                "physical_city": "Phoenix",
-                "physical_state": "AZ",
-                "physical_zip": "85040",
-                "power_units": 18500,
-                "drivers": 21000,
-                "carrier_operation": "interstate",
-                "operation_classification": "authorized_for_hire",
-                "cargo_carried": ["General Freight", "Refrigerated Food", "Machinery"],
-            },
-            {
-                "dot_number": "2345678",
-                "mc_number": "MC-234567",
-                "legal_name": "Schneider National Carriers Inc",
-                "dba_name": "Schneider",
-                "physical_city": "Green Bay",
-                "physical_state": "WI",
-                "physical_zip": "54304",
-                "power_units": 13500,
-                "drivers": 15000,
-                "carrier_operation": "interstate",
-                "operation_classification": "authorized_for_hire",
-                "cargo_carried": ["General Freight", "Intermodal"],
-            },
-            {
-                "dot_number": "3456789",
-                "mc_number": "MC-345678",
-                "legal_name": "J.B. Hunt Transport Inc",
-                "dba_name": "J.B. Hunt",
-                "physical_city": "Lowell",
-                "physical_state": "AR",
-                "physical_zip": "72745",
-                "power_units": 16000,
-                "drivers": 18000,
-                "carrier_operation": "interstate",
-                "operation_classification": "authorized_for_hire",
-                "cargo_carried": ["General Freight", "Intermodal", "Dedicated"],
-            },
-            {
-                "dot_number": "4567890",
-                "mc_number": "MC-456789",
-                "legal_name": "Werner Enterprises Inc",
-                "dba_name": "Werner",
-                "physical_city": "Omaha",
-                "physical_state": "NE",
-                "physical_zip": "68138",
-                "power_units": 8500,
-                "drivers": 11000,
-                "carrier_operation": "interstate",
-                "operation_classification": "authorized_for_hire",
-                "cargo_carried": ["General Freight", "Temperature Controlled"],
-            },
-            {
-                "dot_number": "5678901",
-                "mc_number": "MC-567890",
-                "legal_name": "Landstar System Inc",
-                "dba_name": "Landstar",
-                "physical_city": "Jacksonville",
-                "physical_state": "FL",
-                "physical_zip": "32256",
-                "power_units": 1200,
-                "drivers": 10000,
-                "carrier_operation": "interstate",
-                "operation_classification": "authorized_for_hire",
-                "cargo_carried": ["General Freight", "Specialized"],
-            },
-            {
-                "dot_number": "6789012",
-                "mc_number": "MC-678901",
-                "legal_name": "Knight Transportation Inc",
-                "dba_name": "Knight-Swift",
-                "physical_city": "Phoenix",
-                "physical_state": "AZ",
-                "physical_zip": "85034",
-                "power_units": 22000,
-                "drivers": 24000,
-                "carrier_operation": "interstate",
-                "operation_classification": "authorized_for_hire",
-                "cargo_carried": ["General Freight", "Refrigerated"],
-            },
-            {
-                "dot_number": "7890123",
-                "mc_number": "MC-789012",
-                "legal_name": "XPO Logistics Freight Inc",
-                "dba_name": "XPO",
-                "physical_city": "Ann Arbor",
-                "physical_state": "MI",
-                "physical_zip": "48108",
-                "power_units": 7500,
-                "drivers": 9000,
-                "carrier_operation": "interstate",
-                "operation_classification": "authorized_for_hire",
-                "cargo_carried": ["LTL", "General Freight"],
-            },
-            {
-                "dot_number": "8901234",
-                "mc_number": "MC-890123",
-                "legal_name": "Old Dominion Freight Line Inc",
-                "dba_name": "Old Dominion",
-                "physical_city": "Thomasville",
-                "physical_state": "NC",
-                "physical_zip": "27360",
-                "power_units": 9800,
-                "drivers": 10500,
-                "carrier_operation": "interstate",
-                "operation_classification": "authorized_for_hire",
-                "cargo_carried": ["LTL", "General Freight"],
-            },
-            {
-                "dot_number": "9012345",
-                "mc_number": "MC-901234",
-                "legal_name": "FedEx Freight Inc",
-                "dba_name": "FedEx Freight",
-                "physical_city": "Memphis",
-                "physical_state": "TN",
-                "physical_zip": "38118",
-                "power_units": 12000,
-                "drivers": 13000,
-                "carrier_operation": "interstate",
-                "operation_classification": "authorized_for_hire",
-                "cargo_carried": ["LTL", "Express Freight"],
-            },
-            {
-                "dot_number": "1012345",
-                "mc_number": "MC-101234",
-                "legal_name": "UPS Freight LLC",
-                "dba_name": "TForce Freight",
-                "physical_city": "Richmond",
-                "physical_state": "VA",
-                "physical_zip": "23261",
-                "power_units": 6500,
-                "drivers": 7200,
-                "carrier_operation": "interstate",
-                "operation_classification": "authorized_for_hire",
-                "cargo_carried": ["LTL", "General Freight"],
-            },
-        ]
-
-        return carriers
 
     def _transform_carrier(self, carrier: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Transform raw carrier data to database format."""
@@ -468,10 +319,9 @@ class FMCSACollector(BaseCollector):
                     logger.warning(f"Error fetching safety for DOT {dot_number}: {e}")
                     continue
 
-            # If no data from API, generate sample safety data
+            # No sample fallback: fabricated rows must never be stored (PLAN_082).
             if not all_safety and dot_list:
-                logger.info("Using sample safety data")
-                all_safety = self._get_sample_safety(dot_list[:10])
+                raise RuntimeError("No safety data returned from FMCSA; refusing to substitute sample data")
 
             # Transform and insert
             records = []
@@ -533,51 +383,6 @@ class FMCSACollector(BaseCollector):
         except Exception as e:
             logger.warning(f"FMCSA safety API request failed for {dot_number}: {e}")
             return None
-
-    def _get_sample_safety(self, dot_numbers: List[str]) -> List[Dict[str, Any]]:
-        """Generate sample safety data."""
-        import random
-
-        safety_records = []
-        today = date.today()
-
-        for dot_number in dot_numbers:
-            # Generate realistic safety scores
-            safety_records.append(
-                {
-                    "dot_number": dot_number,
-                    "safety_rating": random.choice(
-                        [
-                            "Satisfactory",
-                            "Satisfactory",
-                            "Satisfactory",
-                            "Conditional",
-                            None,
-                        ]
-                    ),
-                    "rating_date": today,
-                    "unsafe_driving_score": round(random.uniform(10, 60), 2),
-                    "hours_of_service_score": round(random.uniform(15, 55), 2),
-                    "driver_fitness_score": round(random.uniform(5, 40), 2),
-                    "controlled_substances_score": round(random.uniform(0, 20), 2),
-                    "vehicle_maintenance_score": round(random.uniform(20, 65), 2),
-                    "hazmat_compliance_score": round(random.uniform(0, 30), 2)
-                    if random.random() > 0.5
-                    else None,
-                    "crash_indicator_score": round(random.uniform(10, 50), 2),
-                    "vehicle_oos_rate": round(random.uniform(5, 25), 2),
-                    "driver_oos_rate": round(random.uniform(3, 15), 2),
-                    "total_inspections": random.randint(50, 500),
-                    "total_violations": random.randint(10, 150),
-                    "total_crashes": random.randint(0, 20),
-                    "fatal_crashes": random.randint(0, 2),
-                    "injury_crashes": random.randint(0, 5),
-                    "tow_crashes": random.randint(0, 10),
-                    "inspection_date": today,
-                }
-            )
-
-        return safety_records
 
     def _transform_safety(self, safety: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Transform raw safety data to database format."""

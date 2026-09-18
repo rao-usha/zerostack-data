@@ -26,8 +26,9 @@ import app.sources.sec.models  # noqa: F401 — SEC-specific tables
 # Alembic Config object (provides access to alembic.ini values)
 config = context.config
 
-# Set up Python logging from alembic.ini
-if config.config_file_name is not None:
+# Set up Python logging from alembic.ini — but not when invoked from the app
+# (app.core.migrate), where fileConfig would disable the app's loggers.
+if config.config_file_name is not None and config.attributes.get("configure_logger", True):
     fileConfig(config.config_file_name)
 
 # Target metadata for autogenerate

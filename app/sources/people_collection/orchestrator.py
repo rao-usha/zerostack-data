@@ -7,6 +7,7 @@ and handles the full pipeline from collection to database storage.
 """
 
 import asyncio
+import copy
 import logging
 import traceback
 from datetime import datetime, date
@@ -346,6 +347,9 @@ class PeopleCollectionOrchestrator:
             # Store changes
             result.changes_detected = len(all_changes)
             await self._store_changes(all_changes, company, session)
+            # Commit stored people/changes before dedup so a dedup failure
+            # (and its rollback) can't discard them.
+            session.commit()
 
             # Run lightweight company-scoped dedup scan
             try:
@@ -354,7 +358,8 @@ class PeopleCollectionOrchestrator:
                 dedup_svc = DedupService(session)
                 dedup_svc.scan_for_duplicates(company_id=company.id, limit=200)
             except Exception as e:
-                logger.debug(f"Post-storage dedup scan skipped: {e}")
+                session.rollback()
+                logger.warning(f"Post-storage dedup scan skipped: {e}")
 
             # Update job status
             job.status = "success" if not result.errors else "completed_with_errors"
@@ -451,7 +456,11 @@ class PeopleCollectionOrchestrator:
 
         async def collect_with_semaphore(company_id: int) -> CollectionResult:
             async with semaphore:
-                return await self.collect_company(company_id, sources)
+                # Each concurrent company gets its own session (never share one
+                # Session across coroutines).
+                worker = copy.copy(self)
+                worker._provided_session = None
+                return await worker.collect_company(company_id, sources)
 
         # Run all collections
         tasks = [collect_with_semaphore(cid) for cid in company_ids]
@@ -926,7 +935,7 @@ class PeopleCollectionOrchestrator:
                     .filter(
                         LeadershipChangeModel.company_id == company.id,
                         LeadershipChangeModel.person_name == change.person_name,
-                        LeadershipChangeModel.change_type == change.change_type.value,
+                        LeadershipChangeModel.change_type == getattr(change.change_type, "value", change.change_type),
                         LeadershipChangeModel.effective_date == change.effective_date,
                     )
                     .first()
@@ -940,7 +949,7 @@ class PeopleCollectionOrchestrator:
                     company_id=company.id,
                     person_name=change.person_name,
                     person_id=change.person_id,
-                    change_type=change.change_type.value,
+                    change_type=getattr(change.change_type, "value", change.change_type),
                     old_title=change.old_title,
                     new_title=change.new_title,
                     old_company=change.old_company,
@@ -1143,7 +1152,8 @@ class PeopleCollectionOrchestrator:
                     dedup_svc = DedupService(session)
                     dedup_svc.scan_for_duplicates(company_id=company.id, limit=200)
                 except Exception as e:
-                    logger.debug(f"[DIAG] Post-storage dedup scan skipped: {e}")
+                    session.rollback()
+                    logger.warning(f"[DIAG] Post-storage dedup scan skipped: {e}")
 
             except Exception as e:
                 error_msg = f"Storage exception: {str(e)}\n{traceback.format_exc()}"

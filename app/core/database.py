@@ -90,6 +90,7 @@ def _apply_schema_migrations(engine) -> None:
     migrations = [
         "ALTER TABLE lp_fund ADD COLUMN IF NOT EXISTS lp_tier INTEGER",
         "ALTER TABLE ingestion_jobs ADD COLUMN IF NOT EXISTS data_origin VARCHAR(16) NOT NULL DEFAULT 'real'",
+        "ALTER TABLE pe_firm_people ADD COLUMN IF NOT EXISTS role_type VARCHAR(50)",
     ]
     with engine.connect() as conn:
         for sql in migrations:

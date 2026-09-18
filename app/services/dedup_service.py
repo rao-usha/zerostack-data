@@ -129,12 +129,16 @@ class DedupService:
 
                     if classification == "auto_merge":
                         try:
-                            self._auto_merge(
-                                id_a,
-                                id_b,
-                                result,
-                                shared_companies,
-                            )
+                            # SAVEPOINT: a failed merge rolls back only itself,
+                            # leaving the session usable for the rest of the scan.
+                            with self.session.begin_nested():
+                                self._auto_merge(
+                                    id_a,
+                                    id_b,
+                                    result,
+                                    shared_companies,
+                                )
+                                self.session.flush()
                             stats["auto_merged"] += 1
                         except Exception as e:
                             logger.warning(f"Auto-merge failed for {id_a}/{id_b}: {e}")
@@ -357,6 +361,11 @@ class DedupService:
                 # Merge work_email if canonical's CP lacks it
                 if not existing.work_email and cp.work_email:
                     existing.work_email = cp.work_email
+                # Re-point direct reports before deleting, or the
+                # company_people.reports_to_id FK blocks the delete.
+                self.session.query(CompanyPerson).filter(
+                    CompanyPerson.reports_to_id == cp.id
+                ).update({"reports_to_id": existing.id}, synchronize_session="fetch")
                 self.session.delete(cp)
             else:
                 cp.person_id = canonical_id

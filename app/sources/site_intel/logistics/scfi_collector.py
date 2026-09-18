@@ -195,10 +195,9 @@ class SCFICollector(BaseCollector):
             rates_result = await self._collect_scfi_rates(config)
             all_rates.extend(rates_result.get("records", []))
 
-            # If no data from web, use sample rates
+            # No sample/random fallback: fabricated rows must never be stored (PLAN_082).
             if not all_rates:
-                logger.info("Using sample SCFI rate data")
-                all_rates = self._get_sample_scfi_rates()
+                raise RuntimeError("No data returned from source; refusing to substitute sample data")
 
             # Transform and insert records
             records = []
@@ -283,65 +282,6 @@ class SCFICollector(BaseCollector):
         except Exception as e:
             logger.error(f"Failed to collect SCFI rates: {e}", exc_info=True)
             return {"records": [], "error": str(e)}
-
-    def _get_sample_scfi_rates(self) -> List[Dict[str, Any]]:
-        """Generate sample SCFI rate data."""
-        today = date.today()
-
-        # Current approximate SCFI rates (as of 2024)
-        base_rates = {
-            "SCFI_COMPOSITE": 1150,  # Index points
-            "SCFI_EUR": 950,  # USD/TEU
-            "SCFI_MED": 1050,
-            "SCFI_USWC": 2200,  # USD/FEU
-            "SCFI_USEC": 3600,  # USD/FEU
-            "SCFI_PERSGULF": 750,
-            "SCFI_AUS": 400,
-            "SCFI_SAFR": 1800,
-            "SCFI_SAM_EC": 2800,
-            "SCFI_SAM_WC": 1900,
-            "SCFI_JAPAN": 120,  # Short route, low rate
-            "SCFI_KOREA": 95,
-            "SCFI_SEA": 85,
-        }
-
-        rates = []
-
-        # Generate weekly data for past 8 weeks
-        for week_offset in range(8):
-            rate_date = today - timedelta(days=week_offset * 7)
-
-            for index_code, base_rate in base_rates.items():
-                route = self.SCFI_ROUTES.get(index_code, {})
-
-                import random
-
-                variation = random.uniform(-0.08, 0.08)
-                current_rate = base_rate * (1 + variation)
-
-                wow_change = random.uniform(-5, 5)
-                mom_change = random.uniform(-12, 12)
-                yoy_change = random.uniform(-30, 30)
-
-                rates.append(
-                    {
-                        "index_code": index_code,
-                        "provider": "scfi",
-                        "index_name": route.get("name", f"SCFI {index_code}"),
-                        "route_origin_region": route.get("origin_region"),
-                        "route_origin_port": route.get("origin_port"),
-                        "route_destination_region": route.get("destination_region"),
-                        "route_destination_port": route.get("destination_port"),
-                        "container_type": route.get("container_type", "20ft"),
-                        "rate_value": round(current_rate, 2),
-                        "rate_date": rate_date.isoformat(),
-                        "change_pct_wow": round(wow_change, 2),
-                        "change_pct_mom": round(mom_change, 2),
-                        "change_pct_yoy": round(yoy_change, 2),
-                    }
-                )
-
-        return rates
 
     def _transform_rate(self, rate: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Transform raw rate data to database format."""

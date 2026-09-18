@@ -170,8 +170,6 @@ async def ingest_exports_by_hs(
     - '5880': Japan
     - '4280': Germany
     """
-    settings = get_settings()
-    api_key = getattr(settings, "census_survey_api_key", None)
     return create_and_dispatch_job(
         db,
         background_tasks,
@@ -182,7 +180,6 @@ async def ingest_exports_by_hs(
             "month": request.month,
             "hs_code": request.hs_code,
             "country": request.country,
-            "api_key": api_key,
         },
         message="US exports by HS ingestion job created",
     )
@@ -206,8 +203,6 @@ async def ingest_imports_by_hs(
 
     **No API key required** (Census Bureau public API)
     """
-    settings = get_settings()
-    api_key = getattr(settings, "census_survey_api_key", None)
     return create_and_dispatch_job(
         db,
         background_tasks,
@@ -218,7 +213,6 @@ async def ingest_imports_by_hs(
             "month": request.month,
             "hs_code": request.hs_code,
             "country": request.country,
-            "api_key": api_key,
         },
         message="US imports by HS ingestion job created",
     )
@@ -248,8 +242,6 @@ async def ingest_state_exports(
 
     **No API key required** (Census Bureau public API)
     """
-    settings = get_settings()
-    api_key = getattr(settings, "census_survey_api_key", None)
     return create_and_dispatch_job(
         db,
         background_tasks,
@@ -261,7 +253,6 @@ async def ingest_state_exports(
             "state": request.state,
             "hs_code": request.hs_code,
             "country": request.country,
-            "api_key": api_key,
         },
         message="US state exports ingestion job created",
     )
@@ -288,8 +279,6 @@ async def ingest_port_trade(
 
     **No API key required** (Census Bureau public API)
     """
-    settings = get_settings()
-    api_key = getattr(settings, "census_survey_api_key", None)
     return create_and_dispatch_job(
         db,
         background_tasks,
@@ -302,7 +291,6 @@ async def ingest_port_trade(
             "district": request.district,
             "hs_code": request.hs_code,
             "country": request.country,
-            "api_key": api_key,
         },
         message=f"US port {request.trade_type.value}s ingestion job created",
     )
@@ -333,8 +321,6 @@ async def ingest_trade_summary(
 
     **No API key required** (Census Bureau public API)
     """
-    settings = get_settings()
-    api_key = getattr(settings, "census_survey_api_key", None)
     return create_and_dispatch_job(
         db,
         background_tasks,
@@ -343,7 +329,6 @@ async def ingest_trade_summary(
             "dataset": "summary",
             "year": request.year,
             "month": request.month,
-            "api_key": api_key,
         },
         message="US trade summary ingestion job created",
     )

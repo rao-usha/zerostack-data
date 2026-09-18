@@ -99,8 +99,6 @@ async def ingest_businesses(
     **API Key Required:** Set YELP_API_KEY in environment variables.
     Get a free key at: https://www.yelp.com/developers/v3/manage_app
     """
-    settings = get_settings()
-    api_key = settings.get_yelp_api_key()
     return create_and_dispatch_job(
         db,
         background_tasks,
@@ -111,7 +109,6 @@ async def ingest_businesses(
             "term": request.term,
             "categories": request.categories,
             "limit": request.limit,
-            "api_key": api_key,
         },
         message=f"Yelp business search job created for {request.location}",
     )
@@ -140,8 +137,6 @@ async def ingest_multi_location_businesses(
             f"Maximum 100 locations per request to stay within daily limits.",
         )
 
-    settings = get_settings()
-    api_key = settings.get_yelp_api_key()
     return create_and_dispatch_job(
         db,
         background_tasks,
@@ -152,7 +147,6 @@ async def ingest_multi_location_businesses(
             "term": request.term,
             "categories": request.categories,
             "limit_per_location": request.limit_per_location,
-            "api_key": api_key,
         },
         message=f"Yelp multi-location job created for {len(request.locations)} locations",
     )
@@ -170,15 +164,12 @@ async def ingest_categories(
 
     **API Key Required:** Set YELP_API_KEY in environment variables.
     """
-    settings = get_settings()
-    api_key = settings.get_yelp_api_key()
     return create_and_dispatch_job(
         db,
         background_tasks,
         source="yelp",
         config={
             "dataset": "categories",
-            "api_key": api_key,
         },
         message="Yelp categories ingestion job created",
     )

@@ -45,6 +45,7 @@ class QueueJobType(str, enum.Enum):
     AGENTIC = "agentic"
     FOOT_TRAFFIC = "foot_traffic"
     INGESTION = "ingestion"
+    BULK_INGEST = "bulk_ingest"
 
 
 class JobQueue(Base):
@@ -219,3 +220,18 @@ class RateLimitBucket(Base):
             f"<RateLimitBucket domain={self.domain} "
             f"tokens={self.tokens:.1f}/{self.max_tokens:.1f}>"
         )
+
+
+class WorkerHeartbeat(Base):
+    """
+    Liveness row per worker process, refreshed from the poll loop (also when idle).
+
+    Used to refuse batch launches when no worker is alive (SPEC_106).
+    """
+
+    __tablename__ = "worker_heartbeats"
+
+    worker_id = Column(String(100), primary_key=True)
+    hostname = Column(String(255), nullable=True)
+    started_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    last_seen_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)

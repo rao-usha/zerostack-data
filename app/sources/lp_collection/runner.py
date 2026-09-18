@@ -9,11 +9,14 @@ Main entry point for running LP data collection jobs:
 """
 
 import asyncio
+import copy
 import logging
 from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Any, Type
+from typing import Callable, List, Optional, Dict, Any, Type
 
 from sqlalchemy.orm import Session
+
+from app.core.database import get_session_factory
 
 from app.core.models import (
     LpFund,
@@ -77,6 +80,7 @@ class LpCollectionOrchestrator:
         self,
         db: Session,
         config: Optional[CollectionConfig] = None,
+        session_factory: Optional[Callable[[], Session]] = None,
     ):
         """
         Initialize the orchestrator.
@@ -86,6 +90,7 @@ class LpCollectionOrchestrator:
             config: Collection configuration
         """
         self.db = db
+        self._session_factory = session_factory
         self.config = config or CollectionConfig()
         self.normalizer = DataNormalizer()
         self._collectors: Dict[LpCollectionSource, BaseCollector] = {}
@@ -193,7 +198,20 @@ class LpCollectionOrchestrator:
         async def collect_lp(lp: LpFund) -> None:
             async with semaphore:
                 self._progress.current_lp = lp.name
-                results = await self._collect_single_lp(lp, job.id)
+                # Each concurrent LP runs on its own session; self.db is only
+                # touched below in await-free blocks for job progress.
+                factory = self._session_factory or get_session_factory()
+                task_db = factory()
+                try:
+                    worker = copy.copy(self)
+                    worker.db = task_db
+                    task_lp = task_db.get(LpFund, lp.id) or lp
+                    results = await worker._collect_single_lp(task_lp, job.id)
+                except Exception:
+                    task_db.rollback()
+                    raise
+                finally:
+                    task_db.close()
                 all_results.extend(results)
 
                 # Track progress
@@ -355,7 +373,9 @@ class LpCollectionOrchestrator:
                 elif item.item_type == "performance_return":
                     self._persist_performance_return(lp_id, item)
                 elif item.item_type == "13f_holding":
-                    self._persist_13f_holding(lp_id, item)
+                    # Disabled (PLAN_082): wrong CIK mapping, substring LP
+                    # matching and x1000 values. Bulk 13F loader replaces it.
+                    logger.debug("Skipping LP 13F holding item (disabled)")
                 elif item.item_type in ("990_org_info", "990_financials"):
                     self._persist_990_data(lp_id, item)
                 elif item.item_type == "strategy_snapshot":
@@ -592,78 +612,6 @@ class LpCollectionOrchestrator:
                 if value:
                     setattr(perf, field, value)
             self.db.add(perf)
-            item.is_new = True
-
-        self.db.commit()
-
-    def _persist_13f_holding(self, lp_id: int, item: CollectedItem) -> None:
-        """
-        Persist 13F holding data to PortfolioCompany table.
-
-        SEC 13F filings provide authoritative data on institutional holdings
-        including CUSIP, shares held, and market values.
-        """
-        data = item.data
-        cusip = data.get("cusip")
-        issuer_name = data.get("issuer_name")
-        report_date_str = data.get("report_date")
-
-        if not cusip or not issuer_name:
-            return
-
-        # Parse report date
-        report_date = None
-        if report_date_str:
-            try:
-                report_date = datetime.fromisoformat(report_date_str)
-            except ValueError:
-                try:
-                    report_date = datetime.strptime(report_date_str, "%Y-%m-%d")
-                except ValueError:
-                    report_date = datetime.utcnow()
-
-        # Check for existing holding (same LP, cusip, and report period)
-        existing = (
-            self.db.query(PortfolioCompany)
-            .filter(
-                PortfolioCompany.investor_id == lp_id,
-                PortfolioCompany.investor_type == "lp",
-                PortfolioCompany.company_cusip == cusip,
-                PortfolioCompany.source_type == "sec_13f",
-                PortfolioCompany.investment_date == report_date,
-            )
-            .first()
-        )
-
-        if existing:
-            # Update existing holding with newer data
-            if report_date and (
-                not existing.investment_date or report_date > existing.investment_date
-            ):
-                existing.shares_held = data.get("shares")
-                existing.market_value_usd = data.get("value_usd")
-                existing.investment_date = report_date
-                existing.updated_at = datetime.utcnow()
-            item.is_new = False
-        else:
-            # Create new holding
-            holding = PortfolioCompany(
-                investor_id=lp_id,
-                investor_type="lp",
-                company_name=issuer_name,
-                company_cusip=cusip,
-                investment_type="public_equity",
-                investment_date=report_date,
-                shares_held=data.get("shares"),
-                market_value_usd=data.get("value_usd"),
-                current_holding=1,
-                source_type="sec_13f",
-                source_url=item.source_url,
-                confidence_level="high",  # SEC filings are authoritative
-                collected_date=datetime.utcnow(),
-                collection_method="sec_13f_collector",
-            )
-            self.db.add(holding)
             item.is_new = True
 
         self.db.commit()

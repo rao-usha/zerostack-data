@@ -829,6 +829,24 @@ async def _handle_job_failure(
         await _handle_job_completion(db, job)
 
 
+def _resolve_runtime_api_key(base_source: str):
+    """Look up a source's API key from settings/env at execution time."""
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    explicit = {
+        "yelp": lambda: settings.get_yelp_api_key(),
+        "eia": lambda: settings.get_eia_api_key(),
+        "us_trade": lambda: getattr(settings, "census_survey_api_key", None),
+    }
+    try:
+        if base_source in explicit:
+            return explicit[base_source]()
+        return settings.get_api_key(base_source)
+    except (KeyError, ValueError):
+        return None
+
+
 async def _run_dispatched_job(db, job, job_id, source, config, monitoring):
     """Run a job via the SOURCE_DISPATCH registry."""
     from datetime import datetime
@@ -863,6 +881,12 @@ async def _run_dispatched_job(db, job, job_id, source, config, monitoring):
         val = config.get(key)
         if val is not None:
             kwargs[key] = val
+
+    # API keys are never persisted in job config; resolve them at run time.
+    if "api_key" in config_keys and "api_key" not in kwargs:
+        runtime_key = _resolve_runtime_api_key(base_source.split(":")[0])
+        if runtime_key:
+            kwargs["api_key"] = runtime_key
 
     try:
         # Pass job_id only if the function accepts it
@@ -1318,6 +1342,7 @@ async def launch_batch(
     sources: List[str] = None,
     group: str = None,
     mode: str = "full",
+    force: bool = False,
     db: Session = Depends(get_db),
 ):
     """
@@ -1334,9 +1359,12 @@ async def launch_batch(
     """
     from app.core.batch_service import launch_batch_collection
 
-    result = await launch_batch_collection(
-        db, tiers=tiers, sources=sources, group_name=group, mode=mode
-    )
+    try:
+        result = await launch_batch_collection(
+            db, tiers=tiers, sources=sources, group_name=group, mode=mode, force=force
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     return result
 
 

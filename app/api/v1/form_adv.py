@@ -299,12 +299,15 @@ def get_by_state(
     description="""
     Trigger ingestion of Form ADV data.
 
-    Currently loads sample data. In production, would fetch from SEC quarterly files.
+    Not implemented here: the old endpoint loaded 10 fabricated sample advisers.
+    Form ADV now comes from the bulk SEC loaders (PLAN_082, SPEC_112).
     """,
 )
 def ingest_data(
     db: Session = Depends(get_db),
 ):
     """Ingest Form ADV data."""
-    service = FormADVIngestionService(db)
-    return service.ingest_sample_data()
+    raise HTTPException(
+        status_code=501,
+        detail="Form ADV sample ingestion removed; use the bulk SEC Form ADV loader.",
+    )

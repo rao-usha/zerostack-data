@@ -159,28 +159,10 @@ class PressReleaseCollector(BasePECollector):
                     started_at=started_at,
                 )
 
-            # Separate SEC 8-K metadata items from fetchable press releases
-            sec_items = [pr for pr in press_releases if pr.get("source") == "sec_8k"]
+            # SEC 8-K full-text-search hits are not deals (the filer is not a
+            # target); they are dropped here. Real 8-K deal detection comes from
+            # the bulk EDGAR loaders (PLAN_082).
             pr_items = [pr for pr in press_releases if pr.get("source") != "sec_8k"]
-
-            # SEC 8-K filings: create deal items from metadata directly
-            # (filing documents are blocked from Docker, but metadata is sufficient)
-            for sec in sec_items[:15]:
-                items.append(
-                    self._create_item(
-                        item_type="deal_8k_filing",
-                        data={
-                            "firm_id": entity_id,
-                            "firm_name": entity_name,
-                            "title": sec.get("title"),
-                            "filing_date": sec.get("date"),
-                            "company_name": sec.get("company_name"),
-                            "filing_items": sec.get("items", []),
-                        },
-                        source_url=sec.get("url"),
-                        confidence="high",
-                    )
-                )
 
             # Process fetchable press releases with LLM extraction
             llm_client = self._get_llm_client()

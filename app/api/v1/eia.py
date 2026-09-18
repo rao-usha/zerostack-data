@@ -123,8 +123,6 @@ async def ingest_petroleum_data(
     Set EIA_API_KEY environment variable.
     Get a free key at: https://www.eia.gov/opendata/register.php
     """
-    settings = get_settings()
-    api_key = settings.get_eia_api_key()
     return create_and_dispatch_job(
         db,
         background_tasks,
@@ -137,7 +135,6 @@ async def ingest_petroleum_data(
             "start": request.start,
             "end": request.end,
             "facets": request.facets,
-            "api_key": api_key,
         },
         message="EIA petroleum ingestion job created",
     )
@@ -158,8 +155,6 @@ async def ingest_natural_gas_data(
     - storage: Natural gas storage levels
     - prices: Natural gas prices
     """
-    settings = get_settings()
-    api_key = settings.get_eia_api_key()
     return create_and_dispatch_job(
         db,
         background_tasks,
@@ -172,7 +167,6 @@ async def ingest_natural_gas_data(
             "start": request.start,
             "end": request.end,
             "facets": request.facets,
-            "api_key": api_key,
         },
         message="EIA natural gas ingestion job created",
     )
@@ -193,8 +187,6 @@ async def ingest_electricity_data(
     - revenue: Electricity revenue by sector
     - customers: Number of electricity customers
     """
-    settings = get_settings()
-    api_key = settings.get_eia_api_key()
     return create_and_dispatch_job(
         db,
         background_tasks,
@@ -207,7 +199,6 @@ async def ingest_electricity_data(
             "start": request.start,
             "end": request.end,
             "facets": request.facets,
-            "api_key": api_key,
         },
         message="EIA electricity ingestion job created",
     )
@@ -224,8 +215,6 @@ async def ingest_retail_gas_prices(
 
     Includes regular, midgrade, premium, and diesel prices by region.
     """
-    settings = get_settings()
-    api_key = settings.get_eia_api_key()
     return create_and_dispatch_job(
         db,
         background_tasks,
@@ -236,7 +225,6 @@ async def ingest_retail_gas_prices(
             "start": request.start,
             "end": request.end,
             "facets": request.facets,
-            "api_key": api_key,
         },
         message="EIA retail gas prices ingestion job created",
     )
@@ -253,8 +241,6 @@ async def ingest_steo_projections(
 
     Includes monthly projections for energy supply, demand, and prices.
     """
-    settings = get_settings()
-    api_key = settings.get_eia_api_key()
     return create_and_dispatch_job(
         db,
         background_tasks,
@@ -265,7 +251,6 @@ async def ingest_steo_projections(
             "start": request.start,
             "end": request.end,
             "facets": request.facets,
-            "api_key": api_key,
         },
         message="EIA STEO ingestion job created",
     )

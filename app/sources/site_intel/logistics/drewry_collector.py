@@ -150,10 +150,9 @@ class DrewryCollector(BaseCollector):
             rates_result = await self._collect_wci_rates(config)
             all_rates.extend(rates_result.get("records", []))
 
-            # If no data from web, use sample rates
+            # No sample/random fallback: fabricated rows must never be stored (PLAN_082).
             if not all_rates:
-                logger.info("Using sample Drewry WCI rate data")
-                all_rates = self._get_sample_wci_rates()
+                raise RuntimeError("No data returned from source; refusing to substitute sample data")
 
             # Transform and insert records
             records = []
@@ -240,61 +239,6 @@ class DrewryCollector(BaseCollector):
         except Exception as e:
             logger.error(f"Failed to collect WCI rates: {e}", exc_info=True)
             return {"records": [], "error": str(e)}
-
-    def _get_sample_wci_rates(self) -> List[Dict[str, Any]]:
-        """Generate sample Drewry WCI rate data."""
-        today = date.today()
-
-        # Current approximate WCI rates (as of 2024)
-        base_rates = {
-            "WCI_COMPOSITE": 2250,
-            "WCI_SHA_RTM": 2100,
-            "WCI_RTM_SHA": 650,
-            "WCI_SHA_GEN": 2300,
-            "WCI_SHA_LAX": 2400,
-            "WCI_LAX_SHA": 600,
-            "WCI_SHA_NYC": 3800,
-            "WCI_NYC_RTM": 800,
-            "WCI_RTM_NYC": 1400,
-        }
-
-        rates = []
-
-        # Generate weekly data for past 8 weeks
-        for week_offset in range(8):
-            rate_date = today - timedelta(days=week_offset * 7)
-
-            for index_code, base_rate in base_rates.items():
-                route = self.WCI_ROUTES.get(index_code, {})
-
-                import random
-
-                variation = random.uniform(-0.06, 0.06)
-                current_rate = base_rate * (1 + variation)
-
-                wow_change = random.uniform(-4, 4)
-                mom_change = random.uniform(-10, 10)
-                yoy_change = random.uniform(-25, 25)
-
-                rates.append(
-                    {
-                        "index_code": index_code,
-                        "provider": "drewry",
-                        "index_name": route.get("name", f"WCI {index_code}"),
-                        "route_origin_region": route.get("origin_region"),
-                        "route_origin_port": route.get("origin_port"),
-                        "route_destination_region": route.get("destination_region"),
-                        "route_destination_port": route.get("destination_port"),
-                        "container_type": route.get("container_type", "40ft"),
-                        "rate_value": round(current_rate, 2),
-                        "rate_date": rate_date.isoformat(),
-                        "change_pct_wow": round(wow_change, 2),
-                        "change_pct_mom": round(mom_change, 2),
-                        "change_pct_yoy": round(yoy_change, 2),
-                    }
-                )
-
-        return rates
 
     def _transform_rate(self, rate: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Transform raw rate data to database format."""
