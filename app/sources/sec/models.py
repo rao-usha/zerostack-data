@@ -62,6 +62,12 @@ class SECFinancialFact(Base):
     # Additional context
     frame = Column(String(50), nullable=True)  # e.g., "CY2023Q4"
 
+    # SPEC_113: the parser emits one fact per (fact, unit, own period) and sets
+    # fiscal_year/fiscal_period to duration-aware labels derived from that period
+    # (FY/Q1-Q4/H1/9M/D<days>), so the key below is unique per own period. The key
+    # is kept as-is (instants have NULL period_start_date; PG14 has no NULLS NOT
+    # DISTINCT). Rows written before SPEC_113 carry filing fy/fp labels.
+
     __table_args__ = (
         UniqueConstraint(
             "cik",
@@ -122,7 +128,7 @@ class SECIncomeStatement(Base):
 
     # Period
     period_end_date = Column(Date, nullable=False, index=True)
-    period_start_date = Column(Date, nullable=True)
+    period_start_date = Column(Date, nullable=False)  # part of the unique key (SPEC_113)
     fiscal_year = Column(Integer, nullable=False, index=True)
     fiscal_period = Column(String(10), nullable=False, index=True)  # Q1, Q2, Q3, Q4, FY
 
@@ -158,12 +164,12 @@ class SECIncomeStatement(Base):
     weighted_average_shares_diluted = Column(DECIMAL(20, 0), nullable=True)
 
     __table_args__ = (
+        # SPEC_113: keyed on the row's OWN period, not the filing's fy/fp
         UniqueConstraint(
             "cik",
             "period_end_date",
-            "fiscal_year",
-            "fiscal_period",
-            name="uq_sec_income_cik_period",
+            "period_start_date",
+            name="uq_sec_income_cik_period_bounds",
         ),
         Index("idx_sec_income_cik_period", "cik", "period_end_date"),
         Index("idx_sec_income_fiscal", "fiscal_year", "fiscal_period"),
@@ -227,12 +233,11 @@ class SECBalanceSheet(Base):
     stockholders_equity = Column(DECIMAL(20, 2), nullable=True)
 
     __table_args__ = (
+        # SPEC_113: balance sheets are instants -> one row per period end
         UniqueConstraint(
             "cik",
             "period_end_date",
-            "fiscal_year",
-            "fiscal_period",
-            name="uq_sec_balance_cik_period",
+            name="uq_sec_balance_cik_period_end",
         ),
         Index("idx_sec_balance_cik_period", "cik", "period_end_date"),
         Index("idx_sec_balance_fiscal", "fiscal_year", "fiscal_period"),
@@ -257,7 +262,7 @@ class SECCashFlowStatement(Base):
 
     # Period
     period_end_date = Column(Date, nullable=False, index=True)
-    period_start_date = Column(Date, nullable=True)
+    period_start_date = Column(Date, nullable=False)  # part of the unique key (SPEC_113)
     fiscal_year = Column(Integer, nullable=False, index=True)
     fiscal_period = Column(String(10), nullable=False, index=True)
 
@@ -298,12 +303,12 @@ class SECCashFlowStatement(Base):
     free_cash_flow = Column(DECIMAL(20, 2), nullable=True)  # Operating CF - CapEx
 
     __table_args__ = (
+        # SPEC_113: keyed on the row's OWN period, not the filing's fy/fp
         UniqueConstraint(
             "cik",
             "period_end_date",
-            "fiscal_year",
-            "fiscal_period",
-            name="uq_sec_cashflow_cik_period",
+            "period_start_date",
+            name="uq_sec_cashflow_cik_period_bounds",
         ),
         Index("idx_sec_cashflow_cik_period", "cik", "period_end_date"),
         Index("idx_sec_cashflow_fiscal", "fiscal_year", "fiscal_period"),

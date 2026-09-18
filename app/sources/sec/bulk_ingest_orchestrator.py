@@ -27,7 +27,11 @@ from sqlalchemy.orm import Session
 from app.core.models import IngestionJob, JobStatus
 from app.sources.sec import xbrl_parser
 from app.sources.sec.client import SECClient
-from app.sources.sec.ingest_xbrl import _upsert_financial_statements
+from app.sources.sec.ingest_xbrl import (
+    FACT_CONFLICT_COLUMNS,
+    STATEMENT_CONFLICT_COLUMNS,
+    _upsert_financial_statements,
+)
 from app.sources.sec.models import (
     SECBalanceSheet,
     SECCashFlowStatement,
@@ -61,14 +65,7 @@ async def _ingest_one_cik(
             db,
             parsed_data["financial_facts"],
             SECFinancialFact,
-            conflict_columns=[
-                "cik",
-                "fact_name",
-                "period_end_date",
-                "fiscal_year",
-                "fiscal_period",
-                "unit",
-            ],
+            conflict_columns=FACT_CONFLICT_COLUMNS,
             batch_size=500,
         )
 
@@ -78,7 +75,7 @@ async def _ingest_one_cik(
             db,
             parsed_data["income_statement"],
             SECIncomeStatement,
-            conflict_columns=["cik", "period_end_date", "fiscal_year", "fiscal_period"],
+            conflict_columns=STATEMENT_CONFLICT_COLUMNS[SECIncomeStatement],
         )
 
     balance_count = 0
@@ -87,7 +84,7 @@ async def _ingest_one_cik(
             db,
             parsed_data["balance_sheet"],
             SECBalanceSheet,
-            conflict_columns=["cik", "period_end_date", "fiscal_year", "fiscal_period"],
+            conflict_columns=STATEMENT_CONFLICT_COLUMNS[SECBalanceSheet],
         )
 
     cashflow_count = 0
@@ -96,7 +93,7 @@ async def _ingest_one_cik(
             db,
             parsed_data["cash_flow"],
             SECCashFlowStatement,
-            conflict_columns=["cik", "period_end_date", "fiscal_year", "fiscal_period"],
+            conflict_columns=STATEMENT_CONFLICT_COLUMNS[SECCashFlowStatement],
         )
 
     return {

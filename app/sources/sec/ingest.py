@@ -50,6 +50,8 @@ async def prepare_table_for_filing_type(
 
         # 3. Execute table creation (idempotent)
         db.execute(text(create_sql))
+        for index_sql in metadata.generate_create_index_sql(table_name):
+            db.execute(text(index_sql))
         db.commit()
 
         # 4. Register in dataset_registry

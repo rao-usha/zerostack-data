@@ -24,6 +24,21 @@ from app.sources.sec.models import (
 
 logger = logging.getLogger(__name__)
 
+# SPEC_113: statement rows are keyed on their OWN period (not the filing's fy/fp).
+FACT_CONFLICT_COLUMNS = [
+    "cik",
+    "fact_name",
+    "period_end_date",
+    "fiscal_year",
+    "fiscal_period",
+    "unit",
+]
+STATEMENT_CONFLICT_COLUMNS = {
+    SECIncomeStatement: ["cik", "period_end_date", "period_start_date"],
+    SECBalanceSheet: ["cik", "period_end_date"],
+    SECCashFlowStatement: ["cik", "period_end_date", "period_start_date"],
+}
+
 
 def _get_model_columns(model_class) -> Set[str]:
     """Get the set of valid column names for a SQLAlchemy model."""
@@ -178,14 +193,7 @@ async def ingest_company_financial_data(
                 db,
                 parsed_data["financial_facts"],
                 SECFinancialFact,
-                conflict_columns=[
-                    "cik",
-                    "fact_name",
-                    "period_end_date",
-                    "fiscal_year",
-                    "fiscal_period",
-                    "unit",
-                ],
+                conflict_columns=FACT_CONFLICT_COLUMNS,
                 batch_size=500,
             )
             logger.info(f"Upserted {facts_count} financial facts")
@@ -204,12 +212,7 @@ async def ingest_company_financial_data(
                 db,
                 parsed_data["income_statement"],
                 SECIncomeStatement,
-                conflict_columns=[
-                    "cik",
-                    "period_end_date",
-                    "fiscal_year",
-                    "fiscal_period",
-                ],
+                conflict_columns=STATEMENT_CONFLICT_COLUMNS[SECIncomeStatement],
             )
             logger.info(f"Upserted {income_count} income statements")
 
@@ -221,12 +224,7 @@ async def ingest_company_financial_data(
                 db,
                 parsed_data["balance_sheet"],
                 SECBalanceSheet,
-                conflict_columns=[
-                    "cik",
-                    "period_end_date",
-                    "fiscal_year",
-                    "fiscal_period",
-                ],
+                conflict_columns=STATEMENT_CONFLICT_COLUMNS[SECBalanceSheet],
             )
             logger.info(f"Upserted {balance_count} balance sheets")
 
@@ -240,12 +238,7 @@ async def ingest_company_financial_data(
                 db,
                 parsed_data["cash_flow"],
                 SECCashFlowStatement,
-                conflict_columns=[
-                    "cik",
-                    "period_end_date",
-                    "fiscal_year",
-                    "fiscal_period",
-                ],
+                conflict_columns=STATEMENT_CONFLICT_COLUMNS[SECCashFlowStatement],
             )
             logger.info(f"Upserted {cashflow_count} cash flow statements")
 

@@ -13,7 +13,6 @@ Endpoints:
   GET   /macro/company-impact/{ticker}    Macro drivers for a company
   GET   /macro/portfolio-impact           Macro exposure for all PE portfolio companies
   GET   /macro/current-environment        Current FRED values for key nodes
-  POST  /macro/collect/edgar-facts        Trigger SEC EDGAR company facts ingestion
   POST  /macro/collect/seed-relationships Seed/re-seed known causal relationships
 """
 import logging
@@ -531,49 +530,6 @@ async def get_current_macro_environment(db: Session = Depends(get_db)):
 # =============================================================================
 # COLLECTION ENDPOINTS
 # =============================================================================
-
-
-@router.post("/collect/edgar-facts")
-async def collect_edgar_facts(
-    background_tasks: BackgroundTasks,
-    tickers: Optional[list[str]] = None,
-):
-    """Trigger SEC EDGAR XBRL company facts ingestion for anchor companies."""
-    import asyncio
-
-    target_tickers = tickers or ["SHW", "DHI", "LEN", "HD", "LOW", "XOM"]
-
-    def run_ingest():
-        from app.sources.edgar_company_facts.client import EDGARCompanyFactsClient, TARGET_COMPANIES
-        from app.sources.edgar_company_facts.ingest import EDGARCompanyFactsIngestor
-        from app.core.database import get_engine
-        import psycopg2
-
-        # Filter companies to requested tickers
-        companies = [c for c in TARGET_COMPANIES if c["ticker"] in target_tickers]
-
-        # Fetch from EDGAR
-        client = EDGARCompanyFactsClient()
-        records = asyncio.run(client.fetch_all())
-
-        if tickers:
-            records = [r for r in records if r["ticker"] in target_tickers]
-
-        # Get raw psycopg2 connection via SQLAlchemy engine
-        engine = get_engine()
-        with engine.connect() as sa_conn:
-            raw_conn = sa_conn.connection.dbapi_connection
-            ingestor = EDGARCompanyFactsIngestor(raw_conn)
-            result = ingestor.upsert_records(records)
-            logger.info(f"EDGAR ingest complete: {result}")
-
-    background_tasks.add_task(run_ingest)
-
-    return {
-        "status": "started",
-        "message": "SEC EDGAR company facts ingestion started in background",
-        "tickers": target_tickers,
-    }
 
 
 @router.post("/collect/sensitivity")

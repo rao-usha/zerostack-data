@@ -53,9 +53,11 @@ def generate_table_name(filing_type: str) -> str:
 
 def generate_create_table_sql(table_name: str) -> str:
     """
-    Generate CREATE TABLE SQL for SEC filings.
+    Generate CREATE TABLE SQL for SEC filings (valid Postgres).
 
-    All SEC filing tables have the same schema structure.
+    All SEC filing tables have the same schema structure. Indexes are NOT
+    declared inline (MySQL-only syntax); run generate_create_index_sql()
+    after this statement.
 
     Args:
         table_name: Target table name
@@ -66,39 +68,44 @@ def generate_create_table_sql(table_name: str) -> str:
     return f"""
         CREATE TABLE IF NOT EXISTS {table_name} (
             id SERIAL PRIMARY KEY,
-            
+
             -- Company identifiers
             cik TEXT NOT NULL,
             ticker TEXT,
             company_name TEXT NOT NULL,
-            
+
             -- Filing metadata
             accession_number TEXT NOT NULL UNIQUE,
             filing_type TEXT NOT NULL,
             filing_date DATE NOT NULL,
             report_date DATE,
-            
+
             -- Filing URLs
             primary_document TEXT,
             filing_url TEXT,
             interactive_data_url TEXT,
-            
+
             -- File details
             file_number TEXT,
             film_number TEXT,
             items TEXT,  -- For 8-K, which items were triggered
-            
+
             -- Processing metadata
-            ingested_at TIMESTAMP DEFAULT NOW(),
-            
-            -- Indexes for efficient queries
-            INDEX idx_{table_name}_cik (cik),
-            INDEX idx_{table_name}_ticker (ticker),
-            INDEX idx_{table_name}_filing_date (filing_date),
-            INDEX idx_{table_name}_report_date (report_date),
-            INDEX idx_{table_name}_accession (accession_number)
-        );
+            ingested_at TIMESTAMP DEFAULT NOW()
+        )
     """
+
+
+def generate_create_index_sql(table_name: str) -> List[str]:
+    """
+    Generate CREATE INDEX IF NOT EXISTS statements for an SEC filings table.
+
+    accession_number needs no extra index: its UNIQUE constraint creates one.
+    """
+    return [
+        f"CREATE INDEX IF NOT EXISTS idx_{table_name}_{col} ON {table_name} ({col})"
+        for col in ("cik", "ticker", "filing_date", "report_date")
+    ]
 
 
 def parse_company_info(data: Dict[str, Any]) -> Dict[str, Any]:
