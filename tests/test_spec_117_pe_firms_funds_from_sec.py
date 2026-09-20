@@ -138,7 +138,11 @@ def pg_engine():
         conn.execute(text("CREATE SCHEMA IF NOT EXISTS core"))
         conn.execute(text("CREATE TABLE core.identifier (id_type TEXT, id_value TEXT, entity_id BIGINT)"))
         for t in ("pe_funds", "pe_firms", "sec_adv_roster_snapshots", "form_d_offerings",
-                  "form_d_issuers", "form_d_related_persons"):
+                  "form_d_issuers", "form_d_related_persons",
+                  # SPEC_118's tables share this database; without dropping them
+                  # these tests read a mart that SPEC_117 is meant to predate
+                  "sec_adv_private_funds", "sec_adv_private_fund_filings",
+                  "sec_adv_filings"):
             conn.execute(text(f"DROP TABLE IF EXISTS public.{t} CASCADE"))
         conn.execute(text("""
             CREATE TABLE pe_firms (id SERIAL PRIMARY KEY, name TEXT NOT NULL, legal_name TEXT,
@@ -152,6 +156,7 @@ def pg_engine():
                 cik TEXT, vintage_year INTEGER, target_size_usd_millions NUMERIC,
                 final_close_usd_millions NUMERIC, strategy TEXT, status TEXT,
                 first_close_date DATE, sec_file_number TEXT, data_source TEXT,
+                firm_link_method VARCHAR(32), sec_fund_id VARCHAR(20),
                 updated_at TIMESTAMP)"""))
         conn.execute(text("""
             CREATE TABLE sec_adv_roster_snapshots (crd_number TEXT, roster_date DATE,

@@ -135,10 +135,15 @@ class PEFund(Base):
     __tablename__ = "pe_funds"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    firm_id = Column(Integer, ForeignKey("pe_firms.id"), nullable=False, index=True)
+    # nullable: most Form D vehicles name no manager, and inventing a parent
+    # firm to satisfy a NOT NULL would be worse than an unlinked fund
+    firm_id = Column(Integer, ForeignKey("pe_firms.id"), index=True)
+    firm_link_method = Column(String(32))  # which attribution tier set firm_id
 
     # Fund Identification
     name = Column(String(500), nullable=False, index=True)
+    cik = Column(String(10), index=True)  # Form D issuer CIK
+    sec_fund_id = Column(String(20))  # ADV Schedule D 7.B.(1) "805-" fund ID
     fund_number = Column(Integer)  # Fund I, II, III, etc.
     vintage_year = Column(Integer, index=True)
 

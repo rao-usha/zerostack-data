@@ -14,8 +14,9 @@ from app.core.models_queue import JobQueue
 logger = logging.getLogger(__name__)
 
 
-def run_pe_marts(skip_firms: bool = False, skip_funds: bool = False) -> dict:
-    from app.marts import pe_firms_sec, pe_funds_sec
+def run_pe_marts(skip_firms: bool = False, skip_funds: bool = False,
+                 dry_run: bool = False) -> dict:
+    from app.marts import adv_private_funds, pe_firms_sec, pe_funds_sec
 
     engine = get_engine()
     summary = {}
@@ -23,8 +24,13 @@ def run_pe_marts(skip_firms: bool = False, skip_funds: bool = False) -> dict:
         with engine.begin() as conn:
             summary["firms"] = pe_firms_sec.build(conn)
     if not skip_funds:
+        # Current state from the Schedule D filing-grain tables first: it is
+        # what the ADV attribution tiers read, and an empty table would make
+        # them contribute nothing without failing anything.
         with engine.begin() as conn:
-            summary["funds"] = pe_funds_sec.build(conn)
+            summary["adv_private_funds"] = adv_private_funds.build(conn)
+        with engine.begin() as conn:
+            summary["funds"] = pe_funds_sec.build(conn, dry_run=dry_run)
     return summary
 
 
@@ -38,6 +44,7 @@ async def execute(job: JobQueue, db: Session):
         run_pe_marts,
         skip_firms=bool(payload.get("skip_firms")),
         skip_funds=bool(payload.get("skip_funds")),
+        dry_run=bool(payload.get("dry_run")),
     )
 
     firms = summary.get("firms", {})

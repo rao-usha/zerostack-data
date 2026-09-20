@@ -53,3 +53,27 @@ provenance + usage telemetry, not the prose.
   exists for it.
 
 ---
+
+## 2026-09-20 — SPEC_118 filing-platform rule (self-caught by adversarial review)
+
+**Correction:** A new heuristic was validated only by the ranked table it
+produced. `find_platform_advisers` counted *CRDs sharing a name stem*, not
+*distinct advisers named*, so its docstring described a different quantity
+than its code. Separately, the rule re-pointed 320 funds at advisers without
+checking they resolve to a `pe_firms` row — 234 of them ended with no link,
+counted as successes.
+
+**Why it matters:** Both were found by an adversarial review and confirmed by
+direct measurement, before anything was written. The ranked table looked right
+because it *was* right for the four advisers it listed; it said nothing about
+the mechanism.
+
+**How to apply next time:**
+- When a new metric decides which rows get re-pointed, write a test that
+  pins the metric's *definition* (what one input contributes), not only its
+  output on the happy case.
+- Run the validation script through the same code path the mart uses. The
+  "cliff" table here was built from a different index over a different table
+  and ranked a different population than the shipped function.
+- Any rule that overrides an existing link must check the replacement is
+  writable at the point it decides, and count the case where it is not.

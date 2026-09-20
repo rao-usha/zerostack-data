@@ -1747,6 +1747,12 @@ DEFAULT_BULK_SCHEDULES = [
         "description": "1.2 GB download; financial statements change slowly.",
     },
     {
+        "name": "SEC Form ADV Schedule D private funds (monthly)",
+        "source": "bulk:sec_adv_schedule_d",
+        "cron_expression": "0 8 4 * *",
+        "description": "Per-adviser private fund lists; files land on the first business day.",
+    },
+    {
         "name": "SEC Form ADV rosters (monthly)",
         "source": "bulk:sec_adv_roster",
         "cron_expression": "0 8 5 * *",
