@@ -228,3 +228,14 @@ def test_migration_0007_chain_and_sql():
     sql = " ".join(mod.UPGRADE_SQL).lower()
     assert "quarantine.sec_financial_facts_pre_period_fix" in sql
     assert "sec_8k_index" in sql and "accession_number, cik" in sql
+
+
+@pytest.mark.unit
+def test_merge_sql_supports_partial_unique_index():
+    """A partial unique index needs its predicate repeated in ON CONFLICT."""
+    from app.core.copy_loader import build_merge_sql
+
+    sql = " ".join(build_merge_sql(
+        "s", "public.pe_firms", ["crd_number", "name"], ["crd_number"],
+        conflict_where="crd_number IS NOT NULL").split())
+    assert 'ON CONFLICT ("crd_number") WHERE crd_number IS NOT NULL DO UPDATE' in sql

@@ -81,6 +81,7 @@ def _load_executors():
     from app.worker.executors.ingestion import execute as ingestion_exec
     from app.worker.executors.bulk_ingest import execute as bulk_ingest_exec
     from app.worker.executors.entity_resolve import execute as entity_resolve_exec
+    from app.worker.executors.pe_marts import execute as pe_marts_exec
 
     EXECUTORS.update(
         {
@@ -94,6 +95,7 @@ def _load_executors():
             QueueJobType.INGESTION: ingestion_exec,
             QueueJobType.BULK_INGEST: bulk_ingest_exec,
             QueueJobType.ENTITY_RESOLVE: entity_resolve_exec,
+            QueueJobType.PE_MART_BUILD: pe_marts_exec,
         }
     )
 

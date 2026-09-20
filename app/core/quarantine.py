@@ -144,6 +144,15 @@ RULES: List[QuarantineRule] = [
                    "demo", 3, "demo firms (D8)"),
 ]
 
+# Not part of the Phase 0 sweep: these undo the SPEC_117 SEC load. They are
+# applied only when passed explicitly (scripts/quarantine_dry_run.py --rules sec).
+SEC_MART_RULES: List[QuarantineRule] = [
+    QuarantineRule("sec_form_d_funds", "pe_funds", "data_source = 'SEC Form D'",
+                   "quarantine", 40000, "funds loaded from Form D (SPEC_117)"),
+    QuarantineRule("sec_adv_firms", "pe_firms", "CAST(data_sources AS TEXT) LIKE '%SEC ADV%'",
+                   "quarantine", 8000, "firms loaded from Form ADV (SPEC_117)"),
+]
+
 
 # ---------------------------------------------------------------------------
 # Guards

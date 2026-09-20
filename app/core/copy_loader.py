@@ -115,23 +115,31 @@ def build_merge_sql(
     key_columns: Sequence[str],
     update_columns: Optional[Sequence[str]] = None,
     skip_unchanged: bool = True,
+    compare_columns: Optional[Sequence[str]] = None,
+    conflict_where: Optional[str] = None,
 ) -> str:
     cols = ", ".join(qi(c) for c in columns)
     keys = ", ".join(qi(c) for c in key_columns)
+    # a partial unique index only matches ON CONFLICT when its predicate is repeated
+    conflict_target = f"({keys}) WHERE {conflict_where}" if conflict_where else f"({keys})"
     if update_columns is None:
         update_columns = [c for c in columns if c not in key_columns]
     if update_columns:
         sets = ", ".join(f"{qi(c)} = EXCLUDED.{qi(c)}" for c in update_columns)
-        conflict = f"ON CONFLICT ({keys}) DO UPDATE SET {sets}"
+        conflict = f"ON CONFLICT {conflict_target} DO UPDATE SET {sets}"
         if skip_unchanged:
-            compared = [c for c in update_columns if c not in NON_COMPARED_COLUMNS] or list(update_columns)
+            compared = (
+                list(compare_columns)
+                if compare_columns is not None
+                else [c for c in update_columns if c not in NON_COMPARED_COLUMNS] or list(update_columns)
+            )
             alias = qi(target.split(".")[-1])
             current = ", ".join(f"{alias}.{qi(c)}" for c in compared)
             incoming = ", ".join(f"EXCLUDED.{qi(c)}" for c in compared)
             # Leave identical rows completely untouched: no dead tuples, no disk churn
             conflict += f" WHERE ({current}) IS DISTINCT FROM ({incoming})"
     else:
-        conflict = f"ON CONFLICT ({keys}) DO NOTHING"
+        conflict = f"ON CONFLICT {conflict_target} DO NOTHING"
     return f"""
         WITH src AS (
             SELECT DISTINCT ON ({keys}) {cols}
@@ -157,6 +165,8 @@ def merge_staging(
     key_columns: Sequence[str],
     update_columns: Optional[Sequence[str]] = None,
     skip_unchanged: bool = True,
+    compare_columns: Optional[Sequence[str]] = None,
+    conflict_where: Optional[str] = None,
 ) -> Tuple[int, int]:
     """Upsert stg.<stg_name> into target. Returns (inserted, updated).
 
@@ -164,7 +174,12 @@ def merge_staging(
     real changes only.
     """
     row = conn.execute(
-        text(build_merge_sql(stg_name, target, columns, key_columns, update_columns, skip_unchanged))
+        text(
+            build_merge_sql(
+                stg_name, target, columns, key_columns, update_columns, skip_unchanged,
+                compare_columns, conflict_where
+            )
+        )
     ).one()
     return int(row[0] or 0), int(row[1] or 0)
 

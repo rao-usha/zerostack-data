@@ -48,6 +48,7 @@ from app.api.v1 import (
     prediction_markets,
     bulk,
     entity_master,
+    pe_marts,
     schedules,
     webhooks,
     chains,
@@ -1372,6 +1373,7 @@ Browse the endpoint sections below to see what's available:
         {"name": "benchmarks", "description": "📊 **Financial Benchmarks** - Industry multiples, valuation comps, and financial benchmarks"},
         {"name": "13F Analysis", "description": "📊 **13F Quarterly Analysis** - Quarter-over-quarter holding diffs and cross-investor convergence detection"},
         # ── PE Intelligence ────────────────────────────────────────────
+        {"name": "PE Intelligence - Marts", "description": "PE firms/funds built from Form ADV + Form D (PLAN_083)"},
         {"name": "Entity Master", "description": "Identifier-keyed entity master (CIK/CRD/EIN/LEI) + CIK-CRD bridge (PLAN_083)"},
         {"name": "Bulk Ingestion", "description": "Bulk publisher files (SEC data sets) loaded via raw.source_release manifest (PLAN_082)"},
         {"name": "PE Intelligence - Firms", "description": "🏢 **PE Firms** - Private equity firm profiles, fund data, and investment strategies"},
@@ -1579,6 +1581,7 @@ app.include_router(dunl.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(prediction_markets.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(bulk.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(entity_master.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(pe_marts.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(schedules.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(webhooks.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(chains.router, prefix="/api/v1", dependencies=_auth)
