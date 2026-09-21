@@ -167,3 +167,74 @@ class TestApplyRevertPostgres:
         apply(pg_conn, _rules())
         second = apply(pg_conn, _rules())
         assert second["total_rows"] == 0
+
+
+@pg
+class TestShadowDriftAndCap:
+    """SPEC_119 found three ways the rollback path had quietly rotted.
+
+    All three only surface when the rollback is actually run, which is the
+    moment you least want to discover them.
+    """
+
+    def test_shadow_gains_columns_added_after_it_was_created(self, pg_conn):
+        """`CREATE TABLE IF NOT EXISTS ... (LIKE x)` copies the shape only on
+        create, so every migration since the first sweep broke the move with
+        'column ... does not exist'."""
+        from sqlalchemy import text
+
+        from app.core.quarantine import apply, revert
+
+        apply(pg_conn, _rules())                      # creates quarantine.q_parent
+        revert(pg_conn)
+
+        # a later migration adds a column to the live table
+        pg_conn.execute(text("ALTER TABLE q_parent ADD COLUMN note TEXT"))
+        pg_conn.execute(text("UPDATE q_parent SET note = 'added later'"))
+
+        report = apply(pg_conn, _rules())             # must not raise
+        assert report["total_rows"] >= 2
+        kept = pg_conn.execute(text(
+            "SELECT note FROM quarantine.q_parent ORDER BY id")).scalars().all()
+        assert kept == ["added later", "added later"], "the new column travelled"
+
+    def test_shadow_does_not_enforce_stale_not_null(self, pg_conn):
+        """quarantine.pe_funds was born when firm_id was NOT NULL; SPEC_117
+        made it nullable and the move then died on the first unattributed
+        fund. An archive takes whatever the live table held."""
+        from sqlalchemy import text
+
+        from app.core.quarantine import apply, revert
+
+        pg_conn.execute(text("ALTER TABLE q_parent ALTER COLUMN name SET NOT NULL"))
+        apply(pg_conn, _rules())                      # shadow born with NOT NULL
+        revert(pg_conn)
+        pg_conn.execute(text("ALTER TABLE q_parent ALTER COLUMN name DROP NOT NULL"))
+        pg_conn.execute(text("UPDATE q_parent SET name = NULL WHERE kind = 'bad'"))
+
+        apply(pg_conn, _rules())                      # must not raise
+        moved = pg_conn.execute(text(
+            "SELECT count(*) FROM quarantine.q_parent WHERE name IS NULL")).scalar()
+        assert moved == 2
+
+    def test_max_total_blocks_a_rollback_bigger_than_its_budget(self, pg_conn):
+        """The cap is a runaway-predicate backstop counted across every table
+        in one call."""
+        import pytest as _pytest
+
+        from app.core.quarantine import QuarantineGuardError, apply
+
+        with _pytest.raises(QuarantineGuardError, match="max_total"):
+            apply(pg_conn, _rules(), max_total=1)
+
+    def test_an_explicit_budget_allows_a_deliberate_mart_rollback(self, pg_conn):
+        """SEC_MART_RULES alone resolves to ~39k rows, so a rollback of a whole
+        mart has to be able to say how big it is meant to be -- otherwise the
+        backstop silently makes the data irreversible."""
+        from app.core.quarantine import apply
+
+        report = apply(pg_conn, _rules(), max_total=10_000)
+        # 2 parents + their 2 children + 1 grandchild: the running total counts
+        # everything the FK walk pulls, which is why a mart whose root table is
+        # already 39k rows blows through the default long before it finishes.
+        assert report["total_rows"] == 5

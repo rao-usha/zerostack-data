@@ -31,6 +31,11 @@ from app.core.safe_sql import qi
 logger = logging.getLogger(__name__)
 
 TOLERANCE = 1.05
+# A runaway-predicate backstop for the ad-hoc Phase 0 sweeps, counted across
+# every table one apply() touches. A deliberate, measured rollback of a whole
+# SEC mart is legitimately larger than this -- SEC_MART_RULES alone resolves to
+# ~39k pe_funds rows today -- so apply() takes an explicit override. The guard
+# stays low by default precisely so that raising it has to be a decision.
 MAX_TOTAL_ROWS = 25_000
 MAX_DEPTH = 6
 SCHEMAS = ("quarantine", "demo")
@@ -151,6 +156,11 @@ SEC_MART_RULES: List[QuarantineRule] = [
                    "quarantine", 40000, "funds loaded from Form D (SPEC_117)"),
     QuarantineRule("sec_adv_firms", "pe_firms", "CAST(data_sources AS TEXT) LIKE '%SEC ADV%'",
                    "quarantine", 8000, "firms loaded from Form ADV (SPEC_117)"),
+    # pe_firm_people follows through the FK walk, so it needs no rule of its
+    # own. Rolling this group back moves ~60k rows, well over the default
+    # MAX_TOTAL_ROWS -- pass an explicit max_total, which is the point of it.
+    QuarantineRule("sec_form_d_people", "pe_people", "source_key LIKE 'secformd:%'",
+                   "quarantine", 12000, "people from Form D related persons (SPEC_119)"),
 ]
 
 
@@ -241,9 +251,60 @@ def _ensure_meta(conn: Connection) -> None:
     )
 
 
+def _column_types(conn: Connection, schema: str, table: str) -> Dict[str, str]:
+    """{column: sql type} for a live table, or {} when it does not exist."""
+    return {
+        r[0]: r[1]
+        for r in conn.execute(
+            text(
+                "SELECT a.attname, format_type(a.atttypid, a.atttypmod) "
+                "FROM pg_attribute a "
+                "WHERE a.attrelid = to_regclass(:rel) AND a.attnum > 0 "
+                "AND NOT a.attisdropped"
+            ),
+            {"rel": f"{schema}.{table}"},
+        ).fetchall()
+    }
+
+
 def _ensure_target(conn: Connection, schema: str, table: str) -> None:
     target = f"{qi(schema)}.{qi(table)}"
     conn.execute(text(f"CREATE TABLE IF NOT EXISTS {target} (LIKE public.{qi(table)})"))
+
+    # `CREATE TABLE IF NOT EXISTS ... (LIKE ...)` copies the shape only when it
+    # actually creates the table. A shadow left behind by an earlier sweep keeps
+    # the column set it was born with, so every migration that adds a column to
+    # the public table since then breaks the move with "column ... does not
+    # exist" -- and it breaks it at rollback time, which is exactly when the
+    # rollback is needed. Reconcile instead of assuming.
+    live = _column_types(conn, "public", table)
+    shadow = _column_types(conn, schema, table)
+    missing = [(c, t) for c, t in live.items() if c not in shadow]
+    if missing:
+        adds = ", ".join(f"ADD COLUMN IF NOT EXISTS {qi(c)} {t}" for c, t in missing)
+        conn.execute(text(f"ALTER TABLE {target} {adds}"))
+        logger.info(
+            f"[quarantine] {target}: added {len(missing)} column(s) the shadow "
+            f"was missing ({', '.join(c for c, _ in missing)})"
+        )
+
+    # A shadow is an archive, not a live table: it has to accept whatever the
+    # public table held at the moment of the move. `LIKE` copies NOT NULL, and
+    # those constraints then drift -- `quarantine.pe_funds` was born when
+    # `firm_id` was NOT NULL, SPEC_117 made it nullable, and the move then died
+    # on the first unattributed fund. The live table keeps its constraints;
+    # restoring through `revert()` is what re-checks them.
+    notnull = conn.execute(
+        text(
+            "SELECT a.attname FROM pg_attribute a "
+            "WHERE a.attrelid = to_regclass(:rel) AND a.attnum > 0 "
+            "AND NOT a.attisdropped AND a.attnotnull"
+        ),
+        {"rel": f"{schema}.{table}"},
+    ).scalars().all()
+    for column in notnull:
+        conn.execute(text(f"ALTER TABLE {target} ALTER COLUMN {qi(column)} DROP NOT NULL"))
+
     conn.execute(
         text(
             f"ALTER TABLE {target} "
@@ -274,8 +335,9 @@ def _public_columns(conn: Connection, table: str) -> List[str]:
 # ---------------------------------------------------------------------------
 
 class _Mover:
-    def __init__(self, conn: Connection):
+    def __init__(self, conn: Connection, max_total: int = MAX_TOTAL_ROWS):
         self.conn = conn
+        self.max_total = max_total
         self.report: List[Dict] = []
         self.total = 0
         self._tmp = 0
@@ -354,9 +416,10 @@ class _Mover:
             {"n": moved, "seq": seq},
         )
         self.total += moved
-        if self.total > MAX_TOTAL_ROWS:
+        if self.total > self.max_total:
             raise QuarantineGuardError(
-                f"Total moved rows {self.total} exceed MAX_TOTAL_ROWS={MAX_TOTAL_ROWS}"
+                f"Total moved rows {self.total} exceed max_total={self.max_total}. "
+                "Pass apply(..., max_total=N) if this rollback is meant to be this big."
             )
         self.report.append(
             {"rule": rule.name, "schema": rule.target_schema, "table": table,
@@ -365,10 +428,16 @@ class _Mover:
         return moved
 
 
-def apply(conn: Connection, rules: List[QuarantineRule] = RULES) -> Dict:
-    """Quarantine rows for ``rules``. Caller owns the transaction."""
+def apply(conn: Connection, rules: List[QuarantineRule] = RULES,
+          max_total: int = MAX_TOTAL_ROWS) -> Dict:
+    """Quarantine rows for ``rules``. Caller owns the transaction.
+
+    ``max_total`` caps the rows moved across all rules in this call. The
+    default is deliberately smaller than a full mart, so rolling one back is
+    an explicit act rather than something a stray predicate can do by accident.
+    """
     _ensure_meta(conn)
-    mover = _Mover(conn)
+    mover = _Mover(conn, max_total=max_total)
 
     captured = []
     roots = []

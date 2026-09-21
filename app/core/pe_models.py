@@ -100,6 +100,9 @@ class PEFirm(Base):
     cik = Column(String(20), index=True)  # SEC Central Index Key
     sec_file_number = Column(String(50))  # SEC File Number (e.g., 801-XXXXX)
     crd_number = Column(String(20))  # FINRA CRD Number
+    # SPEC_119: files many vehicles, never raises real money -- an SPV/access
+    # platform rather than a fund sponsor. Set by the pe_people mart.
+    is_spv_platform = Column(Boolean)
     is_sec_registered = Column(Boolean, default=False)
 
     # Status
@@ -909,6 +912,8 @@ class PEPerson(Base):
 
     # Social/External
     linkedin_url = Column(String(500), unique=True)
+    # SPEC_119: identity key for SEC-derived rows, NULL on hand-collected ones
+    source_key = Column(Text)
     twitter_url = Column(String(500))
     personal_website = Column(String(500))
 
@@ -1031,6 +1036,17 @@ class PEFirmPeople(Base):
     # Contact
     work_email = Column(String(300))
     work_phone = Column(String(50))
+    # SPEC_119: how the person->firm link was derived, and the evidence behind
+    # it. `firm_link_method` is the fund tier propagated from pe_funds, not a
+    # second vocabulary.
+    data_source = Column(Text)
+    person_link_method = Column(String(32), index=True)
+    firm_link_method = Column(String(32))
+    address_confirmation = Column(String(16))
+    fund_count = Column(Integer)
+    filing_count = Column(Integer)
+    first_seen = Column(Date)
+    last_seen = Column(Date)
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
