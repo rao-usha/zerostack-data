@@ -52,15 +52,30 @@ x-api-keys: &api-keys
 services:
   cloudsqlproxy:
     image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:latest
-    command: --address 0.0.0.0 --port 5432 nexdata-cloud:us-central1:nexdata-pg
+    # --health-check exposes /startup, /readiness and /liveness on 9090, which
+    # is what the `wait` subcommand below polls. Without it the healthcheck can
+    # only ever fail, and a proxy that works while reporting "unhealthy" is
+    # worse than no healthcheck at all.
+    command: >
+      --address 0.0.0.0 --port 5432
+      --health-check --http-address 0.0.0.0 --http-port 9090
+      nexdata-cloud:us-central1:nexdata-pg
     ports:
       - "5435:5432"
     volumes:
-      - ${HOME}/.config/gcloud/application_default_credentials.json:/credentials.json:ro
+      # GCLOUD_ADC is set in .env. The default below is the Linux/macOS path;
+      # gcloud on Windows keeps application default credentials under
+      # %APPDATA%\gcloud instead, so the two are not interchangeable.
+      - ${GCLOUD_ADC:-${HOME}/.config/gcloud/application_default_credentials.json}:/credentials.json:ro
     environment:
       GOOGLE_APPLICATION_CREDENTIALS: /credentials.json
-    profiles:
-      - cloud
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/cloud-sql-proxy", "wait", "--max", "5s"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
   postgres:
     image: postgres:14-alpine
