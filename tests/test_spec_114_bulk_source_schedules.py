@@ -151,13 +151,23 @@ class TestDefaultSchedules:
         """T8"""
         from apscheduler.triggers.cron import CronTrigger
 
+        from app.core.models_queue import QueueJobType
         from app.core.scheduler_service import DEFAULT_BULK_SCHEDULES
         from app.ingest.bulk.registry import list_sources
 
-        sources = list_sources()
-        assert {d["source"].split(":", 1)[1] for d in DEFAULT_BULK_SCHEDULES} == set(sources)
+        # The list carries two kinds of source since SPEC_120: every registered
+        # bulk loader, and the `job:` marts that read what they write. Each is
+        # checked against its own registry -- a typo in either would otherwise
+        # only surface when the schedule fires, unwatched, next month.
+        bulk = {d["source"].split(":", 1)[1] for d in DEFAULT_BULK_SCHEDULES
+                if d["source"].startswith("bulk:")}
+        jobs = {d["source"].split(":", 1)[1] for d in DEFAULT_BULK_SCHEDULES
+                if d["source"].startswith("job:")}
+        assert bulk == set(list_sources())
+        assert jobs == {"entity_resolve", "pe_mart_build"}
+        assert jobs <= {t.value for t in QueueJobType}
         for d in DEFAULT_BULK_SCHEDULES:
-            assert d["source"].startswith("bulk:")
+            assert d["source"].startswith(("bulk:", "job:"))
             CronTrigger.from_crontab(d["cron_expression"])  # raises if invalid
         names = [d["name"] for d in DEFAULT_BULK_SCHEDULES]
         assert len(names) == len(set(names))

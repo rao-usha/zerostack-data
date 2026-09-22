@@ -360,15 +360,22 @@ async def lifespan(app: FastAPI):
 
         scheduler_service.start_scheduler()
 
-        # Auto-create default schedules (idempotent — skips existing)
+        # The bulk SEC loaders and the marts that read them (SPEC_114/120).
+        # Idempotent: existing schedules, even paused ones, are left alone.
+        #
+        # The legacy DEFAULT_SCHEDULES are deliberately NOT seeded here any
+        # more. Seeding them on every boot recreated by name whatever had been
+        # deleted, so the schedule list could never be curated -- 37 of the 42
+        # it kept restoring had never run once. They are still available on
+        # demand from POST /api/v1/schedules/defaults.
         SessionLocal = get_session_factory()
         db = SessionLocal()
         try:
-            created = scheduler_service.create_default_schedules(db)
-            if created:
-                logger.info(f"Created {len(created)} default schedules (paused)")
+            result = scheduler_service.install_default_bulk_schedules(db)
+            if result.get("created"):
+                logger.info(f"Created bulk/mart schedules: {result['created']}")
         except Exception as e:
-            logger.warning(f"Failed to create default schedules: {e}")
+            logger.warning(f"Failed to install bulk schedules: {e}")
         finally:
             db.close()
 

@@ -37,6 +37,40 @@ logger = logging.getLogger(__name__)
 
 # Schedules whose source carries this prefix run as worker bulk_ingest jobs
 BULK_SOURCE_PREFIX = "bulk:"
+# `job:<queue job type>` schedules a worker job that is not a bulk load. The
+# marts need it: nothing rebuilt pe_funds / pe_firms / pe_people on a timer, so
+# the raw SEC tables would move every month while the PE tables kept answering
+# with whatever the last manual run produced.
+SCHEDULE_JOB_PREFIX = "job:"
+
+
+def validate_schedule_source(source: str) -> None:
+    """Raise if a `job:` source names a job type no worker can run.
+
+    Checked when the schedule is created rather than when it fires: a typo
+    that only surfaces at 06:00 on the 10th of next month, in a job nobody is
+    watching, is exactly the failure this is here to prevent.
+    """
+    if not (source or "").startswith(SCHEDULE_JOB_PREFIX):
+        return
+    from app.core.models_queue import QueueJobType
+
+    job_type = source[len(SCHEDULE_JOB_PREFIX):]
+    valid = {t.value for t in QueueJobType}
+    if job_type not in valid:
+        raise ValueError(
+            f"unknown job type {job_type!r} for schedule source {source!r}; "
+            f"expected one of {sorted(valid)}"
+        )
+
+
+def prunable(is_active, last_run_at) -> bool:
+    """A schedule safe to delete: never enabled and never run.
+
+    `last_run_at` is the only record of when a source was last collected, so a
+    paused schedule that ran even once is kept.
+    """
+    return not is_active and last_run_at is None
 
 # =============================================================================
 # Incremental Loading — Source-specific date parameter mapping
@@ -200,6 +234,10 @@ async def run_scheduled_job(schedule_id: int):
             await _run_bulk_schedule(db, schedule)
             return
 
+        if (schedule.source or "").startswith(SCHEDULE_JOB_PREFIX):
+            await _run_job_schedule(db, schedule)
+            return
+
         # Inject incremental start params if configured
         effective_config = _inject_incremental_params(
             config=schedule.config or {},
@@ -279,6 +317,32 @@ async def _run_bulk_schedule(db: Session, schedule: IngestionSchedule) -> None:
     schedule.next_run_at = _calculate_next_run(schedule)
     db.commit()
     logger.info(f"Queued bulk job for {schedule.name}: ingestion_job={job.id}, queue={result}")
+
+
+async def _run_job_schedule(db: Session, schedule: IngestionSchedule) -> None:
+    """Queue an arbitrary worker job for a ``job:<type>`` schedule."""
+    job_type = schedule.source[len(SCHEDULE_JOB_PREFIX):]
+    config = schedule.config or {}
+
+    job = IngestionJob(
+        source=schedule.source,
+        status=JobStatus.PENDING,
+        config=config,
+        schedule_id=schedule.id,
+        trigger="scheduled",
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+
+    payload = dict(config)
+    payload["ingestion_job_id"] = job.id
+    result = submit_job(db=db, job_type=job_type, payload=payload, job_table_id=job.id)
+
+    schedule.last_job_id = job.id
+    schedule.next_run_at = _calculate_next_run(schedule)
+    db.commit()
+    logger.info(f"Queued {job_type} for {schedule.name}: ingestion_job={job.id}, queue={result}")
 
 
 async def _execute_ingestion_job(db: Session, job: IngestionJob):
@@ -566,6 +630,7 @@ def create_schedule(
     Returns:
         Created IngestionSchedule
     """
+    validate_schedule_source(source)
     schedule = IngestionSchedule(
         name=name,
         source=source,
@@ -584,6 +649,9 @@ def create_schedule(
                 hour=hour,
                 day_of_week=day_of_week,
                 day_of_month=day_of_month,
+                # without this a CUSTOM schedule falls through to the non-cron
+                # branch and gets a first next_run_at its cron never implied
+                cron_expression=cron_expression,
             )
         ),
     )
@@ -1775,6 +1843,21 @@ DEFAULT_BULK_SCHEDULES = [
         "source": "bulk:sec_13f",
         "cron_expression": "30 9 9 * *",
         "description": "Quarterly data sets; holdings only for the newest release.",
+    },
+    # --- marts, after every monthly loader has landed ---------------------
+    {
+        "name": "Entity master resolve (monthly)",
+        "source": "job:entity_resolve",
+        "cron_expression": "0 4 10 * *",
+        "description": "Rebuilds the identifier graph the PE marts read for CIK/CRD links.",
+    },
+    {
+        "name": "PE marts rebuild (monthly)",
+        "source": "job:pe_mart_build",
+        "cron_expression": "0 6 10 * *",
+        "description": "firms, ADV current state, funds then people. Two hours after the "
+                       "resolver: both are idempotent, so a late loader costs a stale "
+                       "month, not a corrupt table.",
     },
 ]
 
