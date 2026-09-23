@@ -4,12 +4,12 @@ Tests for configurable freshness SLA (#4).
 Covers:
 - DB SLA overrides schedule-derived cadence
 - CRUD operations (list, upsert, delete)
-- Violation detection fires webhook
+- Violation detection: see SPEC_128 (data watchdog)
 - No SLA = existing behavior (fallback to schedule cadence)
 """
 
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock
 from datetime import datetime, timedelta
 
 from app.core.models import SourceFreshnessSLA
@@ -233,97 +233,5 @@ class TestFreshnessSLACRUD:
         assert result[1]["alert_on_violation"] is False
 
 
-@pytest.mark.asyncio
-class TestFreshnessViolationChecker:
-    """Test check_freshness_violations() function."""
-
-    async def test_violation_fires_webhook(self):
-        """Stale source with SLA fires ALERT_DATA_STALENESS webhook."""
-        from app.api.v1.freshness import check_freshness_violations
-        from app.core.models import WebhookEventType
-
-        now = datetime.utcnow()
-
-        sla = MagicMock(spec=SourceFreshnessSLA)
-        sla.source = "fred"
-        sla.max_age_hours = 24.0
-        sla.alert_on_violation = 1
-
-        db = MagicMock()
-
-        call_count = [0]
-
-        def side_effect_query(*args):
-            call_count[0] += 1
-            mock_q = MagicMock()
-            if call_count[0] == 1:
-                # SLA query
-                mock_q.filter.return_value.all.return_value = [sla]
-            elif call_count[0] == 2:
-                # Last success query
-                row = MagicMock()
-                row.source = "fred"
-                row.last_success = now - timedelta(hours=48)
-                mock_q.filter.return_value.group_by.return_value.all.return_value = [row]
-            return mock_q
-
-        db.query.side_effect = side_effect_query
-
-        with patch(
-            "app.core.webhook_service.trigger_webhooks", new_callable=AsyncMock
-        ) as mock_trigger:
-            mock_trigger.return_value = {"webhooks_triggered": 1}
-
-            result = await check_freshness_violations(db)
-
-            assert result["violations"] == 1
-            assert result["details"][0]["source"] == "fred"
-            mock_trigger.assert_called_once()
-            call_kwargs = mock_trigger.call_args.kwargs
-            assert call_kwargs["event_type"] == WebhookEventType.ALERT_DATA_STALENESS
-
-    async def test_no_violations_when_fresh(self):
-        """Fresh source does not trigger webhook."""
-        from app.api.v1.freshness import check_freshness_violations
-
-        now = datetime.utcnow()
-
-        sla = MagicMock(spec=SourceFreshnessSLA)
-        sla.source = "fred"
-        sla.max_age_hours = 48.0
-        sla.alert_on_violation = 1
-
-        db = MagicMock()
-        call_count = [0]
-
-        def side_effect_query(*args):
-            call_count[0] += 1
-            mock_q = MagicMock()
-            if call_count[0] == 1:
-                mock_q.filter.return_value.all.return_value = [sla]
-            elif call_count[0] == 2:
-                row = MagicMock()
-                row.source = "fred"
-                row.last_success = now - timedelta(hours=12)  # Fresh
-                mock_q.filter.return_value.group_by.return_value.all.return_value = [row]
-            return mock_q
-
-        db.query.side_effect = side_effect_query
-
-        with patch(
-            "app.core.webhook_service.trigger_webhooks", new_callable=AsyncMock
-        ) as mock_trigger:
-            result = await check_freshness_violations(db)
-
-            assert result["violations"] == 0
-            mock_trigger.assert_not_called()
-
-    async def test_no_slas_returns_zero_violations(self):
-        """No configured SLAs = no violations to check."""
-        from app.api.v1.freshness import check_freshness_violations
-
-        db = MagicMock()
-        db.query.return_value.filter.return_value.all.return_value = []
-
-        result = await check_freshness_violations(db)
-        assert result["violations"] == 0
+# Violation detection moved to the data watchdog (SPEC_128, rule_sla); see
+# tests/test_spec_128_data_watchdog_and_health.py::test_sla_violation_and_never_succeeded.

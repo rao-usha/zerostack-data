@@ -7,6 +7,7 @@ Provides job monitoring, metrics collection, and alerting capabilities.
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
+from types import SimpleNamespace
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, text
 
@@ -265,29 +266,69 @@ class JobMonitor:
                 "created_at": datetime.utcnow().isoformat(),
             })
 
-        # Data staleness — sources with no recent jobs
-        stale_result = self.db.execute(text(
-            "SELECT source, MAX(created_at) as last_job_at FROM ingestion_jobs "
-            "GROUP BY source"
-        ))
+        alerts.extend(self._staleness_alerts())
+        return alerts
 
-        for row in stale_result.fetchall():
-            source, last_job_at = row[0], row[1]
-            if last_job_at:
-                time_since_last = datetime.utcnow() - last_job_at
-                if time_since_last > timedelta(hours=24):
-                    alerts.append({
-                        "alert_type": "data_staleness",
-                        "source": source,
-                        "severity": "info",
-                        "message": f"No jobs for source '{source}' in {time_since_last.days} days, {time_since_last.seconds // 3600} hours",
-                        "last_job_at": last_job_at.isoformat(),
-                        "hours_since_last": round(
-                            time_since_last.total_seconds() / 3600, 2
-                        ),
-                        "created_at": datetime.utcnow().isoformat(),
-                    })
+    def _staleness_alerts(self) -> List[Dict[str, Any]]:
+        """Data staleness from *successful* jobs only (SPEC_128).
 
+        Counting every job as activity meant a source failing every hour looked
+        fresh. Never succeeded => critical; older than 1.5x its scheduled
+        cadence => critical; otherwise older than 24h => info.
+        """
+        from app.services.data_watchdog import STALL_FACTOR, schedule_cadence_hours
+
+        now = datetime.utcnow()
+        rows = self.db.execute(text(
+            "SELECT source, "
+            "MAX(completed_at) FILTER (WHERE LOWER(status) = 'success') AS last_success_at, "
+            "MAX(created_at) AS last_job_at "
+            "FROM ingestion_jobs GROUP BY source"
+        )).fetchall()
+
+        # Tightest active schedule per source, for the cadence threshold
+        cadence: Dict[str, float] = {}
+        for s in self.db.execute(text(
+            "SELECT source, frequency, cron_expression FROM ingestion_schedules WHERE is_active = 1"
+        )).mappings().all():
+            hours = schedule_cadence_hours(SimpleNamespace(**s))
+            if hours and (s["source"] not in cadence or hours < cadence[s["source"]]):
+                cadence[s["source"]] = hours
+
+        alerts = []
+        for source, last_success_at, last_job_at in rows:
+            base = {
+                "alert_type": "data_staleness",
+                "source": source,
+                "last_success_at": last_success_at.isoformat() if last_success_at else None,
+                "last_job_at": last_job_at.isoformat() if last_job_at else None,
+                "created_at": now.isoformat(),
+            }
+            if last_success_at is None:
+                alerts.append({
+                    **base,
+                    "severity": "critical",
+                    "message": f"Source '{source}' has never completed a successful job",
+                    "hours_since_last": None,
+                })
+                continue
+
+            age = now - last_success_at
+            age_h = age.total_seconds() / 3600
+            expected = cadence.get(source)
+            if expected and age_h > expected * STALL_FACTOR:
+                severity = "critical"
+            elif age > timedelta(hours=24):
+                severity = "info"
+            else:
+                continue
+            alerts.append({
+                **base,
+                "severity": severity,
+                "message": f"No successful job for source '{source}' in {age.days} days, {age.seconds // 3600} hours",
+                "hours_since_last": round(age_h, 2),
+                "expected_cadence_hours": expected,
+            })
         return alerts
 
 

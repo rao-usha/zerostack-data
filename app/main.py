@@ -225,6 +225,10 @@ from app.api.v1 import diligence_pack as diligence_pack_router
 # Nexdata Atlas (SPEC_064 / PLAN_065 rev_01) — primary public-data explorer
 from app.api.v1 import atlas as atlas_router
 
+# Data watchdog + liveness/readiness probes (SPEC_128)
+from app.api.v1 import watchdog as watchdog_router
+from app.api import health as health_probes
+
 from app.graphql import graphql_app
 
 # Configure logging
@@ -418,6 +422,10 @@ async def lifespan(app: FastAPI):
         # Register rule evaluation (runs at 4 AM — after snapshots & degradation)
         scheduler_service.register_rule_evaluation(hour=4)
         logger.info("Rule evaluation registered")
+
+        # Data watchdog: push alerts + dead-man's ping (SPEC_128, every 15 min)
+        from app.services.data_watchdog import register_watchdog_job
+        register_watchdog_job()
 
         # Register people collection schedules
         try:
@@ -1322,6 +1330,7 @@ Browse the endpoint sections below to see what's available:
         {"name": "export", "description": "📤 **Data Export** - Export table data to CSV, JSON, or Parquet files"},
         {"name": "import", "description": "📥 **Bulk Portfolio Import** - Upload CSV/Excel files to import portfolio data with validation, preview, and rollback"},
         {"name": "freshness", "description": "📊 **Data Freshness** - Monitor source staleness, auto-refresh status, and incremental loading"},
+        {"name": "watchdog", "description": "Data watchdog - open alerts for dead workers, stalled schedules, failed releases and SLA breaches (pushed to ALERT_WEBHOOK_URL)"},
         {"name": "Source Configuration", "description": "Per-source timeouts, retry policies, and rate limits"},
         {"name": "Audit Trail", "description": "Collection audit trail - who triggered what, when, and how"},
         {"name": "Settings", "description": "Application settings - manage external source API keys"},
@@ -1744,6 +1753,9 @@ app.include_router(llm_costs.router, prefix="/api/v1", dependencies=_auth)
 # Data Freshness Dashboard
 app.include_router(freshness.router, prefix="/api/v1", dependencies=_auth)
 
+# Data watchdog (SPEC_128)
+app.include_router(watchdog_router.router, prefix="/api/v1", dependencies=_auth)
+
 # GraphQL API
 app.include_router(graphql_app, prefix="/graphql", tags=["graphql"])
 
@@ -1803,52 +1815,5 @@ def root():
     }
 
 
-@app.get("/health")
-def health_check():
-    """
-    Health check endpoint.
-
-    Returns status of the service and database connectivity.
-    """
-    from app.core.database import get_engine
-    from sqlalchemy import text
-
-    health_status = {"status": "healthy", "service": "running", "database": "unknown", "worker": "unknown"}
-
-    # Check database connectivity
-    try:
-        engine = get_engine()
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        health_status["database"] = "connected"
-
-        # Check worker availability — any heartbeat in last 5 min?
-        try:
-            row = conn.execute(text(
-                "SELECT COUNT(*) FROM job_queue "
-                "WHERE worker_id IS NOT NULL "
-                "AND heartbeat_at >= NOW() - INTERVAL '5 minutes' "
-                "AND status IN ('RUNNING', 'CLAIMED')"
-            )).scalar()
-            if row and row > 0:
-                health_status["worker"] = "active"
-            else:
-                # Check if any jobs were completed recently (worker may be idle)
-                recent = conn.execute(text(
-                    "SELECT COUNT(*) FROM job_queue "
-                    "WHERE status IN ('SUCCESS', 'FAILED') "
-                    "AND completed_at >= NOW() - INTERVAL '10 minutes'"
-                )).scalar()
-                if recent and recent > 0:
-                    health_status["worker"] = "idle"
-                else:
-                    health_status["worker"] = "unavailable"
-                    health_status["status"] = "degraded"
-        except Exception:
-            health_status["worker"] = "unknown"
-    except Exception as e:
-        health_status["status"] = "degraded"
-        health_status["database"] = f"error: {str(e)}"
-        logger.warning(f"Database health check failed: {e}")
-
-    return health_status
+# /livez, /readyz and /health live in app/api/health.py (SPEC_128)
+app.include_router(health_probes.router)
