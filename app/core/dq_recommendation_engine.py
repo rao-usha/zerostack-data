@@ -309,6 +309,7 @@ def _analyze_missing_coverage(db: Session) -> List[Recommendation]:
     # Sources in registry
     registry_sources = (
         db.query(DatasetRegistry.source)
+        .filter(DatasetRegistry.ingested())
         .distinct()
         .all()
     )
@@ -337,7 +338,8 @@ def _analyze_missing_coverage(db: Session) -> List[Recommendation]:
 
     # Tables never profiled
     registry_tables = (
-        db.query(DatasetRegistry.table_name, DatasetRegistry.source).all()
+        db.query(DatasetRegistry.table_name, DatasetRegistry.source)
+        .filter(DatasetRegistry.ingested()).all()
     )
     profiled_tables = {
         r[0]

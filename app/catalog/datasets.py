@@ -558,7 +558,10 @@ _DISPATCH: List[DatasetSpec] = [
     _dispatch("sec_company_filings", "sec", "SEC company filings (per company)",
               "10-K / 10-Q / 8-K filing metadata for requested companies from the EDGAR API.",
               "filings", "one row per filing", "dispatch:sec", "ad_hoc",
-              patterns=("sec_10*", "sec_8k*")),
+              # sec/metadata.generate_table_name: sec_10k, sec_10q_a, sec_8k, sec_s1 ...
+              # (sec_8k* would also match the bulk sec_8k_index; resolve_tables
+              # never lets a pattern take a table another dataset declares)
+              patterns=("sec_10k*", "sec_10q*", "sec_8k*", "sec_s1*", "sec_s3*", "sec_s4*")),
     _dispatch("sec_company_financials", "sec", "SEC XBRL financials (per company)",
               "XBRL financial statements for requested companies from the EDGAR API; superseded "
               "by the companyfacts bulk load.",
@@ -594,7 +597,7 @@ _DISPATCH: List[DatasetSpec] = [
               "Crop production, yields, livestock inventory and annual summaries from USDA NASS "
               "QuickStats.",
               "timeseries", "one row per commodity per geography per period", "dispatch:usda:crop",
-              "monthly", patterns=("usda_*",),
+              "monthly", patterns=("usda_crop_production*", "usda_livestock*"),
               also=("dispatch:usda:livestock", "dispatch:usda:annual_summary",
                     "dispatch:usda:all_major_crops")),
     # DUNL
@@ -916,6 +919,28 @@ _API: List[DatasetSpec] = [
         "other", "one row per generated LP / relationship", "api:synthetic#lp_gp_universe",
         "ad_hoc", tables=("lp_fund", "lp_gp_relationships"), status="internal"),
 ]
+
+
+# Tables more than one dataset writes, and why. The dataset_registry mirror
+# gives each the most restrictive rights of all its writers
+# (mirror.merge_rights); the test suite fails on a new shared table that is
+# not listed here.
+SHARED_TABLES: Dict[str, str] = {
+    "sec_financial_facts": "companyfacts bulk load and the per-company XBRL pull write the same facts",
+    "sec_income_statement": "companyfacts bulk load and the per-company XBRL pull",
+    "sec_balance_sheet": "companyfacts bulk load and the per-company XBRL pull",
+    "sec_cash_flow_statement": "companyfacts bulk load and the per-company XBRL pull",
+    "sec_form_adv": "ADV roster load and the per-adviser IAPD pull (adds personnel)",
+    "pe_firms": "SEC-derived mart rows (with CRD) beside legacy LLM-collected rows",
+    "pe_funds": "SEC-derived mart rows beside legacy LLM-collected rows",
+    "pe_people": "Form D related persons beside LLM-collected people",
+    "pe_firm_people": "Form D related persons beside LLM-collected people",
+    "job_postings": "scraped ATS postings and generated synthetic postings share one table",
+    "lp_fund": "scraped LP profiles and generated synthetic LPs share one table",
+    "lp_document": "public-pension strategy documents and LP collection documents",
+    "container_freight_index": "Drewry, Freightos and SCFI indices, one row per index per date",
+    "three_pl_company": "Transport Topics list enriched in place by the FMCSA, SEC and website collectors",
+}
 
 
 CATALOG: Tuple[DatasetSpec, ...] = tuple(_BULK + _DERIVED + _DISPATCH + _SITE_INTEL + _JOBS + _API)

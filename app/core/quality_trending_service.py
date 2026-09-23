@@ -150,7 +150,7 @@ def compute_daily_snapshots(db: Session) -> List[DQQualitySnapshot]:
     Composite score = 30% completeness + 20% freshness + 30% validity + 20% consistency.
     """
     today = date.today()
-    registries = db.query(DatasetRegistry).all()
+    registries = db.query(DatasetRegistry).filter(DatasetRegistry.ingested()).all()
     snapshots = []
 
     for registry in registries:

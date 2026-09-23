@@ -484,7 +484,9 @@ class DataQualityDeepTemplate:
         data["rules_top_failing"] = top_failing
 
         # Rule coverage: tables with rules vs without
-        all_registered = db.query(DatasetRegistry.table_name).all()
+        all_registered = (
+            db.query(DatasetRegistry.table_name).filter(DatasetRegistry.ingested()).all()
+        )
         all_table_names_set = {t[0] for t in all_registered}
         tables_with_rules = set()
         for r in all_rules:

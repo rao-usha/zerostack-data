@@ -719,8 +719,398 @@ class TestMirrorPg:
         finally:
             db.close()
         rows = self._rows(pg_engine)
-        assert rows["fred_interest_rates"]["source_metadata"] == {"series": ["DGS10"]}
-        # the next sync restores the catalog block without touching the ingestor's data
-        sync_dataset_registry(pg_engine)
-        meta = self._rows(pg_engine)["fred_interest_rates"]["source_metadata"]
+        # review fix: the ingestor's metadata replaces its own keys, the catalog block survives
+        meta = rows["fred_interest_rates"]["source_metadata"]
         assert meta["series"] == ["DGS10"] and meta["catalog"]["key"] == "fred_series"
+        assert sync_dataset_registry(pg_engine)["updated"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Review fixes (spec-123-fix)
+# ---------------------------------------------------------------------------
+
+
+def _universe():
+    """Every table name the code declares plus every concrete catalog table."""
+    from app.catalog.tables import declared_tables
+
+    return set(declared_tables()) | {t for s in _catalog() for t in s.tables}
+
+
+@pytest.mark.unit
+class TestPatternOverlap:
+    """F1: a glob must never count another dataset's table."""
+
+    def test_sec_8k_pattern_skips_bulk_8k_index(self):
+        from app.catalog import get_spec
+        from app.catalog.live import resolve_tables
+
+        existing = {"sec_8k", "sec_8k_a", "sec_8k_index", "sec_10k", "sec_10q", "sec_s1"}
+        got = resolve_tables(get_spec("sec_company_filings"), existing)
+        assert "sec_8k_index" not in got
+        assert set(got) == {"sec_8k", "sec_8k_a", "sec_10k", "sec_10q", "sec_s1"}
+        # the bulk dataset still owns it
+        assert "sec_8k_index" in resolve_tables(get_spec("sec_edgar_submissions"), existing)
+
+    def test_usda_pattern_skips_site_intel_truck_rates(self):
+        from app.catalog import get_spec
+        from app.catalog.live import resolve_tables
+
+        existing = {"usda_crop_production", "usda_livestock", "usda_truck_rate"}
+        assert set(resolve_tables(get_spec("usda_nass"), existing)) == {
+            "usda_crop_production", "usda_livestock"}
+
+    def test_no_pattern_resolves_to_another_datasets_table(self):
+        from app.catalog.live import claimed_tables, resolve_tables
+
+        universe = _universe()
+        claimed = claimed_tables(_catalog())
+        bad = []
+        for spec in _catalog():
+            for t in resolve_tables(spec, universe, claimed):
+                if t not in spec.tables and t in claimed:
+                    bad.append((spec.key, t, sorted(claimed[t])))
+        assert not bad, f"patterns that take another dataset's table: {bad}"
+
+    def test_no_table_matches_two_datasets_patterns(self):
+        from app.catalog.tables import pattern_matches
+
+        bad = []
+        for t in sorted(_universe()):
+            owners = {s.key for s in _catalog()
+                      if any(pattern_matches(p, t) for p in s.table_patterns)}
+            if len(owners) > 1:
+                bad.append((t, sorted(owners)))
+        assert not bad, f"tables matched by several datasets' patterns: {bad}"
+
+    def test_only_sec_8k_index_needs_the_exclusion(self):
+        """Every other pattern is narrow enough on its own; keep it that way."""
+        from app.catalog.tables import pattern_matches
+
+        claimed = {t: s.key for s in _catalog() for t in s.tables}
+        hits = sorted({(s.key, t) for s in _catalog() for p in s.table_patterns
+                       for t in claimed if pattern_matches(p, t) and t not in s.tables})
+        assert hits == [("sec_company_filings", "sec_8k_index")]
+
+
+@pytest.mark.unit
+class TestSharedTableRights:
+    """F3: a table written by several datasets carries the most restrictive rights."""
+
+    def _block(self, table):
+        from app.catalog.mirror import catalog_block, table_writers
+
+        ws = table_writers(_catalog(), {table})[table]
+        return catalog_block(ws[0], ws)
+
+    def test_shared_tables_are_declared(self):
+        from app.catalog.datasets import SHARED_TABLES
+
+        claims = {}
+        for s in _catalog():
+            for t in s.tables:
+                claims.setdefault(t, []).append(s.key)
+        shared = {t for t, ks in claims.items() if len(ks) > 1}
+        assert shared == set(SHARED_TABLES), (
+            f"undeclared shared tables: {sorted(shared - set(SHARED_TABLES))}; "
+            f"stale entries: {sorted(set(SHARED_TABLES) - shared)}")
+
+    def test_three_pl_company_is_restricted_and_llm_flagged(self):
+        b = self._block("three_pl_company")
+        assert b["redistribution"] == "restricted"
+        assert b["pii_class"] == "business_contact"
+        assert b["origin"] == "llm_extracted"
+        assert set(b["origins"]) == {"llm_extracted", "scraped", "derived"}
+        assert set(b["datasets"]) == {"si_3pl_fmcsa_enrichment", "si_3pl_sec_enrichment",
+                                      "si_3pl_website_enrichment", "si_3pl_companies"}
+
+    @pytest.mark.parametrize("table, origin, pii", [
+        ("job_postings", "synthetic", "none"),
+        ("lp_fund", "synthetic", "business_contact"),
+        ("pe_firms", "llm_extracted", "personal"),
+        ("pe_funds", "llm_extracted", "personal"),
+    ])
+    def test_worst_origin_and_pii_win(self, table, origin, pii):
+        b = self._block(table)
+        assert b["origin"] == origin and origin in b["origins"]
+        assert b["pii_class"] == pii
+
+    def test_merge_never_less_restrictive_than_any_writer(self):
+        from app.catalog import get_spec
+        from app.catalog.datasets import SHARED_TABLES
+        from app.catalog.mirror import PII_RANK, REDISTRIBUTION_RANK
+
+        for table in SHARED_TABLES:
+            b = self._block(table)
+            for key in b["datasets"]:
+                s = get_spec(key)
+                assert REDISTRIBUTION_RANK.index(b["redistribution"]) >= \
+                    REDISTRIBUTION_RANK.index(s.redistribution), (table, key)
+                assert PII_RANK.index(b["pii_class"]) >= PII_RANK.index(s.pii_class), (table, key)
+                assert s.origin in b["origins"], (table, key)
+
+    def test_single_writer_block_unchanged(self):
+        from app.catalog import get_spec
+        from app.catalog.mirror import catalog_block
+
+        b = catalog_block(get_spec("sec_13f"))
+        assert b["origin"] == "official" and b["origins"] == ["official"]
+        assert "datasets" not in b
+
+    def test_status_is_only_as_public_as_the_least_public_writer(self):
+        from app.catalog.mirror import merge_rights
+        from app.catalog.spec import DatasetSpec
+
+        ga = DatasetSpec(**_base(status_public="ga", reviewed=True))
+        beta = DatasetSpec(**_base(key="b", status_public="beta", reviewed=True))
+        internal = DatasetSpec(**_base(key="c"))
+        assert merge_rights([ga])["status_public"] == "ga"
+        assert merge_rights([ga, beta])["status_public"] == "beta"
+        assert merge_rights([ga, internal])["status_public"] == "internal"
+
+
+@pytest.mark.unit
+class TestPiiFixes:
+    """F4: filer directory, entity master and physician utilization hold natural persons."""
+
+    @pytest.mark.parametrize("key", ["sec_edgar_submissions", "entity_source_records",
+                                     "entity_master", "cms_medicare_utilization"])
+    def test_personal(self, key):
+        from app.catalog import get_spec
+
+        assert get_spec(key).pii_class == "personal"
+
+    def test_other_cms_datasets_stay_none(self):
+        from app.catalog import get_spec
+
+        assert get_spec("cms_drug_pricing").pii_class == "none"
+
+
+@pytest.mark.unit
+class TestLiveBounds:
+    """F7: refresh is admin-only; one request does a bounded amount of counting."""
+
+    def _two_tables(self, client):
+        from sqlalchemy import text
+
+        from app.core.database import get_db
+
+        gen = client.app.dependency_overrides[get_db]()
+        db = next(gen)
+        engine = db.get_bind()
+        db.close()
+        with engine.begin() as conn:
+            conn.execute(text("CREATE TABLE osha_inspections (id INTEGER)"))
+            conn.execute(text("CREATE TABLE osha_violations (id INTEGER)"))
+            conn.execute(text("INSERT INTO osha_violations VALUES (1)"))
+        return engine
+
+    def test_refresh_requires_admin(self, sqlite_client):
+        from app.core.authz import current_principal
+
+        sqlite_client.app.dependency_overrides[current_principal] = lambda: {"role": "user"}
+        assert sqlite_client.get("/api/v1/catalog/courtlistener_dockets").status_code == 200
+        r = sqlite_client.get("/api/v1/catalog/courtlistener_dockets", params={"refresh": True})
+        assert r.status_code == 403
+        sqlite_client.app.dependency_overrides[current_principal] = lambda: {"role": "admin"}
+        r = sqlite_client.get("/api/v1/catalog/courtlistener_dockets", params={"refresh": True})
+        assert r.status_code == 200
+
+    def test_exact_counts_are_capped(self, sqlite_client):
+        from app.catalog import get_spec
+        from app.catalog.live import clear_cache, dataset_live
+
+        engine = self._two_tables(sqlite_client)
+        clear_cache()
+        live = dataset_live(engine, get_spec("osha"), max_exact=1)
+        assert [t["rows_exact"] for t in live["tables"]] == [True, False]
+        assert live["rows_exact"] is False
+
+    def test_deadline_stops_exact_counts(self, sqlite_client):
+        from app.catalog import get_spec
+        from app.catalog.live import clear_cache, dataset_live
+
+        engine = self._two_tables(sqlite_client)
+        clear_cache()
+        live = dataset_live(engine, get_spec("osha"), deadline_s=0)
+        assert all(t["rows_exact"] is False for t in live["tables"])
+
+    def test_concurrent_requests_share_one_computation(self, sqlite_client, monkeypatch):
+        import threading
+        import time as _time
+
+        from app.catalog import get_spec
+        from app.catalog import live as live_mod
+
+        engine = self._two_tables(sqlite_client)
+        live_mod.clear_cache()
+        calls = []
+        real = live_mod.count_rows
+
+        def slow(*a, **kw):
+            calls.append(a[1])
+            _time.sleep(0.2)
+            return real(*a, **kw)
+
+        monkeypatch.setattr(live_mod, "count_rows", slow)
+        spec = get_spec("osha")
+        threads = [threading.Thread(target=live_mod.dataset_live, args=(engine, spec))
+                   for _ in range(3)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        assert len(calls) == 2  # two tables, counted once
+
+
+@pg
+class TestMirrorScopePg:
+    """F2/F5/F6: catalog-only rows stay out of DQ; the block survives ingest writes."""
+
+    def _session(self, engine):
+        from sqlalchemy.orm import sessionmaker
+
+        return sessionmaker(bind=engine)()
+
+    def test_inserted_rows_are_catalog_only(self, pg_engine):
+        from app.catalog.mirror import sync_dataset_registry
+        from app.core.models import CATALOG_ONLY_TS, DatasetRegistry
+
+        sync_dataset_registry(pg_engine)
+        db = self._session(pg_engine)
+        try:
+            row = db.query(DatasetRegistry).filter_by(table_name="form_d_filings").one()
+            assert row.last_updated_at == CATALOG_ONLY_TS
+            assert row.created_at > CATALOG_ONLY_TS
+            ingested = {r.table_name for r in db.query(DatasetRegistry)
+                        .filter(DatasetRegistry.ingested())}
+            assert "form_d_filings" not in ingested and "core.entity" not in ingested
+        finally:
+            db.close()
+
+    def test_ingestor_touch_makes_row_ingested(self, pg_engine):
+        from app.catalog.mirror import sync_dataset_registry
+        from app.core.ingest_base import BaseSourceIngestor
+        from app.core.models import DatasetRegistry
+
+        sync_dataset_registry(pg_engine)
+
+        class _Sec(BaseSourceIngestor):
+            SOURCE_NAME = "sec"
+
+        db = self._session(pg_engine)
+        try:
+            _Sec(db)._update_dataset_registry(dataset_id="sec_form_d", table_name="form_d_filings")
+        finally:
+            db.close()
+        # a re-sync keeps the ingestor's clock
+        sync_dataset_registry(pg_engine)
+        db = self._session(pg_engine)
+        try:
+            assert db.query(DatasetRegistry).filter(
+                DatasetRegistry.ingested(), DatasetRegistry.table_name == "form_d_filings",
+            ).count() == 1
+        finally:
+            db.close()
+
+    def test_quality_gate_skips_catalog_only_rows(self, pg_engine, monkeypatch):
+        import asyncio
+        from types import SimpleNamespace
+
+        import app.core.data_quality_service as dqs
+        from app.api.v1.jobs import _run_quality_gate
+        from app.catalog.mirror import sync_dataset_registry
+
+        sync_dataset_registry(pg_engine)
+        seen = []
+
+        def _eval(db, job, table):
+            seen.append(table)
+            raise RuntimeError("stop")  # the gate swallows errors
+
+        monkeypatch.setattr(dqs, "evaluate_rules_for_job", _eval)
+        db = self._session(pg_engine)
+        try:
+            asyncio.run(_run_quality_gate(db, SimpleNamespace(id=1, source="sec")))
+            asyncio.run(_run_quality_gate(db, SimpleNamespace(id=2, source="entity_master")))
+        finally:
+            db.close()
+        assert seen == []
+
+    def test_quality_gate_still_runs_for_ingested_rows(self, pg_engine, monkeypatch):
+        import asyncio
+        from types import SimpleNamespace
+
+        from sqlalchemy import text
+
+        import app.core.data_quality_service as dqs
+        from app.api.v1.jobs import _run_quality_gate
+        from app.catalog.mirror import sync_dataset_registry
+
+        with pg_engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO dataset_registry (source, dataset_id, table_name, created_at, "
+                "last_updated_at) VALUES ('fred', 'fred_interest_rates', 'fred_interest_rates', "
+                "now() - interval '1 day', now() - interval '1 day')"))
+        sync_dataset_registry(pg_engine)  # adds catalog-only fred_gdp_x
+        seen = []
+
+        def _eval(db, job, table):
+            seen.append(table)
+            raise RuntimeError("stop")
+
+        monkeypatch.setattr(dqs, "evaluate_rules_for_job", _eval)
+        db = self._session(pg_engine)
+        try:
+            asyncio.run(_run_quality_gate(db, SimpleNamespace(id=1, source="fred")))
+        finally:
+            db.close()
+        assert seen == ["fred_interest_rates"]
+
+    def test_profile_all_tables_skips_catalog_only_rows(self, pg_engine, monkeypatch):
+        from sqlalchemy import text
+
+        import app.core.data_profiling_service as dps
+        from app.catalog.mirror import sync_dataset_registry
+
+        with pg_engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO dataset_registry (source, dataset_id, table_name, created_at, "
+                "last_updated_at) VALUES ('fred', 'fred_interest_rates', 'fred_interest_rates', "
+                "now(), now())"))
+        sync_dataset_registry(pg_engine)
+        profiled = []
+        monkeypatch.setattr(dps, "profile_table",
+                            lambda db, table, **kw: profiled.append(table))
+        db = self._session(pg_engine)
+        try:
+            dps.profile_all_tables(db)
+        finally:
+            db.close()
+        assert profiled == ["fred_interest_rates"]
+
+    def test_plain_orm_replace_keeps_catalog_block(self, pg_engine):
+        """Per-source ingestors (bea, bls, eia, ...) assign source_metadata directly."""
+        from app.catalog.mirror import sync_dataset_registry
+        from app.core.models import DatasetRegistry
+
+        sync_dataset_registry(pg_engine)
+        db = self._session(pg_engine)
+        try:
+            row = db.query(DatasetRegistry).filter_by(table_name="fred_interest_rates").one()
+            row.source_metadata = {"series": ["DGS10"]}
+            db.commit()
+        finally:
+            db.close()
+        db = self._session(pg_engine)
+        try:
+            row = db.query(DatasetRegistry).filter_by(table_name="fred_interest_rates").one()
+            assert row.source_metadata["series"] == ["DGS10"]
+            assert row.source_metadata["catalog"]["key"] == "fred_series"
+            # an explicit new catalog block is not overridden
+            row.source_metadata = {"catalog": {"in_catalog": False}}
+            db.commit()
+            db.refresh(row)
+            assert row.source_metadata == {"catalog": {"in_catalog": False}}
+        finally:
+            db.close()

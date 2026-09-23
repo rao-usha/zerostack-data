@@ -138,3 +138,44 @@ No schema changes, no `/sources` refactor, no `dataset_key` column on
 | T11 | detail with live counts + coverage + pattern expansion | PG |
 | T12 | statement_timeout fallback to estimate | PG |
 | T13 | registry mirror sync: insert, preserve, mark, idempotent | PG |
+| T14 | patterns never take another dataset's concrete table; no table matched by two datasets' patterns | unit |
+| T15 | shared tables declared in `SHARED_TABLES`; merged block is never less restrictive than any writer | unit |
+| T16 | PII: filer directory, entity master, CMS utilization are `personal` | unit |
+| T17 | `refresh=true` admin-only; exact-count cap, deadline, single-flight | unit |
+| T18 | catalog-only rows excluded from quality gate / profiling; ingestor touch includes them; catalog block survives ingestor writes | PG |
+
+## Review fixes (spec-123-fix)
+
+- **Pattern overlap.** `resolve_tables` never lets a pattern take a table
+  another dataset declares concretely (`sec_8k*` vs the bulk
+  `sec_8k_index`). `usda_*` narrowed to `usda_crop_production*` /
+  `usda_livestock*` (it matched the site-intel `usda_truck_rate`); SEC
+  per-company patterns narrowed to the filing types `sec/metadata.py`
+  generates.
+- **Shared tables.** Tables written by several datasets are listed in
+  `datasets.SHARED_TABLES` with the reason. The mirror's catalog block for
+  such a table is merged (`mirror.merge_rights`): most restrictive
+  redistribution (`restricted > internal_only > attribution > open`) and
+  PII (`personal > business_contact > none`), `origin` = the most severe
+  (`synthetic > llm_extracted > scraped > derived > official`), `origins` =
+  all, `datasets` = all writers, `status_public` only as public as the least
+  public writer.
+- **PII.** `sec_edgar_submissions` (insiders file under their own CIK),
+  `entity_source_records` / `entity_master` (fed insider owners) and
+  `cms_medicare_utilization` (individual physicians) are `personal`.
+- **DQ scope.** Mirror-inserted rows get `last_updated_at = CATALOG_ONLY_TS`
+  (1970-01-01; the column is NOT NULL). `DatasetRegistry.ingested()` filters
+  them out of the post-job quality gate, `profile_all_tables`,
+  `evaluate_all_rules`, `compute_daily_snapshots`, the DQ recommendation
+  engine and the DQ deep report. The first ingestor write stamps a real time
+  and the row joins those consumers — so DQ scope is unchanged by the mirror.
+- **Catalog block survival.** `_update_dataset_registry` merges the catalog
+  block into the new metadata, and a `before_update` listener on
+  `DatasetRegistry` does the same for per-source ingestors that assign
+  `source_metadata` directly. (Raw-SQL writers are not covered; none of them
+  rewrite `source_metadata` today.)
+- **Live-count bounds.** `refresh=true` needs the admin role (403
+  otherwise). One computation does at most `MAX_EXACT_COUNTS` (12) exact
+  counts within `LIVE_DEADLINE_S` (20 s); the rest get the `pg_class`
+  estimate (`rows_exact=false`). Concurrent requests for the same dataset
+  share one computation.

@@ -192,6 +192,9 @@ DATASET_RIGHTS: Dict[str, SourceRights] = {
     "realestate_redfin": _r("Redfin Data Center terms (attribution, no resale)", "restricted", "official"),
     "realestate_osm_buildings": _r("ODbL 1.0 (OpenStreetMap, share-alike)", "restricted", "official",
                                    attribution="© OpenStreetMap contributors"),
+    "sec_edgar_submissions": _usg("U.S. Securities and Exchange Commission (EDGAR)", "personal",
+                                  "Filers include natural persons (insiders filing under their own "
+                                  "CIK) with name, phone and street addresses."),
     "sec_insider": _usg("U.S. Securities and Exchange Commission (EDGAR)", "personal",
                         "Reporting owners are natural persons."),
     "sec_form_d": _usg("U.S. Securities and Exchange Commission (EDGAR)", "personal",
@@ -199,6 +202,14 @@ DATASET_RIGHTS: Dict[str, SourceRights] = {
     "sec_13f": _usg("U.S. Securities and Exchange Commission (EDGAR)", "none"),
     "sec_companyfacts": _usg("U.S. Securities and Exchange Commission (EDGAR)", "none"),
     "sec_company_financials": _usg("U.S. Securities and Exchange Commission (EDGAR)", "none"),
+    "entity_source_records": SourceRights(
+        "Nexdata-derived from SEC EDGAR (public domain inputs)", "internal_only", "personal", "derived",
+        notes="Feeds insider reporting owners (natural persons) with name, state and ZIP."),
+    "entity_master": SourceRights(
+        "Nexdata-derived from SEC EDGAR (public domain inputs)", "internal_only", "personal", "derived",
+        notes="Resolved from entity_source_records, which include natural persons."),
+    "cms_medicare_utilization": _usg("Centers for Medicare & Medicaid Services", "personal",
+                                     "Rendering providers are individual physicians (name, gender, NPI)."),
     "pe_people_sec": SourceRights("Nexdata-derived from SEC Form D related persons", "internal_only",
                                   "personal", "derived"),
     "intl_imf": _r("IMF terms of use (reuse with attribution)", "attribution", "official",

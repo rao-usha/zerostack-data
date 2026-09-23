@@ -1176,7 +1176,7 @@ def evaluate_all_rules(db: Session) -> Dict[str, Any]:
         }
 
     # Get all registered tables
-    all_datasets = db.query(DatasetRegistry).all()
+    all_datasets = db.query(DatasetRegistry).filter(DatasetRegistry.ingested()).all()
     table_by_source: Dict[str, List[str]] = {}
     for ds in all_datasets:
         table_by_source.setdefault(ds.source, []).append(ds.table_name)

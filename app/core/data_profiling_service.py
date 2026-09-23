@@ -431,7 +431,7 @@ def profile_table(
 
 def profile_all_tables(db: Session) -> List[DataProfileSnapshot]:
     """Profile all tables in the dataset registry."""
-    registries = db.query(DatasetRegistry).all()
+    registries = db.query(DatasetRegistry).filter(DatasetRegistry.ingested()).all()
     snapshots = []
 
     for registry in registries:
