@@ -17,7 +17,7 @@ Export a database table to a file (CSV, JSON, or Parquet).
 
 2. **Verify the table exists:**
    ```bash
-   curl -s "http://localhost:8001/api/v1/export/tables" | python -c "
+   curl -H "X-API-Key: $NEXDATA_API_KEY" -s "http://localhost:8001/api/v1/export/tables" | python -c "
    import sys,json
    TABLE = 'TABLE_NAME'
    tables = json.load(sys.stdin)
@@ -39,7 +39,7 @@ Export a database table to a file (CSV, JSON, or Parquet).
 
 3. **Preview before export** (show first 3 rows):
    ```bash
-   curl -s "http://localhost:8001/api/v1/export/tables/TABLE_NAME/preview?limit=3" | python -c "
+   curl -H "X-API-Key: $NEXDATA_API_KEY" -s "http://localhost:8001/api/v1/export/tables/TABLE_NAME/preview?limit=3" | python -c "
    import sys,json; d=json.load(sys.stdin)
    cols = d['columns'][:6]
    print('Preview (first 3 rows, first 6 columns):')
@@ -51,7 +51,7 @@ Export a database table to a file (CSV, JSON, or Parquet).
 
 4. **Create the export job:**
    ```bash
-   curl -s -X POST "http://localhost:8001/api/v1/export/jobs" \
+   curl -H "X-API-Key: $NEXDATA_API_KEY" -s -X POST "http://localhost:8001/api/v1/export/jobs" \
      -H "Content-Type: application/json" \
      -d '{
        "table_name": "TABLE_NAME",
@@ -70,14 +70,14 @@ Export a database table to a file (CSV, JSON, or Parquet).
    JOB_ID=<id from step 4>
    for i in $(seq 1 30); do
      sleep 2
-     STATUS=$(curl -s "http://localhost:8001/api/v1/export/jobs/$JOB_ID" | python -c "
+     STATUS=$(curl -H "X-API-Key: $NEXDATA_API_KEY" -s "http://localhost:8001/api/v1/export/jobs/$JOB_ID" | python -c "
        import sys,json; d=json.load(sys.stdin); print(d['status'])")
      if [ "$STATUS" = "completed" ]; then
        echo "Export completed!"
        break
      elif [ "$STATUS" = "failed" ]; then
        echo "Export failed!"
-       curl -s "http://localhost:8001/api/v1/export/jobs/$JOB_ID" | python -m json.tool
+       curl -H "X-API-Key: $NEXDATA_API_KEY" -s "http://localhost:8001/api/v1/export/jobs/$JOB_ID" | python -m json.tool
        break
      fi
    done
@@ -85,7 +85,7 @@ Export a database table to a file (CSV, JSON, or Parquet).
 
 6. **Show result and download URL:**
    ```bash
-   curl -s "http://localhost:8001/api/v1/export/jobs/$JOB_ID" | python -c "
+   curl -H "X-API-Key: $NEXDATA_API_KEY" -s "http://localhost:8001/api/v1/export/jobs/$JOB_ID" | python -c "
    import sys,json; d=json.load(sys.stdin)
    print(f'File: {d.get(\"file_name\",\"?\")}')
    print(f'Size: {d.get(\"file_size_bytes\",0):,} bytes')
@@ -96,7 +96,7 @@ Export a database table to a file (CSV, JSON, or Parquet).
 
 7. **Optionally download** to the local machine:
    ```bash
-   curl -s -o "./exports/FILE_NAME" "http://localhost:8001/api/v1/export/jobs/$JOB_ID/download"
+   curl -H "X-API-Key: $NEXDATA_API_KEY" -s -o "./exports/FILE_NAME" "http://localhost:8001/api/v1/export/jobs/$JOB_ID/download"
    echo "Saved to ./exports/FILE_NAME"
    ```
 
@@ -104,7 +104,7 @@ Export a database table to a file (CSV, JSON, or Parquet).
 
 Show top 20 tables with data:
 ```bash
-curl -s http://localhost:8001/api/v1/export/tables | python -c "
+curl -H "X-API-Key: $NEXDATA_API_KEY" -s http://localhost:8001/api/v1/export/tables | python -c "
 import sys,json
 tables = json.load(sys.stdin)
 with_data = sorted([t for t in tables if t['row_count'] > 0], key=lambda x: -x['row_count'])

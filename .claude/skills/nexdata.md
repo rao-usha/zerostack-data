@@ -15,7 +15,7 @@ from scripts.nexdata_client import search_investors, get_company_score, get_port
 
 **Direct curl**:
 ```bash
-curl -s "http://localhost:8001/api/v1/search?q=Sequoia&type=investor" | python -m json.tool
+curl -H "X-API-Key: $NEXDATA_API_KEY" -s "http://localhost:8001/api/v1/search?q=Sequoia&type=investor" | python -m json.tool
 ```
 
 ---

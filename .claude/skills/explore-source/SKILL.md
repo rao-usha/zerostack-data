@@ -24,7 +24,7 @@ Explore a data source end-to-end: tables, records, schema, sample data, endpoint
 
 2. **Find matching tables** in the database:
    ```bash
-   curl -s http://localhost:8001/api/v1/export/tables | python -c "
+   curl -H "X-API-Key: $NEXDATA_API_KEY" -s http://localhost:8001/api/v1/export/tables | python -c "
    import sys,json
    PREFIX = 'SOURCE_PREFIX'
    tables = json.load(sys.stdin)
@@ -41,7 +41,7 @@ Explore a data source end-to-end: tables, records, schema, sample data, endpoint
 
 3. **Show schema** for the largest table:
    ```bash
-   curl -s "http://localhost:8001/api/v1/export/tables/TABLE_NAME/preview?limit=1" | python -c "
+   curl -H "X-API-Key: $NEXDATA_API_KEY" -s "http://localhost:8001/api/v1/export/tables/TABLE_NAME/preview?limit=1" | python -c "
    import sys,json; d=json.load(sys.stdin)
    print('Schema:')
    for col, typ in d.get('column_types',{}).items():
@@ -51,7 +51,7 @@ Explore a data source end-to-end: tables, records, schema, sample data, endpoint
 
 4. **Show sample data** (first 5 rows of the largest table):
    ```bash
-   curl -s "http://localhost:8001/api/v1/export/tables/TABLE_NAME/preview?limit=5" | python -c "
+   curl -H "X-API-Key: $NEXDATA_API_KEY" -s "http://localhost:8001/api/v1/export/tables/TABLE_NAME/preview?limit=5" | python -c "
    import sys,json; d=json.load(sys.stdin)
    cols = d['columns'][:8]  # First 8 columns max
    print(' | '.join(f'{c:20s}' for c in cols))
@@ -64,7 +64,7 @@ Explore a data source end-to-end: tables, records, schema, sample data, endpoint
 
 5. **Check API key status:**
    ```bash
-   curl -s http://localhost:8001/api/v1/settings/api-keys | python -c "
+   curl -H "X-API-Key: $NEXDATA_API_KEY" -s http://localhost:8001/api/v1/settings/api-keys | python -c "
    import sys,json
    for k in json.load(sys.stdin):
        src = k.get('source','').lower()
@@ -76,7 +76,7 @@ Explore a data source end-to-end: tables, records, schema, sample data, endpoint
 
 6. **Check last ingestion job:**
    ```bash
-   curl -s "http://localhost:8001/api/v1/jobs?source=SOURCE&limit=3" | python -c "
+   curl -H "X-API-Key: $NEXDATA_API_KEY" -s "http://localhost:8001/api/v1/jobs?source=SOURCE&limit=3" | python -c "
    import sys,json
    jobs = json.load(sys.stdin)
    if not jobs: print('No ingestion history')
@@ -87,7 +87,7 @@ Explore a data source end-to-end: tables, records, schema, sample data, endpoint
 
 7. **List available endpoints** for this source by checking Swagger:
    ```bash
-   curl -s http://localhost:8001/openapi.json | python -c "
+   curl -H "X-API-Key: $NEXDATA_API_KEY" -s http://localhost:8001/openapi.json | python -c "
    import sys,json
    spec = json.load(sys.stdin)
    paths = spec.get('paths',{})
@@ -138,7 +138,7 @@ Explore a data source end-to-end: tables, records, schema, sample data, endpoint
 
 Show a summary of all sources with data:
 ```bash
-curl -s http://localhost:8001/api/v1/export/tables | python -c "
+curl -H "X-API-Key: $NEXDATA_API_KEY" -s http://localhost:8001/api/v1/export/tables | python -c "
 import sys,json
 from collections import defaultdict
 tables = json.load(sys.stdin)

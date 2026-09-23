@@ -16,10 +16,12 @@ Endpoints:
 import logging
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.core.client_ip import client_ip
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.services.atlas import AtlasService
 from app.services.atlas import boundaries as boundaries_mod
@@ -31,6 +33,59 @@ from app.services.diligence.taxonomies import load_msa, load_naics
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/atlas", tags=["Nexdata Atlas (public-data explorer)"])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SPEC_127 — metering for routes that spend money (LLM calls, Google Places)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def atlas_quota(
+    request: Request,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Daily quota on the paid Atlas routes, via the playground's QuotaService.
+
+    Anonymous callers are metered per IP, signed-in users per user id (own
+    `atlas_*` subject namespace, so Atlas and the playground don't share a
+    budget). A platform admin token is unmetered. Invalid tokens are treated
+    as anonymous rather than rejected — Atlas is a public surface.
+    """
+    from app.services.quota.quota_service import QuotaService
+    from app.users.auth import AUD_APP, AUD_PLAYGROUND, ROLE_ADMIN, AuthService
+
+    settings = get_settings()
+    info: Optional[Dict[str, Any]] = None
+    if authorization and authorization.startswith("Bearer "):
+        try:
+            info = AuthService(db).verify_token(
+                authorization[7:], audiences=(AUD_APP, AUD_PLAYGROUND)
+            )
+        except ValueError:
+            info = None
+
+    if info and info.get("aud") == AUD_APP and info.get("role") == ROLE_ADMIN:
+        return {"metered": False}
+
+    if info:
+        subject_type, subject_key = "atlas_usr", str(info["user_id"])
+        limit = settings.atlas_llm_runs_per_user
+    else:
+        subject_type = "atlas_ip"
+        subject_key = client_ip(request)
+        limit = settings.atlas_llm_runs_per_ip
+
+    result = QuotaService(db).check_and_consume(subject_type, subject_key, limit)
+    if not result.allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "detail": "Daily Atlas AI limit reached. Try again tomorrow.",
+                "reset_ts": result.reset_ts,
+            },
+            headers={"X-RateLimit-Limit": str(result.limit), "X-RateLimit-Remaining": "0"},
+        )
+    return {"metered": True, "remaining": result.remaining}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -68,7 +123,7 @@ class FeedbackBody(BaseModel):
 def explore(body: ExploreBody, request: Request, db: Session = Depends(get_db)):
     """Run an exploration. Public, anonymous-friendly. Returns the full
     exploration object (resolved entities, cards, connections, related)."""
-    anon_ip = request.client.host if request.client else None
+    anon_ip = client_ip(request)
     try:
         exploration = AtlasService(db).explore(
             query=body.query,
@@ -332,7 +387,7 @@ class PlanBody(BaseModel):
     prompt: Optional[str] = Field(None, max_length=2000)
 
 
-@router.post("/plan")
+@router.post("/plan", dependencies=[Depends(atlas_quota)])
 def atlas_plan(body: PlanBody, db: Session = Depends(get_db)):
     """SPEC_094 — return a Plan (4-8 beat walkthrough) the frontend
     executor can run for any thesis. Always 200; on any failure path
@@ -350,7 +405,7 @@ class ExplainBody(BaseModel):
     max_tokens: Optional[int] = 200
 
 
-@router.post("/explain")
+@router.post("/explain", dependencies=[Depends(atlas_quota)])
 def atlas_explain(body: ExplainBody, db: Session = Depends(get_db)):
     """SPEC_093 — stream a 2-3 sentence rationale for a demo beat.
     No tools, no UI actions — narration delta events only."""
@@ -387,7 +442,7 @@ class CompetitionBody(BaseModel):
     live_fallback: Optional[bool] = None
 
 
-@router.post("/competition")
+@router.post("/competition", dependencies=[Depends(atlas_quota)])
 def atlas_competition(body: CompetitionBody, db: Session = Depends(get_db)):
     """SPEC_100 — return competing establishments within a trade-area
     aggregated from Census CBP (federal establishment census). Replaces
@@ -478,7 +533,7 @@ class PilotBody(BaseModel):
     session_state: Optional[Dict[str, Any]] = None
 
 
-@router.post("/pilot")
+@router.post("/pilot", dependencies=[Depends(atlas_quota)])
 def atlas_pilot_endpoint(body: PilotBody, db: Session = Depends(get_db)):
     """Atlas Pilot v0 — LLM agent that answers questions by calling
     constrained tools over the governed Atlas data corpus. Non-streaming;
@@ -491,7 +546,7 @@ def atlas_pilot_endpoint(body: PilotBody, db: Session = Depends(get_db)):
     return result
 
 
-@router.post("/pilot/stream")
+@router.post("/pilot/stream", dependencies=[Depends(atlas_quota)])
 def atlas_pilot_stream_endpoint(body: PilotBody, db: Session = Depends(get_db)):
     """Atlas Pilot v1 — streaming variant. Yields one NDJSON event per
     state transition (plan_started, thinking, tool_call_started,

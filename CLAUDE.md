@@ -28,11 +28,19 @@ docker-compose logs api --tail 50
 docker-compose logs api -f  # follow
 
 # Test an endpoint
-curl -s http://localhost:8001/api/v1/<endpoint> | python -m json.tool
+curl -H "X-API-Key: $NEXDATA_API_KEY" -s http://localhost:8001/api/v1/<endpoint> | python -m json.tool
 
 # Swagger UI
 # http://localhost:8001/docs
 ```
+
+### API Authentication (SPEC_127)
+
+Auth is on by default (`REQUIRE_AUTH=true`); only `/health`, `/auth/*`, the playground and Atlas are anonymous. Writes/ops routes need role `admin`.
+
+- **Browser console:** sign in at http://localhost:3001 with a user made by `docker-compose exec api python scripts/create_user.py EMAIL --admin`.
+- **CLI / skills / scripts:** mint an admin-scope key once with `docker-compose exec api python scripts/create_api_key.py EMAIL`, then `export NEXDATA_API_KEY=nxd_...` in the host shell. Every curl in this file and in `.claude/skills` sends `-H "X-API-Key: $NEXDATA_API_KEY"`; `scripts/nexdata_client.py` and `app/services/eval_runner.py` read the same variable. Only admin-scope keys work outside `/api/v1/public`.
+- **Local dev without auth:** `REQUIRE_AUTH=false` (logs a loud warning; every caller is admin). Never on an exposed host.
 
 ### Testing
 
@@ -185,7 +193,7 @@ docker-compose logs worker --tail 50
 docker-compose logs worker -f  # follow
 
 # API: worker status (active workers, queue depth, last claimed)
-curl -s http://localhost:8001/api/v1/jobs/workers | python -m json.tool
+curl -H "X-API-Key: $NEXDATA_API_KEY" -s http://localhost:8001/api/v1/jobs/workers | python -m json.tool
 
 # API: health check (includes worker availability)
 curl -s http://localhost:8001/health | python -m json.tool

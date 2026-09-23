@@ -63,7 +63,7 @@ services:
       --health-check --http-address 0.0.0.0 --http-port 9090
       nexdata-cloud:us-central1:nexdata-pg
     ports:
-      - "5435:5432"
+      - "127.0.0.1:5435:5432"
     volumes:
       # GCLOUD_ADC is set in .env. The default below is the Linux/macOS path;
       # gcloud on Windows keeps application default credentials under
@@ -86,7 +86,7 @@ services:
       POSTGRES_PASSWORD: nexdata_dev_password
       POSTGRES_DB: nexdata
     ports:
-      - "5434:5432"  # Use port 5434 on host to avoid conflict
+      - "127.0.0.1:5434:5432"  # Use port 5434 on host to avoid conflict; loopback only (SPEC_127)
     volumes:
       - postgres_data:/var/lib/postgresql/data  # Named volume for data persistence
     healthcheck:
@@ -102,7 +102,7 @@ services:
         # Set to 1 to install Playwright browsers (~500MB) for JS-rendered page scraping
         INSTALL_BROWSERS: ${INSTALL_BROWSERS:-0}
     ports:
-      - "8001:8000"  # Use port 8001 on host to avoid conflicts
+      - "127.0.0.1:8001:8000"  # Use port 8001 on host to avoid conflicts; loopback only (SPEC_127)
     dns:
       - 8.8.8.8
       - 8.8.4.4
@@ -111,6 +111,10 @@ services:
       NEXDATA_ENV: ${NEXDATA_ENV:-local}
       <<: *api-keys
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
+      # Access control (SPEC_127): auth on, signup closed unless overridden
+      REQUIRE_AUTH: ${REQUIRE_AUTH:-true}
+      ALLOW_SIGNUP: ${ALLOW_SIGNUP:-false}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       MAX_CONCURRENCY: 4
       LOG_LEVEL: INFO
       BROWSER_HEADED: ${BROWSER_HEADED:-0}
@@ -202,7 +206,7 @@ services:
   frontend:
     image: nginx:alpine
     ports:
-      - "3001:80"
+      - "127.0.0.1:3001:80"
     volumes:
       - ./frontend:/usr/share/nginx/html:ro
       - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro

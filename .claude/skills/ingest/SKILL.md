@@ -14,7 +14,7 @@ Trigger a data ingestion job for the specified source and monitor its progress.
 
 2. **Check API key status** before attempting ingestion:
    ```bash
-   curl -s http://localhost:8001/api/v1/settings/api-keys | python -c "
+   curl -H "X-API-Key: $NEXDATA_API_KEY" -s http://localhost:8001/api/v1/settings/api-keys | python -c "
    import sys,json
    keys = json.load(sys.stdin)
    for k in keys:
@@ -58,14 +58,14 @@ Trigger a data ingestion job for the specified source and monitor its progress.
 
 4. **Execute the ingestion:**
    ```bash
-   curl -s -X POST "http://localhost:8001/api/v1/ENDPOINT" \
+   curl -H "X-API-Key: $NEXDATA_API_KEY" -s -X POST "http://localhost:8001/api/v1/ENDPOINT" \
      -H "Content-Type: application/json" \
      -d '{"param": "value"}' | python -m json.tool
    ```
 
 5. **Track the job** — extract `job_id` from response and poll:
    ```bash
-   curl -s "http://localhost:8001/api/v1/jobs/JOB_ID" | python -c "
+   curl -H "X-API-Key: $NEXDATA_API_KEY" -s "http://localhost:8001/api/v1/jobs/JOB_ID" | python -c "
    import sys,json; d=json.load(sys.stdin)
    print(f\"Status: {d['status']} | Source: {d['source']} | Rows: {d.get('rows_collected','?')}\")"
    ```

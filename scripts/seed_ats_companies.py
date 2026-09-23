@@ -15,6 +15,7 @@ Usage:
 import argparse
 import asyncio
 import io
+import os
 import sys
 import time
 from pathlib import Path
@@ -325,7 +326,7 @@ async def run(collect: bool = False, direct: bool = False):
     if direct:
         await seed_direct(collect=collect)
     else:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(headers={"X-API-Key": os.environ["NEXDATA_API_KEY"]} if os.environ.get("NEXDATA_API_KEY") else {}) as client:
             # Check if API is up
             try:
                 r = await client.get(f"{API_BASE_URL}/health", timeout=5)

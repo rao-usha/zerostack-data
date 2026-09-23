@@ -206,8 +206,12 @@
 
   <script>
     const API = "/api/v1";
-    const LS_TOKEN = "nexdata_token";
-    const LS_USER = "nexdata_user";
+    // Own keys (SPEC_127): the console stores its platform token under
+    // "nexdata_token" on this same origin, and a playground sign-in must not
+    // overwrite it. The playground still accepts a console token as a fallback.
+    const LS_TOKEN = "nexdata_playground_token";
+    const LS_USER = "nexdata_playground_user";
+    const LS_APP_TOKEN = "nexdata_token";
     const LS_SESSION = "nexdata_pg_session";
 
     // Anonymous session id (reserved for future per-session metering).
@@ -227,7 +231,7 @@
     }
 
     function authHeaders() {
-      const t = localStorage.getItem(LS_TOKEN);
+      const t = localStorage.getItem(LS_TOKEN) || localStorage.getItem(LS_APP_TOKEN);
       return t ? { "Authorization": "Bearer " + t } : {};
     }
 

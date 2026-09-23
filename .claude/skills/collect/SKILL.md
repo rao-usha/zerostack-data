@@ -88,7 +88,7 @@ Trigger one of the agentic collection pipelines and monitor progress.
 
 3. **Execute the collection:**
    ```bash
-   curl -s -X POST "http://localhost:8001/api/v1/ENDPOINT" \
+   curl -H "X-API-Key: $NEXDATA_API_KEY" -s -X POST "http://localhost:8001/api/v1/ENDPOINT" \
      -H "Content-Type: application/json" \
      -d 'BODY' | python -m json.tool
    ```
@@ -117,4 +117,4 @@ Available collection pipelines:
 - People deep-collect takes ~3-5 min per company (SEC + website + news + org chart)
 - PE collection uses LLM extraction — watch for cost accumulation
 - Site intel collection can take 30+ min for all domains
-- Always check for running jobs first: `curl -s http://localhost:8001/api/v1/jobs?status=running`
+- Always check for running jobs first: `curl -H "X-API-Key: $NEXDATA_API_KEY" -s http://localhost:8001/api/v1/jobs?status=running`

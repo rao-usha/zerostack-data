@@ -38,6 +38,51 @@ class Settings(BaseSettings):
         description="JWT secret key for authentication tokens",
     )
 
+    # Access control (SPEC_127). Auth is ON unless explicitly disabled for
+    # local development; self-registration is OFF unless explicitly enabled.
+    require_auth: bool = Field(
+        default=True,
+        description="Require an app JWT on protected routers. false = local dev only.",
+    )
+    allow_signup: bool = Field(
+        default=False,
+        description="Allow open self-registration via POST /auth/register",
+    )
+    admin_emails: str = Field(
+        default="",
+        description=(
+            "Comma-separated emails promoted to role=admin at password login / "
+            "user creation (verified accounts only)"
+        ),
+    )
+    atlas_llm_runs_per_ip: int = Field(
+        default=30,
+        ge=0,
+        le=100000,
+        description="Daily Atlas LLM/Places calls for an anonymous caller (per IP)",
+    )
+    atlas_llm_runs_per_user: int = Field(
+        default=300,
+        ge=0,
+        le=1000000,
+        description="Daily Atlas LLM/Places calls for a signed-in non-admin user",
+    )
+
+    trusted_proxy_cidrs: str = Field(
+        default="127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,::1/128,fc00::/7",
+        description=(
+            "Comma-separated networks whose X-Real-IP / X-Forwarded-For is trusted "
+            "when deriving a caller's IP for quotas (the bundled nginx runs on a "
+            "private Docker network). Empty = never trust forwarding headers."
+        ),
+    )
+
+    def admin_email_set(self) -> set:
+        """ADMIN_EMAILS as a normalized set of lowercase addresses."""
+        return {
+            e.strip().lower() for e in (self.admin_emails or "").split(",") if e.strip()
+        }
+
     # Transactional email (PLAN_063 — Synthetic Data Playground passwordless auth)
     email_provider: str = Field(
         default="console",

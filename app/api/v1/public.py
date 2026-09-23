@@ -17,7 +17,13 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.auth.api_keys import APIKeyService, RateLimiter, RateLimitInfo
+from app.auth.api_keys import (
+    SCOPE_LEVELS,
+    APIKeyService,
+    RateLimiter,
+    RateLimitInfo,
+    scope_allows,
+)
 
 
 # ============================================================================
@@ -74,9 +80,19 @@ class PaginatedResponse(BaseModel):
 
 
 class APIKeyAuth:
-    """Dependency for API key authentication and rate limiting."""
+    """Dependency for API key authentication, scope and rate limits.
 
-    def __init__(self):
+    SPEC_127: the key's scope must satisfy `required_scope`
+    (read < write < admin), and keys are accepted only in the `X-API-Key`
+    header. Query-string keys (`?api_key=`) used to work; they leak into
+    access logs, proxies and browser history, so they are now refused with a
+    message pointing at the header.
+    """
+
+    def __init__(self, required_scope: str = "read"):
+        if required_scope not in SCOPE_LEVELS:
+            raise ValueError(f"Unknown API key scope: {required_scope}")
+        self.required_scope = required_scope
         self.key_info: Optional[Dict[str, Any]] = None
         self.rate_info: Optional[RateLimitInfo] = None
 
@@ -84,18 +100,19 @@ class APIKeyAuth:
         self,
         request: Request,
         x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-        api_key: Optional[str] = Query(None, alias="api_key"),
         db: Session = Depends(get_db),
     ) -> Dict[str, Any]:
-        """Validate API key and check rate limits."""
-        # Get key from header or query param
-        raw_key = x_api_key or api_key
+        """Validate API key and check scope and rate limits."""
+        raw_key = x_api_key
 
         if not raw_key:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="API key required. Provide via X-API-Key header or api_key query parameter.",
-            )
+            detail = "API key required. Provide it in the X-API-Key header."
+            if request.query_params.get("api_key"):
+                detail = (
+                    "API keys are no longer accepted in the query string. "
+                    "Send the key in the X-API-Key header instead."
+                )
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
 
         # Validate key
         service = APIKeyService(db)
@@ -105,6 +122,13 @@ class APIKeyAuth:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired API key",
+            )
+
+        if not scope_allows(key_info.get("scope"), self.required_scope):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"API key scope '{key_info.get('scope')}' does not allow "
+                f"'{self.required_scope}' access",
             )
 
         # Check rate limits
@@ -140,7 +164,7 @@ class APIKeyAuth:
 
 
 # Create reusable auth dependency
-require_api_key = APIKeyAuth()
+require_api_key = APIKeyAuth(required_scope="read")
 
 
 # ============================================================================
@@ -180,7 +204,7 @@ async def list_investors(
     """
     List investors with pagination and filtering.
 
-    **Requires API Key** - Pass via `X-API-Key` header or `api_key` query param.
+    **Requires API Key** (scope `read`) - Pass via the `X-API-Key` header.
 
     **Filters:**
     - `lp_type`: Filter by investor type (e.g., "Pension Fund", "Endowment")
@@ -269,7 +293,7 @@ async def get_investor(
     """
     Get detailed information about a specific investor.
 
-    **Requires API Key** - Pass via `X-API-Key` header or `api_key` query param.
+    **Requires API Key** (scope `read`) - Pass via the `X-API-Key` header.
     """
     start_time = time.time()
 
@@ -352,7 +376,7 @@ async def search(
     """
     Search investors and companies.
 
-    **Requires API Key** - Pass via `X-API-Key` header or `api_key` query param.
+    **Requires API Key** (scope `read`) - Pass via the `X-API-Key` header.
 
     **Parameters:**
     - `q`: Search query (minimum 2 characters)

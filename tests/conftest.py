@@ -2,6 +2,14 @@
 Pytest configuration and shared fixtures.
 """
 import os
+
+# SPEC_127 made REQUIRE_AUTH default to true. Endpoint tests exercise route
+# behaviour, not auth, so the suite runs with auth off unless a test turns it
+# back on (tests/test_spec_127_access_lockdown.py does, per test). Forced, not
+# setdefault: the api container sets REQUIRE_AUTH=true, and
+# `docker-compose exec api pytest` must not turn every route test into a 401.
+os.environ["REQUIRE_AUTH"] = "false"
+
 import pytest
 from datetime import date, datetime, timedelta
 from sqlalchemy import create_engine
@@ -10,6 +18,8 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.compiler import compiles
 from app.core.models import Base
 from app.core.config import reset_settings
+
+reset_settings()  # drop any settings cached before REQUIRE_AUTH was forced
 
 
 # Teach SQLite how to compile PostgreSQL ARRAY columns (renders as TEXT)

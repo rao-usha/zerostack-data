@@ -177,12 +177,12 @@ docker-compose restart api
 # Wait ~25 seconds
 
 # Generate HTML report
-curl -s -X POST http://localhost:8001/api/v1/reports/generate \
+curl -H "X-API-Key: $NEXDATA_API_KEY" -s -X POST http://localhost:8001/api/v1/reports/generate \
   -H "Content-Type: application/json" \
   -d '{"template": "investor_profile", "format": "html", "params": {"investor_id": 3, "investor_type": "pe_firm"}}' | python -m json.tool
 
 # Download the report (use the ID from the response)
-curl -s http://localhost:8001/api/v1/reports/<ID>/download -o report.html
+curl -H "X-API-Key: $NEXDATA_API_KEY" -s http://localhost:8001/api/v1/reports/<ID>/download -o report.html
 
 # Open in browser to verify:
 # - Chart.js charts render with correct palette

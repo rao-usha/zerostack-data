@@ -12,7 +12,7 @@ Generate a data coverage report showing what data exists in the Nexdata database
 
 1. **Fetch all table data:**
    ```bash
-   curl -s http://localhost:8001/api/v1/export/tables -o /tmp/nexdata_tables.json
+   curl -H "X-API-Key: $NEXDATA_API_KEY" -s http://localhost:8001/api/v1/export/tables -o /tmp/nexdata_tables.json
    ```
 
 2. **Generate the coverage report:**

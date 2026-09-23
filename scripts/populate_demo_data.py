@@ -21,6 +21,7 @@ import sys
 import time
 import argparse
 import io
+import os
 from datetime import date
 from typing import Dict, Any
 
@@ -36,6 +37,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Configuration
 API_BASE_URL = "http://localhost:8001"
+# SPEC_127: admin-scope key (scripts/create_api_key.py)
+API_HEADERS = {"X-API-Key": os.environ["NEXDATA_API_KEY"]} if os.environ.get("NEXDATA_API_KEY") else {}
 POLL_INTERVAL = 3  # seconds between status checks
 MAX_WAIT_TIME = 300  # maximum seconds to wait for a job
 
@@ -105,7 +108,7 @@ def wait_for_job(job_id: int, job_name: str, timeout: int = MAX_WAIT_TIME) -> bo
     
     while time.time() - start_time < timeout:
         try:
-            response = requests.get(f"{API_BASE_URL}/api/v1/jobs/{job_id}", timeout=10)
+            response = requests.get(f"{API_BASE_URL}/api/v1/jobs/{job_id}", timeout=10, headers=API_HEADERS)
             if response.status_code == 200:
                 job_data = response.json()
                 status = job_data.get("status")
@@ -308,6 +311,7 @@ def _run_datasets(header: str, datasets: list, quick: bool = False,
                 f"{API_BASE_URL}{endpoint}",
                 json=payload,
                 timeout=10,
+                headers=API_HEADERS,
             )
 
             if response.status_code in [200, 201, 202]:

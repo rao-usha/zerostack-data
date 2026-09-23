@@ -26,12 +26,12 @@ Test a Nexdata API endpoint and display formatted results.
 
    For GET requests with query params:
    ```bash
-   curl -s "http://localhost:8001/api/v1/PATH?param=value"
+   curl -H "X-API-Key: $NEXDATA_API_KEY" -s "http://localhost:8001/api/v1/PATH?param=value"
    ```
 
    For POST requests with JSON body:
    ```bash
-   curl -s -X POST "http://localhost:8001/api/v1/PATH" \
+   curl -H "X-API-Key: $NEXDATA_API_KEY" -s -X POST "http://localhost:8001/api/v1/PATH" \
      -H "Content-Type: application/json" \
      -d '{"param": "value"}'
    ```

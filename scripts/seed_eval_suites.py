@@ -8,6 +8,7 @@ Idempotent: skips any suite whose name already exists.
 """
 
 import argparse
+import os
 import sys
 import httpx
 
@@ -452,7 +453,7 @@ EVAL_SUITES = [
 
 def seed(host: str, dry_run: bool = False) -> None:
     base = host.rstrip("/")
-    client = httpx.Client(timeout=30.0)
+    client = httpx.Client(timeout=30.0, headers={"X-API-Key": os.environ["NEXDATA_API_KEY"]} if os.environ.get("NEXDATA_API_KEY") else {})
 
     # Fetch existing suite names to avoid duplicates
     resp = client.get(f"{base}/api/v1/evals/suites?active_only=false")

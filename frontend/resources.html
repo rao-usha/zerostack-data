@@ -150,6 +150,10 @@
             padding: 2rem;
         }
     </style>
+    <!-- SPEC_127: the API links below are admin-only. auth.js turns a click
+         into an authenticated fetch when signed in to the console; a plain
+         navigation cannot carry the bearer token and would get a 401. -->
+    <script src="/js/auth.js"></script>
 </head>
 <body>
     <header class="header">
@@ -195,19 +199,19 @@
                 </div>
                 <div class="card-arrow">↗</div>
             </a>
-            <a class="card" href="http://localhost:8001/api/v1/jobs/list" target="_blank" rel="noopener">
+            <a class="card" href="/api/v1/jobs/list" target="_blank" rel="noopener">
                 <div class="card-icon icon-logs">📋</div>
                 <div class="card-body">
                     <div class="card-title">Job Queue</div>
-                    <div class="card-desc">Ingestion job status</div>
+                    <div class="card-desc">Ingestion job status (admin sign-in)</div>
                 </div>
                 <div class="card-arrow">↗</div>
             </a>
-            <a class="card" href="http://localhost:8001/api/v1/export/tables" target="_blank" rel="noopener">
+            <a class="card" href="/api/v1/export/tables" target="_blank" rel="noopener">
                 <div class="card-icon icon-pg">🗄️</div>
                 <div class="card-body">
                     <div class="card-title">Table Coverage</div>
-                    <div class="card-desc">All tables + row counts</div>
+                    <div class="card-desc">All tables + row counts (admin sign-in)</div>
                 </div>
                 <div class="card-arrow">↗</div>
             </a>
@@ -257,7 +261,7 @@
             <div><span style="color:#6366f1">docker-compose restart api</span>  &nbsp;# restart after code changes</div>
             <div><span style="color:#6366f1">docker-compose logs api -f</span>   &nbsp;# follow API logs</div>
             <div><span style="color:#6366f1">docker-compose ps</span>            &nbsp;# check all container status</div>
-            <div><span style="color:#06b6d4">curl -s http://localhost:8001/api/v1/export/tables | python -m json.tool</span></div>
+            <div><span style="color:#06b6d4">curl -s -H "X-API-Key: $NEXDATA_API_KEY" http://localhost:8001/api/v1/export/tables | python -m json.tool</span></div>
         </div>
     </div>
 
