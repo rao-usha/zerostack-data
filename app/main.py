@@ -53,6 +53,7 @@ from app.api.v1 import (
     foot_traffic,
     prediction_markets,
     bulk,
+    catalog,
     entity_master,
     pe_marts,
     schedules,
@@ -270,6 +271,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"create_tables failed: {e}")
         raise
+
+    # dataset_registry is a generated mirror of the dataset catalog (SPEC_123).
+    # Idempotent; never deletes rows. A failure must not block startup.
+    try:
+        from app.catalog.mirror import sync_dataset_registry
+        sync_dataset_registry(engine)
+    except Exception as e:
+        logger.warning(f"dataset catalog mirror sync skipped: {e}")
 
     # --- Batch metadata columns on ingestion_jobs ---
     try:
@@ -1351,6 +1360,7 @@ Browse the endpoint sections below to see what's available:
         {"name": "Playground Admin", "description": "📇 **Playground Admin** - Lead pipeline + intent scoring from the Synthetic Data Playground (JWT-gated sales surface)"},
         # ── Source Directory ──────────────────────────────────────────────
         {"name": "sources", "description": "📚 **Source Directory** — Overview and status for all data sources"},
+        {"name": "catalog", "description": "🗂️ **Dataset Catalog** — Declared datasets: producer, tables, cadence, rights, live row counts and coverage"},
         # ── Government / Economic Data ─────────────────────────────────
         {"name": "census-batch", "description": "📊 **U.S. Census Bureau - Batch** - Bulk census data ingestion"},
         {"name": "census-geography", "description": "📊 **U.S. Census Bureau - Geography** - Geographic hierarchy and FIPS codes"},
@@ -1613,6 +1623,7 @@ app.include_router(foot_traffic.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(dunl.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(prediction_markets.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(bulk.router, prefix="/api/v1", dependencies=_admin)
+app.include_router(catalog.router, prefix="/api/v1", dependencies=_auth)  # SPEC_123
 app.include_router(entity_master.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(pe_marts.router, prefix="/api/v1", dependencies=_admin)
 app.include_router(schedules.router, prefix="/api/v1", dependencies=_admin)
