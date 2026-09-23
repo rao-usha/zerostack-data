@@ -88,16 +88,43 @@ without a worker.
 ### Watchdog (`app/services/data_watchdog.py`)
 
 ```
-run_watchdog(db, now=None, transport=None)
+run_watchdog(db, now=None, transport=None, ping=False)
   pg_try_advisory_xact_lock  -> skip if another run holds it
-  findings = rules(db, now)            # each rule isolated; a crashing rule
+  findings, errored = evaluate_rules(db, now)  # each rule isolated; a crashing rule
                                        # becomes a `watchdog:rule_error:<rule>` finding
-  transitions = reconcile(db, findings, now)   # open / remind / escalate / resolve
+  transitions = reconcile(db, findings, now, errored, webhook_configured)
   deliver(transitions)  -> log always; POST ALERT_WEBHOOK_URL if set
-  mark notified only if delivery succeeded (or no webhook configured)
+  apply_delivered() only if delivery succeeded (or no webhook configured)
+  fan out stalled/sla to ALERT_DATA_STALENESS subscribers once per episode
   commit
-  ping HEARTBEAT_PING_URL if set
+  ping HEARTBEAT_PING_URL if ping (scheduled path only)
 ```
+
+Review fixes (spec-128-fix):
+
+- **Per-schedule stall evidence.** `last_success_for_schedule(db, id)` reads
+  only rows with `schedule_id = id`: successful `ingestion_jobs`, and
+  successful `job_queue` rows linked to them. A queue row is linked only when
+  `job_table_id = j.id` **and** `payload->>'ingestion_job_id' = j.id` (lp,
+  agentic, people, foot_traffic queue rows point `job_table_id` at their own
+  tables, whose ids overlap). Other schedules of the same source, manual runs,
+  and releases loaded by hand do not mask a broken schedule.
+- **Shared per-source success** `last_success_by_source()` (same two kinds
+  of evidence) is used by the SLA rule, `JobMonitor.check_alerts` and
+  `/datasets/freshness`, so `job:pe_mart_build` is not "never succeeded" there.
+- **State machine.** A rule that crashes never resolves its open alerts. An
+  alert resolves only after it has been absent for
+  `WATCHDOG_RESOLVE_GRACE_MINUTES` (30, i.e. two clean runs). A *warning*
+  that re-opens within 24h of its last notice re-opens quietly and is said
+  again after 24h or on escalation; critical re-opens are always said.
+  Escalations and resolves are applied only after delivery, so a webhook
+  outage retries them. Alerts only logged (no URL) are sent once a URL is set
+  (`notified_via`).
+- **Worker alert** stays open until a live heartbeat is seen; jobs
+  auto-cancelled as `no_worker_available` are not a recovery and are excluded
+  from the failure spike.
+- **Manual run** (`POST /watchdog/run`) does not ping the dead-man's switch.
+  `GET /watchdog/status` omits raw `last_error` text (logs/webhook keep it).
 
 Cadence: `CUSTOM` + cron uses the largest gap between the next four fire
 times of the same `CronTrigger` APScheduler uses (UTC); frequencies map to
@@ -109,7 +136,8 @@ Alert keys: `worker:none_alive`, `schedule:stalled:<id>`,
 
 `watchdog_alerts` columns: `key` (PK), `rule`, `severity`, `status`
 (`open`/`resolved`), `message`, `details` JSON, `first_seen_at`,
-`last_seen_at`, `last_notified_at`, `resolved_at`, `notify_count`.
+`last_seen_at`, `last_notified_at`, `resolved_at`, `notify_count`,
+`notified_via` (`webhook`/`log`), `announced`, `quiet`, `fanned_out_at`.
 New table, created by `create_all` (no Alembic migration, per PLAN_086 rules).
 
 Newly opened `schedule:stalled:*` and `sla:*` alerts are also forwarded to
@@ -122,7 +150,7 @@ other maintenance jobs; `max_instances=1`, `coalesce=True`.
 
 Env: `ALERT_WEBHOOK_URL`, `HEARTBEAT_PING_URL`,
 `WATCHDOG_WORKER_DEAD_MINUTES` (10), `WATCHDOG_FAILURE_SPIKE` (5),
-`WATCHDOG_INTERVAL_MINUTES` (15).
+`WATCHDOG_INTERVAL_MINUTES` (15), `WATCHDOG_RESOLVE_GRACE_MINUTES` (30).
 
 ## Test Cases
 
@@ -143,6 +171,16 @@ Env: `ALERT_WEBHOOK_URL`, `HEARTBEAT_PING_URL`,
 | T13 | `test_heartbeat_ping_and_noop_when_unset` | dead-man's ping |
 | T14 | `test_monitoring_staleness_success_only` (PG) | never => critical, failed != activity |
 | T15 | `test_freshness_unknown_and_never_run` | no SLA => unknown; never-run listed |
+| T5b | `test_stall_is_per_schedule_not_per_source` (PG) | other schedule / manual run / release / colliding lp+people job_table_id don't mask |
+| T16 | `test_crashing_rule_does_not_resolve_its_open_alerts` (PG) | no false RESOLVED on rule error |
+| T17 | `test_resolve_needs_grace_and_warning_flaps_are_rate_limited` (PG) | resolve grace; quiet warning re-open |
+| T17b | `test_critical_reopen_is_not_quieted` (PG) | critical re-open always said |
+| T18 | `test_escalation_and_resolve_survive_webhook_outage` (PG) | escalate/resolve retried |
+| T19 | `test_subscriber_fanout_once_per_episode_even_when_slack_is_down` (PG) | no fan-out spam |
+| T20 | `test_alerts_logged_before_webhook_is_set_are_sent_once_it_is` (PG) | log-only alerts reach Slack later |
+| T21 | `test_worker_alert_stays_open_after_pending_jobs_are_auto_cancelled` (PG) | no false all-clear |
+| T22 | `test_watchdog_endpoints` (PG) | manual run no ping; status hides raw error |
+| T23 | `test_job_schedules_count_linked_queue_success_everywhere` (PG) | monitoring/freshness agree with watchdog |
 
 ## Out of scope
 
@@ -168,4 +206,9 @@ Env: `ALERT_WEBHOOK_URL`, `HEARTBEAT_PING_URL`,
 
 ## Feedback History
 
-_No corrections yet._
+- 2026-09-23 review round: stall evidence was per-source and the queue join
+  ignored job_type; rule errors resolved open alerts; no flap guard; fan-out
+  and escalations mishandled during webhook outages; log-only alerts never
+  reached Slack; worker alert resolved on auto-cancel; monitoring/freshness
+  disagreed with the watchdog on `job:` sources; manual run fed the
+  dead-man's switch. All fixed on `spec-128-fix` (see Design).

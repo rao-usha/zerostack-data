@@ -16,14 +16,18 @@ Every 15 minutes (APScheduler, registered from the app lifespan) it checks:
 
 Each finding has a stable key. ``watchdog_alerts`` holds its state so an alert
 is sent once, reminded at most every 24h, and followed by a ``resolved``
-notice. Delivery is a Slack-compatible ``{"text": ...}`` POST to
-``ALERT_WEBHOOK_URL`` plus a log line at WARNING/ERROR. After each completed
-run ``HEARTBEAT_PING_URL`` is pinged, so an external dead-man's switch notices
-when the whole stack -- API, scheduler, database -- is gone.
+notice once it has been gone for two runs (never because its rule crashed).
+Delivery is a Slack-compatible ``{"text": ...}`` POST to ``ALERT_WEBHOOK_URL``
+plus a log line at WARNING/ERROR; a notice is only marked sent once it went
+out, and alerts that were only logged are sent when a webhook is configured.
+After each *scheduled* run ``HEARTBEAT_PING_URL`` is pinged, so an external
+dead-man's switch notices when the whole stack -- API, scheduler, database --
+is gone.
 
 Success evidence is only ever read from successful rows: ``ingestion_jobs``
-and ``job_queue`` with status ``success``, and ``raw.source_release`` rows
-that ``loaded``.
+with status ``success``, and ``job_queue`` success rows linked to an
+IngestionJob (by job_table_id *and* payload.ingestion_job_id). Stall checks are
+per schedule (schedule_id), not per source.
 """
 
 from __future__ import annotations
@@ -32,7 +36,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
 
 import httpx
 from sqlalchemy import text
@@ -46,13 +50,12 @@ JOB_ID = "system_data_watchdog"
 DEFAULT_INTERVAL_MINUTES = 15
 STALL_FACTOR = 1.5
 RENOTIFY_AFTER = timedelta(hours=24)
+# An alert must be absent this long (two 15-min runs) before it is resolved.
+DEFAULT_RESOLVE_GRACE_MINUTES = 30
 HTTP_TIMEOUT_SECONDS = 10.0
 # Arbitrary constant for pg_try_advisory_xact_lock: one watchdog run at a time
 # (the timer and POST /watchdog/run can overlap).
 LOCK_KEY = 128_000_128
-
-BULK_PREFIX = "bulk:"
-JOB_PREFIX = "job:"
 
 FREQUENCY_HOURS = {
     "hourly": 1,
@@ -63,6 +66,8 @@ FREQUENCY_HOURS = {
 }
 
 SEVERITY_RANK = {"warning": 1, "critical": 2}
+# Finding details kept out of GET /watchdog/status (raw upstream error text).
+PRIVATE_DETAILS = frozenset({"last_error"})
 
 
 def _env_int(name: str, default: int) -> int:
@@ -144,16 +149,20 @@ def _has_source_release(db: Session) -> bool:
     return db.execute(text("SELECT to_regclass('raw.source_release')")).scalar() is not None
 
 
+WORKER_KEY = "worker:none_alive"
+# cancel_stale_pending_jobs marks never-claimed jobs failed with this reason.
+NO_WORKER_REASON = "no_worker_available"
+
+
 def rule_worker(db: Session, now: datetime) -> List[Finding]:
-    """Work is waiting and no worker has been seen for N minutes."""
+    """Work is waiting and no worker has been seen for N minutes.
+
+    Once open, the alert stays open until a worker heartbeat is seen again:
+    the queue emptying because cancel_stale_pending_jobs failed the waiting
+    jobs is not a recovery.
+    """
     dead_minutes = _env_int("WATCHDOG_WORKER_DEAD_MINUTES", 10)
     cutoff = now - timedelta(minutes=dead_minutes)
-
-    pending, oldest = db.execute(text(
-        "SELECT COUNT(*), MIN(created_at) FROM job_queue WHERE LOWER(status) = 'pending'"
-    )).one()
-    if not pending or oldest is None or oldest > cutoff:
-        return []
 
     live = db.execute(
         text("SELECT COUNT(*) FROM worker_heartbeats WHERE last_seen_at >= :cutoff"),
@@ -162,59 +171,93 @@ def rule_worker(db: Session, now: datetime) -> List[Finding]:
     if live:
         return []
 
+    pending, oldest = db.execute(text(
+        "SELECT COUNT(*), MIN(created_at) FROM job_queue WHERE LOWER(status) = 'pending'"
+    )).one()
+    waiting = bool(pending) and oldest is not None and oldest <= cutoff
+    if not waiting:
+        open_row = db.get(WatchdogAlert, WORKER_KEY)
+        if open_row is None or open_row.status != "open":
+            return []
+
     last_seen = db.execute(text("SELECT MAX(last_seen_at) FROM worker_heartbeats")).scalar()
-    waited_h = (now - oldest).total_seconds() / 3600
-    return [Finding(
-        key="worker:none_alive",
-        rule="worker",
-        severity="critical",
-        message=(
+    if waiting:
+        waited_h = (now - oldest).total_seconds() / 3600
+        message = (
             f"No live worker for {dead_minutes}+ min while {pending} job(s) wait in the "
             f"queue (oldest {waited_h:.1f}h). Start it: docker-compose up -d worker"
-        ),
+        )
+    else:
+        message = (
+            f"Still no live worker heartbeat (last "
+            f"{last_seen.isoformat() if last_seen else 'never'}); waiting jobs may have "
+            f"been auto-cancelled. Start it: docker-compose up -d worker"
+        )
+    return [Finding(
+        key=WORKER_KEY,
+        rule="worker",
+        severity="critical",
+        message=message,
         details={
-            "pending_jobs": int(pending),
-            "oldest_pending_at": oldest.isoformat(),
+            "pending_jobs": int(pending or 0),
+            "oldest_pending_at": oldest.isoformat() if oldest else None,
             "last_heartbeat_at": last_seen.isoformat() if last_seen else None,
         },
     )]
 
 
-def last_success_for_schedule(db: Session, schedule_id: int, source: str,
-                              has_release_table: bool) -> Optional[datetime]:
-    """Newest evidence that this schedule's work succeeded. Success rows only."""
-    params = {"id": schedule_id, "source": source}
+# job_queue.job_table_id is not always an ingestion_jobs id: lp, agentic,
+# people and foot_traffic queue rows point at their own tables, and those id
+# sequences overlap. Every producer that links a queue row to an IngestionJob
+# (scheduler_service, jobs API, batch_service, job_splitter, backfill,
+# dependency_service) also puts that id in payload.ingestion_job_id, so a link
+# only counts when both agree.
+_LINKED_QUEUE_JOIN = (
+    "JOIN ingestion_jobs j ON j.id = q.job_table_id "
+    "AND q.payload->>'ingestion_job_id' = CAST(j.id AS TEXT)"
+)
+
+
+def last_success_for_schedule(db: Session, schedule_id: int) -> Optional[datetime]:
+    """Newest successful run *of this schedule*. Success rows only.
+
+    Strictly per schedule: another schedule of the same source, a manual run,
+    or a release loaded by hand does not make a broken schedule healthy.
+    scheduler_service tags every IngestionJob it creates (plain, bulk: and
+    job: schedules) with schedule_id.
+    """
+    params = {"id": schedule_id}
     ingestion = db.execute(text(
         "SELECT MAX(completed_at) FROM ingestion_jobs "
-        "WHERE (schedule_id = :id OR source = :source) AND LOWER(status) = 'success'"
+        "WHERE schedule_id = :id AND LOWER(status) = 'success'"
     ), params).scalar()
     # Queue rows linked to this schedule's IngestionJobs: the worker may finish
-    # a job without writing the IngestionJob back (fixed separately, SPEC_121).
+    # a job without writing the IngestionJob back (pe_marts; SPEC_121).
     linked = db.execute(text(
-        "SELECT MAX(q.completed_at) FROM job_queue q "
-        "JOIN ingestion_jobs j ON j.id = q.job_table_id "
-        "WHERE (j.schedule_id = :id OR j.source = :source) AND LOWER(q.status) = 'success'"
+        f"SELECT MAX(q.completed_at) FROM job_queue q {_LINKED_QUEUE_JOIN} "
+        "WHERE j.schedule_id = :id AND LOWER(q.status) = 'success'"
     ), params).scalar()
+    return _max_ts(ingestion, linked)
 
-    extra: List[Optional[datetime]] = []
-    if source.startswith(BULK_PREFIX):
-        name = source[len(BULK_PREFIX):]
-        extra.append(db.execute(text(
-            "SELECT MAX(completed_at) FROM job_queue WHERE job_type = 'bulk_ingest' "
-            "AND LOWER(status) = 'success' AND payload->>'bulk_source' = :name"
-        ), {"name": name}).scalar())
-        if has_release_table:
-            extra.append(db.execute(text(
-                "SELECT MAX(loaded_at) FROM raw.source_release "
-                "WHERE source = :name AND status = 'loaded'"
-            ), {"name": name}).scalar())
-    elif source.startswith(JOB_PREFIX):
-        extra.append(db.execute(text(
-            "SELECT MAX(completed_at) FROM job_queue "
-            "WHERE job_type = :t AND LOWER(status) = 'success'"
-        ), {"t": source[len(JOB_PREFIX):]}).scalar())
 
-    return _max_ts(ingestion, linked, *extra)
+def last_success_by_source(db: Session, sources: Optional[List[str]] = None) -> Dict[str, datetime]:
+    """Newest successful run per source: successful ``ingestion_jobs`` rows, plus
+    successful queue rows properly linked to an IngestionJob (for workers that
+    do not write the IngestionJob back, e.g. ``job:pe_mart_build``).
+
+    Shared by the SLA rule, JobMonitor.check_alerts and /datasets/freshness so
+    the three surfaces agree.
+    """
+    where = "WHERE ts IS NOT NULL" + (" AND source = ANY(:sources)" if sources is not None else "")
+    rows = db.execute(text(
+        "SELECT source, MAX(ts) FROM ("
+        "  SELECT source, completed_at AS ts FROM ingestion_jobs WHERE LOWER(status) = 'success'"
+        "  UNION ALL"
+        f"  SELECT j.source, q.completed_at FROM job_queue q {_LINKED_QUEUE_JOIN}"
+        "  WHERE LOWER(q.status) = 'success'"
+        f") s {where} GROUP BY source"
+    ), {"sources": list(sources)} if sources is not None else {}).all()
+    return {r[0]: r[1] for r in rows}
 
 
 def rule_stalled_schedules(db: Session, now: datetime) -> List[Finding]:
@@ -225,7 +268,6 @@ def rule_stalled_schedules(db: Session, now: datetime) -> List[Finding]:
     )).mappings().all()
     if not rows:
         return []
-    has_release = _has_source_release(db)
 
     findings = []
     for row in rows:
@@ -233,7 +275,7 @@ def rule_stalled_schedules(db: Session, now: datetime) -> List[Finding]:
         if not cadence:
             continue
         threshold = cadence * STALL_FACTOR
-        last = last_success_for_schedule(db, row["id"], row["source"], has_release)
+        last = last_success_for_schedule(db, row["id"])
         since = last or row["created_at"]
         if since is None:
             continue
@@ -286,21 +328,24 @@ def rule_failed_releases(db: Session, now: datetime) -> List[Finding]:
             key=f"release:failed:{source}",
             rule="failed_release",
             severity="warning",
+            # The raw error stays out of the message (GET /watchdog/status shows
+            # messages); _format_line adds it to the log and webhook text only.
             message=(f"{len(keys)} {source} release(s) failed in the last 24h: "
-                     f"{', '.join(keys[:5])}{' ...' if len(keys) > 5 else ''}"
-                     + (f" -- {last_error[:160]}" if last_error else "")),
+                     f"{', '.join(keys[:5])}{' ...' if len(keys) > 5 else ''}"),
             details={"source": source, "release_keys": keys, "last_error": last_error},
         ))
     return findings
 
 
 def rule_failure_spike(db: Session, now: datetime) -> List[Finding]:
-    """Many failed queue jobs in the last hour."""
+    """Many failed queue jobs in the last hour. Jobs auto-cancelled for lack of
+    a worker are left out: that is the worker alert's story, not a spike."""
     threshold = _env_int("WATCHDOG_FAILURE_SPIKE", 5)
     rows = db.execute(text(
         "SELECT job_type, COUNT(*) FROM job_queue "
-        "WHERE LOWER(status) = 'failed' AND completed_at >= :since GROUP BY job_type"
-    ), {"since": now - timedelta(hours=1)}).all()
+        "WHERE LOWER(status) = 'failed' AND completed_at >= :since "
+        "AND COALESCE(error_message, '') NOT LIKE :no_worker GROUP BY job_type"
+    ), {"since": now - timedelta(hours=1), "no_worker": NO_WORKER_REASON + "%"}).all()
     by_type = {str(r[0]): int(r[1]) for r in rows}
     total = sum(by_type.values())
     if total < threshold:
@@ -323,11 +368,7 @@ def rule_sla(db: Session, now: datetime) -> List[Finding]:
     )).all()
     if not slas:
         return []
-    sources = [s[0] for s in slas]
-    last = dict(db.execute(text(
-        "SELECT source, MAX(completed_at) FROM ingestion_jobs "
-        "WHERE LOWER(status) = 'success' AND source = ANY(:sources) GROUP BY source"
-    ), {"sources": sources}).all())
+    last = last_success_by_source(db, [s[0] for s in slas])
 
     findings = []
     for source, max_age in slas:
@@ -370,16 +411,19 @@ RULES: List[Tuple[str, Callable[[Session, datetime], List[Finding]]]] = [
 ]
 
 
-def evaluate(db: Session, now: Optional[datetime] = None) -> List[Finding]:
-    """Run every rule. A crashing rule becomes its own finding, never a silent gap."""
+def evaluate_rules(db: Session, now: Optional[datetime] = None) -> Tuple[List[Finding], Set[str]]:
+    """Run every rule. A crashing rule becomes its own finding, never a silent
+    gap, and is reported back so its open alerts are not taken as resolved."""
     now = now or datetime.utcnow()
     findings: List[Finding] = []
+    errored: Set[str] = set()
     for name, rule in RULES:
         try:
             with db.begin_nested():  # a failed statement must not poison the others
                 findings.extend(rule(db, now))
         except Exception as e:
             logger.error(f"Watchdog rule {name} failed: {e}", exc_info=True)
+            errored.add(name)
             findings.append(Finding(
                 key=f"watchdog:rule_error:{name}",
                 rule="rule_error",
@@ -387,7 +431,12 @@ def evaluate(db: Session, now: Optional[datetime] = None) -> List[Finding]:
                 message=f"Watchdog check '{name}' could not run ({type(e).__name__}); see API logs",
                 details={"rule": name, "error_type": type(e).__name__},
             ))
-    return findings
+    return findings, errored
+
+
+def evaluate(db: Session, now: Optional[datetime] = None) -> List[Finding]:
+    """Findings of every rule (see evaluate_rules)."""
+    return evaluate_rules(db, now)[0]
 
 
 # =============================================================================
@@ -395,11 +444,28 @@ def evaluate(db: Session, now: Optional[datetime] = None) -> List[Finding]:
 # =============================================================================
 
 
-def reconcile(db: Session, findings: List[Finding], now: datetime) -> List[Tuple[str, Finding, WatchdogAlert]]:
+def _resolve_grace() -> timedelta:
+    return timedelta(minutes=_env_int("WATCHDOG_RESOLVE_GRACE_MINUTES", DEFAULT_RESOLVE_GRACE_MINUTES))
+
+
+def reconcile(db: Session, findings: List[Finding], now: datetime,
+              errored_rules: Iterable[str] = (), webhook_configured: bool = False,
+              ) -> List[Tuple[str, Finding, WatchdogAlert]]:
     """Update ``watchdog_alerts`` and return what should be said this run.
 
-    Actions: ``opened`` (new, reopened, or never delivered), ``escalated``
-    (warning -> critical), ``reminded`` (still open after 24h), ``resolved``.
+    Actions: ``opened`` (new, reopened, not delivered yet, or so far only
+    logged and a webhook is now configured), ``escalated`` (warning ->
+    critical), ``reminded`` (still open after 24h), ``resolved``.
+
+    Nothing here marks a notice as sent; ``apply_delivered`` does that once the
+    message went out, so a failed webhook POST is retried next run, including
+    escalations and resolves.
+
+    - An alert resolves only after it has been absent for the resolve grace
+      (30 min by default: two clean runs), never because its rule crashed.
+    - A *warning* that re-opens within 24h of its last notice re-opens
+      quietly; it is said again once 24h have passed or if it escalates.
+      Critical re-opens are always said.
     """
     changes: List[Tuple[str, Finding, WatchdogAlert]] = []
     seen = set()
@@ -409,46 +475,79 @@ def reconcile(db: Session, findings: List[Finding], now: datetime) -> List[Tuple
             continue
         seen.add(f.key)
         row = db.get(WatchdogAlert, f.key)
-        action: Optional[str] = None
         if row is None:
             row = WatchdogAlert(key=f.key, rule=f.rule, severity=f.severity, status="open",
                                 message=f.message, details=f.details, first_seen_at=now,
-                                last_seen_at=now, notify_count=0)
+                                last_seen_at=now, notify_count=0, announced=0, quiet=0)
             db.add(row)
-            action = "opened"
         elif row.status != "open":
+            recently_said = (row.last_notified_at is not None
+                             and now - row.last_notified_at < RENOTIFY_AFTER)
             row.status = "open"
             row.first_seen_at = now
             row.resolved_at = None
-            row.last_notified_at = None
-            action = "opened"
-        elif row.last_notified_at is None:
-            action = "opened" if not row.notify_count else "reminded"
-        elif SEVERITY_RANK.get(f.severity, 0) > SEVERITY_RANK.get(row.severity, 0):
+            row.announced = 0
+            row.fanned_out_at = None
+            row.quiet = int(recently_said and f.severity != "critical")
+
+        escalate = SEVERITY_RANK.get(f.severity, 0) > SEVERITY_RANK.get(row.severity, 0)
+        action: Optional[str] = None
+        if not row.announced:
+            in_window = (row.last_notified_at is not None
+                         and now - row.last_notified_at < RENOTIFY_AFTER)
+            if not (row.quiet and in_window and not escalate):
+                action = "opened"
+        elif escalate:
             action = "escalated"
-        elif now - row.last_notified_at >= RENOTIFY_AFTER:
+        elif webhook_configured and row.notified_via != "webhook":
+            action = "opened"  # so far only logged: send it now that there is a webhook
+        elif row.last_notified_at is None or now - row.last_notified_at >= RENOTIFY_AFTER:
             action = "reminded"
 
         row.rule = f.rule
-        row.severity = f.severity
+        if action != "escalated":  # an escalation sticks once it has been said
+            row.severity = f.severity
         row.message = f.message
         row.details = f.details
         row.last_seen_at = now
         if action:
             changes.append((action, f, row))
 
+    errored = set(errored_rules)
+    cutoff = now - _resolve_grace()
     open_rows = db.query(WatchdogAlert).filter(WatchdogAlert.status == "open").all()
     for row in open_rows:
-        if row.key in seen:
+        if row.key in seen or row.rule in errored:
+            continue  # still firing, or its rule could not tell us
+        if row.last_seen_at is not None and row.last_seen_at > cutoff:
+            continue  # absent for too short a time: flap guard
+        if not row.announced:
+            # Never said (quiet re-open, or never delivered): end it quietly.
+            row.status = "resolved"
+            row.resolved_at = now
             continue
-        row.status = "resolved"
-        row.resolved_at = now
         f = Finding(key=row.key, rule=row.rule, severity=row.severity,
                     message=row.message, details=row.details or {})
         changes.append(("resolved", f, row))
 
     db.flush()
     return changes
+
+
+def apply_delivered(changes: List[Tuple[str, Finding, WatchdogAlert]], now: datetime,
+                    via: str) -> None:
+    """Record that ``changes`` were said (via ``webhook`` or ``log``)."""
+    for action, f, row in changes:
+        if action == "resolved":
+            row.status = "resolved"
+            row.resolved_at = now
+            continue
+        row.last_notified_at = now
+        row.notify_count = (row.notify_count or 0) + 1
+        row.notified_via = via
+        row.announced = 1
+        row.quiet = 0
+        row.severity = f.severity
 
 
 def open_alerts(db: Session) -> List[Dict[str, Any]]:
@@ -464,7 +563,8 @@ def open_alerts(db: Session) -> List[Dict[str, Any]]:
             "rule": r.rule,
             "severity": r.severity,
             "message": r.message,
-            "details": r.details,
+            # Raw upstream error text stays in the logs and the webhook.
+            "details": {k: v for k, v in (r.details or {}).items() if k not in PRIVATE_DETAILS},
             "first_seen_at": iso(r.first_seen_at),
             "last_seen_at": iso(r.last_seen_at),
             "last_notified_at": iso(r.last_notified_at),
@@ -483,11 +583,13 @@ def _format_line(action: str, f: Finding) -> str:
     sev = f.severity.upper()
     if action == "resolved":
         return f"[RESOLVED] {f.message} (`{f.key}`)"
+    last_error = (f.details or {}).get("last_error")
+    message = f"{f.message} -- {str(last_error)[:160]}" if last_error else f.message
     if action == "reminded":
-        return f"[{sev}] still open: {f.message} (`{f.key}`)"
+        return f"[{sev}] still open: {message} (`{f.key}`)"
     if action == "escalated":
-        return f"[{sev}] escalated: {f.message} (`{f.key}`)"
-    return f"[{sev}] {f.message} (`{f.key}`)"
+        return f"[{sev}] escalated: {message} (`{f.key}`)"
+    return f"[{sev}] {message} (`{f.key}`)"
 
 
 def format_message(changes: List[Tuple[str, Finding]]) -> str:
@@ -575,31 +677,43 @@ def last_run() -> Dict[str, Any]:
     return dict(_last_run)
 
 
-async def run_watchdog(db: Session, now: Optional[datetime] = None, transport=None) -> Dict[str, Any]:
-    """Evaluate, reconcile state, deliver, ping. One run at a time."""
+FANOUT_RULES = ("stalled_schedule", "sla")
+
+
+async def run_watchdog(db: Session, now: Optional[datetime] = None, transport=None,
+                       ping: bool = False) -> Dict[str, Any]:
+    """Evaluate, reconcile state, deliver. One run at a time.
+
+    ``ping`` feeds the external dead-man's switch. Only the scheduled path
+    (run_watchdog_job) passes it: a manual POST /watchdog/run must not keep
+    HEARTBEAT_PING_URL green while APScheduler is dead.
+    """
     global _last_run
     now = now or datetime.utcnow()
 
     got = db.execute(text("SELECT pg_try_advisory_xact_lock(:k)"), {"k": LOCK_KEY}).scalar()
     if not got:
         db.rollback()
-        return {"skipped": True, "reason": "another watchdog run is in progress"}
+        # A run is in progress, so the stack is alive: keep the switch fed.
+        pinged = await ping_heartbeat(transport=transport) if ping else False
+        return {"skipped": True, "reason": "another watchdog run is in progress", "pinged": pinged}
 
-    findings = evaluate(db, now)
-    changes = reconcile(db, findings, now)
+    webhook = bool(os.getenv("ALERT_WEBHOOK_URL", "").strip())
+    findings, errored = evaluate_rules(db, now)
+    changes = reconcile(db, findings, now, errored_rules=errored, webhook_configured=webhook)
 
     delivered = await deliver([(a, f) for a, f, _ in changes], transport=transport)
     if delivered:
-        for action, _, row in changes:
-            if action != "resolved":
-                row.last_notified_at = now
-                row.notify_count = (row.notify_count or 0) + 1
-    for action, f, _ in changes:
-        if action == "opened" and f.rule in ("stalled_schedule", "sla"):
+        apply_delivered(changes, now, "webhook" if webhook else "log")
+    # Registered ALERT_DATA_STALENESS subscribers: once per episode, whether
+    # or not the Slack webhook is up (it is a separate channel).
+    for action, f, row in changes:
+        if action != "resolved" and f.rule in FANOUT_RULES and row.fanned_out_at is None:
+            row.fanned_out_at = now
             await _fanout_to_subscribers(f)
     db.commit()
 
-    pinged = await ping_heartbeat(transport=transport)
+    pinged = await ping_heartbeat(transport=transport) if ping else False
 
     def keys(action):
         return [f.key for a, f, _ in changes if a == action]
@@ -628,7 +742,7 @@ async def run_watchdog_job() -> None:
     db = None
     try:
         db = get_session_factory()()
-        await run_watchdog(db)
+        await run_watchdog(db, ping=True)
     except Exception as e:
         logger.error(f"Data watchdog run failed: {type(e).__name__}: {e}", exc_info=True)
         now = datetime.utcnow()

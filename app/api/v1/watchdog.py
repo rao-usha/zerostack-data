@@ -36,5 +36,9 @@ def watchdog_status(db: Session = Depends(get_db)):
 
 @router.post("/run")
 async def watchdog_run(db: Session = Depends(get_db)):
-    """Run the watchdog now (same dedupe as the timer: nothing is re-sent early)."""
-    return await data_watchdog.run_watchdog(db)
+    """Run the watchdog now (same dedupe as the timer: nothing is re-sent early).
+
+    Does not ping HEARTBEAT_PING_URL: only the scheduled run may prove the
+    scheduler is alive.
+    """
+    return await data_watchdog.run_watchdog(db, ping=False)

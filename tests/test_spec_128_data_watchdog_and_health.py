@@ -315,15 +315,15 @@ def test_stalled_schedule_uses_success_only(pgdb):
     ij = _ingestion_job(pgdb, "bulk:sec_13f", "pending", NOW - timedelta(days=20), bulk.id)
     _queue(pgdb, "bulk_ingest", "success", NOW - timedelta(days=20),
            completed_at=NOW - timedelta(days=20), job_table_id=ij.id,
-           payload={"bulk_source": "sec_13f"})
+           payload={"bulk_source": "sec_13f", "ingestion_job_id": ij.id})
 
-    # A monthly loader that only has a loaded release 10 days ago: fine.
-    rel = _schedule(pgdb, name="form d", source="bulk:sec_form_d", cron="0 8 8 * *")
-    from sqlalchemy import text
-    pgdb.execute(text(
-        "INSERT INTO raw.source_release (source, release_key, url, status, loaded_at) "
-        "VALUES ('sec_form_d', '2026Q3', 'u', 'loaded', :t)"), {"t": NOW - timedelta(days=10)})
-    pgdb.commit()
+    # A mart schedule whose IngestionJob is never written back (pe_marts
+    # executor), but whose linked queue row succeeded yesterday: not stalled.
+    marts_ok = _schedule(pgdb, name="marts ok", source="job:entity_resolve", cron="0 6 * * *")
+    mj = _ingestion_job(pgdb, "job:entity_resolve", "pending", NOW - timedelta(days=1), marts_ok.id)
+    _queue(pgdb, "entity_resolve", "success", NOW - timedelta(days=1),
+           completed_at=NOW - timedelta(hours=20), job_table_id=mj.id,
+           payload={"ingestion_job_id": mj.id})
 
     # A mart schedule that has never succeeded and is older than its threshold.
     never = _schedule(pgdb, name="marts", source="job:pe_mart_build", cron="0 6 10 * *")
@@ -340,7 +340,47 @@ def test_stalled_schedule_uses_success_only(pgdb):
     assert set(findings) == {f"schedule:stalled:{daily.id}", f"schedule:stalled:{never.id}"}
     assert findings[f"schedule:stalled:{never.id}"].details["last_success_at"] is None
     assert findings[f"schedule:stalled:{daily.id}"].severity == "critical"
-    assert rel.id and bulk.id
+    assert bulk.id
+
+
+@pg
+def test_stall_is_per_schedule_not_per_source(pgdb):
+    """T5b (review fix): other schedules, manual runs, loaded releases and
+    colliding job_table_ids of other domain tables do not mask a stalled schedule."""
+    from sqlalchemy import text
+
+    from app.services.data_watchdog import evaluate
+
+    broken = _schedule(pgdb, name="fred GDP", source="fred", cron="0 6 * * *")
+    healthy = _schedule(pgdb, name="fred CPI", source="fred", cron="0 7 * * *")
+    failed = _ingestion_job(pgdb, "fred", "failed", NOW - timedelta(days=30), broken.id)
+    _ingestion_job(pgdb, "fred", "failed", NOW - timedelta(hours=2), broken.id)
+    # The other fred schedule and a manual fred run both succeed.
+    _ingestion_job(pgdb, "fred", "success", NOW - timedelta(hours=3), healthy.id)
+    _ingestion_job(pgdb, "fred", "success", NOW - timedelta(hours=1), None)
+    # LP / people queue rows whose job_table_id (their own tables' ids) collides
+    # with the broken schedule's IngestionJob id, and they succeeded yesterday.
+    _queue(pgdb, "lp", "success", NOW - timedelta(days=1),
+           completed_at=NOW - timedelta(days=1), job_table_id=failed.id, payload={})
+    _queue(pgdb, "people", "success", NOW - timedelta(days=1),
+           completed_at=NOW - timedelta(days=1), job_table_id=failed.id,
+           payload={"company_id": 3})
+
+    # A bulk schedule whose own runs fail while a manual load succeeded.
+    bulk = _schedule(pgdb, name="form d", source="bulk:sec_form_d", cron="0 8 * * *")
+    bj = _ingestion_job(pgdb, "bulk:sec_form_d", "failed", NOW - timedelta(days=4), bulk.id)
+    _queue(pgdb, "bulk_ingest", "failed", NOW - timedelta(days=4),
+           completed_at=NOW - timedelta(days=4), job_table_id=bj.id,
+           payload={"bulk_source": "sec_form_d", "ingestion_job_id": bj.id})
+    _queue(pgdb, "bulk_ingest", "success", NOW - timedelta(hours=5),
+           completed_at=NOW - timedelta(hours=5), payload={"bulk_source": "sec_form_d"})
+    pgdb.execute(text(
+        "INSERT INTO raw.source_release (source, release_key, url, status, loaded_at) "
+        "VALUES ('sec_form_d', '2026Q3', 'u', 'loaded', :t)"), {"t": NOW - timedelta(hours=5)})
+    pgdb.commit()
+
+    keys = {f.key for f in evaluate(pgdb, NOW) if f.rule == "stalled_schedule"}
+    assert keys == {f"schedule:stalled:{broken.id}", f"schedule:stalled:{bulk.id}"}
 
 
 @pg
@@ -479,9 +519,14 @@ def test_dedupe_remind_and_resolve(pgdb, monkeypatch):
     assert third["reminded"] == ["worker:none_alive"]
     assert len(rec.posts()) == 2
 
-    # The job is picked up: resolved notice, row kept as resolved.
+    # A worker comes back and picks the job up: resolved notice, row kept.
+    from sqlalchemy import text
+
     from app.core.models_queue import JobQueue
     pgdb.query(JobQueue).update({"status": "success"})
+    pgdb.execute(text(
+        "INSERT INTO worker_heartbeats (worker_id, started_at, last_seen_at) VALUES ('w1', :t, :t)"),
+        {"t": NOW + timedelta(hours=24, minutes=58)})
     pgdb.commit()
     fourth = run(NOW + timedelta(hours=25))
     assert fourth["resolved"] == ["worker:none_alive"]
@@ -594,11 +639,17 @@ def test_run_pings_heartbeat_and_status_lists_open(pgdb, monkeypatch):
     monkeypatch.setenv("HEARTBEAT_PING_URL", "https://hc-ping.example/uuid")
     rec = Recorder()
     _queue(pgdb, "bulk_ingest", "pending", NOW - timedelta(hours=1))
-    result = asyncio.run(run_watchdog(pgdb, now=NOW, transport=rec.transport))
+    result = asyncio.run(run_watchdog(pgdb, now=NOW, transport=rec.transport, ping=True))
     assert result["pinged"] is True
     assert [r.method for r in rec.requests] == ["GET"]   # no webhook configured
     keys = [a["key"] for a in open_alerts(pgdb)]
     assert keys == ["worker:none_alive"]
+
+    # A manual run (POST /watchdog/run) never feeds the dead-man's switch:
+    # only the scheduled path proves the scheduler is alive.
+    manual = asyncio.run(run_watchdog(pgdb, now=NOW + timedelta(minutes=5), transport=rec.transport))
+    assert manual["pinged"] is False
+    assert [r.method for r in rec.requests] == ["GET"]
 
 
 @pg
@@ -614,6 +665,305 @@ def test_broken_rule_does_not_hide_others(pgdb, monkeypatch):
     keys = _keys(wd.evaluate(pgdb, NOW))
     assert "watchdog:rule_error:broken" in keys
     assert "worker:none_alive" in keys
+
+
+# ---------------------------------------------------------------------------
+# review fixes: alert state machine
+# ---------------------------------------------------------------------------
+
+def _stub_rule(monkeypatch, name, state):
+    """Replace RULES with one rule whose output is driven by ``state``."""
+    import app.services.data_watchdog as wd
+
+    def rule(db, now):
+        if state.get("raise"):
+            raise RuntimeError("statement timeout")
+        if not state.get("on"):
+            return []
+        return [wd.Finding(key=state.get("key", f"{name}:x"), rule=name,
+                           severity=state.get("severity", "warning"),
+                           message=state.get("message", f"{name} is broken"))]
+
+    monkeypatch.setattr(wd, "RULES", [(name, rule)])
+
+
+@pg
+def test_crashing_rule_does_not_resolve_its_open_alerts(pgdb, monkeypatch):
+    """T16: a rule that errors keeps its open alerts open; no false RESOLVED."""
+    from app.core.models_watchdog import WatchdogAlert
+    from app.services.data_watchdog import run_watchdog
+
+    monkeypatch.setenv("ALERT_WEBHOOK_URL", "https://hooks.example/abc")
+    rec = Recorder()
+    state = {"on": True, "key": "schedule:stalled:9", "severity": "critical"}
+    _stub_rule(monkeypatch, "stalled_schedule", state)
+
+    assert asyncio.run(run_watchdog(pgdb, now=NOW, transport=rec.transport))["opened"] == \
+        ["schedule:stalled:9"]
+
+    state["raise"] = True
+    for minutes in (15, 60, 120):
+        r = asyncio.run(run_watchdog(pgdb, now=NOW + timedelta(minutes=minutes),
+                                     transport=rec.transport))
+        assert r["resolved"] == []
+        assert pgdb.get(WatchdogAlert, "schedule:stalled:9").status == "open"
+    assert not any("RESOLVED" in p["text"] and "schedule:stalled:9" in p["text"]
+                   for p in rec.posts())
+    assert pgdb.get(WatchdogAlert, "watchdog:rule_error:stalled_schedule").status == "open"
+
+    # Rule works again and the schedule is still stalled: not re-opened, not re-sent.
+    state["raise"] = False
+    before = len(rec.posts())
+    r = asyncio.run(run_watchdog(pgdb, now=NOW + timedelta(minutes=135), transport=rec.transport))
+    assert "schedule:stalled:9" not in r["opened"]
+    assert all("schedule:stalled:9" not in p["text"] for p in rec.posts()[before:])
+
+
+@pg
+def test_resolve_needs_grace_and_warning_flaps_are_rate_limited(pgdb, monkeypatch):
+    """T17: one clean run does not resolve; a warning that re-opens within 24h
+    of its last notice is re-opened quietly (at most one notice per 24h)."""
+    from app.services.data_watchdog import run_watchdog
+
+    monkeypatch.setenv("ALERT_WEBHOOK_URL", "https://hooks.example/abc")
+    rec = Recorder()
+    state = {"on": True, "key": "queue:failure_spike"}
+    _stub_rule(monkeypatch, "failure_spike", state)
+
+    def run(minutes):
+        return asyncio.run(run_watchdog(pgdb, now=NOW + timedelta(minutes=minutes),
+                                        transport=rec.transport))
+
+    assert run(0)["opened"] == ["queue:failure_spike"]
+    state["on"] = False
+    assert run(15)["resolved"] == []          # one clean run is not enough
+    state["on"] = True
+    assert run(30)["opened"] == []            # still the same episode
+    state["on"] = False
+    run(45)
+    assert run(75)["resolved"] == ["queue:failure_spike"]
+    posts = len(rec.posts())
+    assert posts == 2                         # OPENED + RESOLVED
+
+    # Flaps back within 24h of the last notice: re-opened quietly...
+    state["on"] = True
+    r = run(120)
+    assert r["opened"] == [] and len(rec.posts()) == posts
+    # ...and its quiet episode resolves quietly too.
+    state["on"] = False
+    run(135)
+    assert run(165)["resolved"] == [] and len(rec.posts()) == posts
+
+    # Still flapping a day after the last notice: it is said again.
+    state["on"] = True
+    assert run(24 * 60 + 5)["opened"] == ["queue:failure_spike"]
+    assert len(rec.posts()) == posts + 1
+
+
+@pg
+def test_critical_reopen_is_not_quieted(pgdb, monkeypatch):
+    from app.services.data_watchdog import run_watchdog
+
+    monkeypatch.setenv("ALERT_WEBHOOK_URL", "https://hooks.example/abc")
+    rec = Recorder()
+    state = {"on": True, "key": "schedule:stalled:3", "severity": "critical"}
+    _stub_rule(monkeypatch, "stalled_schedule", state)
+
+    def run(minutes):
+        return asyncio.run(run_watchdog(pgdb, now=NOW + timedelta(minutes=minutes),
+                                        transport=rec.transport))
+
+    run(0)
+    state["on"] = False
+    run(15)
+    assert run(45)["resolved"] == ["schedule:stalled:3"]
+    state["on"] = True
+    assert run(60)["opened"] == ["schedule:stalled:3"]
+
+
+@pg
+def test_escalation_and_resolve_survive_webhook_outage(pgdb, monkeypatch):
+    """T18: an escalation or resolve that could not be delivered is retried."""
+    from app.core.models_watchdog import WatchdogAlert
+    from app.services.data_watchdog import run_watchdog
+
+    monkeypatch.setenv("ALERT_WEBHOOK_URL", "https://hooks.example/abc")
+    up, down = Recorder(), Recorder(status=500)
+    state = {"on": True, "key": "sla:fred", "severity": "warning"}
+    _stub_rule(monkeypatch, "sla", state)
+
+    def run(minutes, rec):
+        return asyncio.run(run_watchdog(pgdb, now=NOW + timedelta(minutes=minutes),
+                                        transport=rec.transport))
+
+    run(0, up)
+    state["severity"] = "critical"
+    assert run(15, down)["escalated"] == ["sla:fred"]
+    assert pgdb.get(WatchdogAlert, "sla:fred").severity == "warning"   # not yet said
+    assert run(30, up)["escalated"] == ["sla:fred"]
+    assert "escalated" in up.posts()[-1]["text"]
+    assert run(45, up)["escalated"] == []
+
+    state["on"] = False
+    run(60, up)
+    assert run(90, down)["resolved"] == ["sla:fred"]
+    assert pgdb.get(WatchdogAlert, "sla:fred").status == "open"        # not yet said
+    assert run(105, up)["resolved"] == ["sla:fred"]
+    assert "RESOLVED" in up.posts()[-1]["text"]
+    assert pgdb.get(WatchdogAlert, "sla:fred").status == "resolved"
+
+
+@pg
+def test_subscriber_fanout_once_per_episode_even_when_slack_is_down(pgdb, monkeypatch):
+    """T19: ALERT_DATA_STALENESS subscribers hear about an episode once."""
+    import app.services.data_watchdog as wd
+
+    calls = []
+
+    async def fanout(f):
+        calls.append(f.key)
+
+    monkeypatch.setattr(wd, "_fanout_to_subscribers", fanout)
+    monkeypatch.setenv("ALERT_WEBHOOK_URL", "https://hooks.example/abc")
+    down = Recorder(status=500)
+    state = {"on": True, "key": "schedule:stalled:4", "severity": "critical"}
+    _stub_rule(monkeypatch, "stalled_schedule", state)
+
+    for minutes in (0, 15, 30, 45):
+        r = asyncio.run(wd.run_watchdog(pgdb, now=NOW + timedelta(minutes=minutes),
+                                        transport=down.transport))
+        assert r["delivered"] is False
+    assert calls == ["schedule:stalled:4"]
+
+
+@pg
+def test_alerts_logged_before_webhook_is_set_are_sent_once_it_is(pgdb, monkeypatch):
+    """T20: an alert only logged (no URL) goes to Slack once the URL is configured."""
+    from app.core.models_watchdog import WatchdogAlert
+    from app.services.data_watchdog import run_watchdog
+
+    rec = Recorder()
+    state = {"on": True, "key": "schedule:stalled:5", "severity": "critical"}
+    _stub_rule(monkeypatch, "stalled_schedule", state)
+
+    r = asyncio.run(run_watchdog(pgdb, now=NOW, transport=rec.transport))
+    assert r["opened"] == ["schedule:stalled:5"] and rec.requests == []
+    assert pgdb.get(WatchdogAlert, "schedule:stalled:5").notified_via == "log"
+    r = asyncio.run(run_watchdog(pgdb, now=NOW + timedelta(minutes=15), transport=rec.transport))
+    assert r["opened"] == []                  # no log spam every 15 minutes
+
+    monkeypatch.setenv("ALERT_WEBHOOK_URL", "https://hooks.example/abc")
+    r = asyncio.run(run_watchdog(pgdb, now=NOW + timedelta(minutes=30), transport=rec.transport))
+    assert r["opened"] == ["schedule:stalled:5"]
+    assert len(rec.posts()) == 1 and "schedule:stalled:5" in rec.posts()[0]["text"]
+    assert pgdb.get(WatchdogAlert, "schedule:stalled:5").notified_via == "webhook"
+    asyncio.run(run_watchdog(pgdb, now=NOW + timedelta(minutes=45), transport=rec.transport))
+    assert len(rec.posts()) == 1
+
+
+@pg
+def test_worker_alert_stays_open_after_pending_jobs_are_auto_cancelled(pgdb, monkeypatch):
+    """T21: auto-cancelling stale pending jobs is not a worker recovery."""
+    from sqlalchemy import text
+
+    from app.core.models_queue import JobQueue
+    from app.services.data_watchdog import evaluate, run_watchdog
+
+    monkeypatch.setenv("WATCHDOG_FAILURE_SPIKE", "2")
+    for _ in range(3):
+        _queue(pgdb, "bulk_ingest", "pending", NOW - timedelta(hours=3))
+    assert "worker:none_alive" in asyncio.run(run_watchdog(pgdb, now=NOW))["opened"]
+
+    # cancel_stale_pending_jobs: pending -> failed with no_worker_available
+    pgdb.query(JobQueue).update({
+        "status": "failed", "completed_at": NOW + timedelta(minutes=10),
+        "error_message": "no_worker_available: job pending too long with no worker"})
+    pgdb.commit()
+    for minutes in (15, 30, 60):
+        r = asyncio.run(run_watchdog(pgdb, now=NOW + timedelta(minutes=minutes)))
+        assert r["resolved"] == []
+    keys = _keys(evaluate(pgdb, NOW + timedelta(minutes=60)))
+    assert "worker:none_alive" in keys
+    assert "queue:failure_spike" not in keys   # the auto-cancel is not a failure spike
+
+    # A worker comes back: now it resolves.
+    pgdb.execute(text(
+        "INSERT INTO worker_heartbeats (worker_id, started_at, last_seen_at) VALUES ('w1', :t, :t)"),
+        {"t": NOW + timedelta(minutes=70)})
+    pgdb.commit()
+    asyncio.run(run_watchdog(pgdb, now=NOW + timedelta(minutes=75)))
+    r = asyncio.run(run_watchdog(pgdb, now=NOW + timedelta(minutes=75)))
+    pgdb.execute(text("UPDATE worker_heartbeats SET last_seen_at = :t"),
+                 {"t": NOW + timedelta(minutes=110)})
+    pgdb.commit()
+    r = asyncio.run(run_watchdog(pgdb, now=NOW + timedelta(minutes=115)))
+    assert r["resolved"] == ["worker:none_alive"]
+
+
+@pg
+def test_watchdog_endpoints(pgdb, monkeypatch):
+    """T22: /status hides raw error text; POST /run does not ping the heartbeat."""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from sqlalchemy import text
+
+    import app.services.data_watchdog as wd
+    from app.api.v1 import watchdog
+    from app.core.database import get_db
+
+    pings = []
+
+    async def ping(transport=None):
+        pings.append(1)
+        return True
+
+    monkeypatch.setattr(wd, "ping_heartbeat", ping)
+    pgdb.execute(text(
+        "INSERT INTO raw.source_release (source, release_key, url, status, error, updated_at) "
+        "VALUES ('sec_13f', '2026Q3', 'u', 'failed', 'password=hunter2 at 10.0.0.5', :t)"),
+        {"t": datetime.utcnow() - timedelta(hours=1)})
+    pgdb.commit()
+
+    app = FastAPI()
+    app.include_router(watchdog.router, prefix="/api/v1")
+    app.dependency_overrides[get_db] = lambda: pgdb
+    client = TestClient(app)
+
+    r = client.post("/api/v1/watchdog/run")
+    assert r.status_code == 200 and r.json()["pinged"] is False
+    assert pings == []
+    status = client.get("/api/v1/watchdog/status")
+    assert status.status_code == 200
+    assert "release:failed:sec_13f" in [a["key"] for a in status.json()["open_alerts"]]
+    assert "hunter2" not in status.text and "10.0.0.5" not in status.text
+
+
+@pg
+def test_job_schedules_count_linked_queue_success_everywhere(pgdb):
+    """T23: job:<type> sources whose worker never writes the IngestionJob back
+    are not 'never succeeded' in check_alerts or the freshness dashboard."""
+    from app.api.v1.freshness import get_freshness_dashboard
+    from app.core.monitoring import JobMonitor
+
+    now = datetime.utcnow()
+    sched = _schedule(pgdb, name="marts", source="job:pe_mart_build", cron="0 6 * * *")
+    ij = _ingestion_job(pgdb, "job:pe_mart_build", "pending", now - timedelta(hours=3), sched.id)
+    _queue(pgdb, "pe_mart_build", "success", now - timedelta(hours=3),
+           completed_at=now - timedelta(hours=2), job_table_id=ij.id,
+           payload={"ingestion_job_id": ij.id})
+    # Colliding id of an LP job does not make 'fred' look successful.
+    fj = _ingestion_job(pgdb, "fred", "failed", now - timedelta(hours=3))
+    _queue(pgdb, "lp", "success", now - timedelta(hours=1), completed_at=now - timedelta(hours=1),
+           job_table_id=fj.id, payload={})
+
+    alerts = {a["source"]: a for a in JobMonitor(pgdb).check_alerts()
+              if a["alert_type"] == "data_staleness"}
+    assert "job:pe_mart_build" not in alerts
+    assert alerts["fred"]["severity"] == "critical"
+
+    by = {s["source"]: s for s in get_freshness_dashboard(db=pgdb)["sources"]}
+    assert by["job:pe_mart_build"]["freshness"] == "fresh"
+    assert by["fred"]["freshness"] == "never_succeeded"
 
 
 @pytest.mark.unit
@@ -674,29 +1024,28 @@ def test_freshness_unknown_and_never_run():
     def query(*args):
         calls[0] += 1
         q = MagicMock()
-        if calls[0] == 1:   # last success per source
-            q.filter.return_value.group_by.return_value.all.return_value = [
-                SimpleNamespace(source="adhoc", last_success=now - timedelta(hours=500)),
-                SimpleNamespace(source="fred", last_success=now - timedelta(hours=2)),
-            ]
-        elif calls[0] == 2:  # active schedules
+        if calls[0] == 1:  # active schedules
             q.filter.return_value.all.return_value = [
                 SimpleNamespace(source="fred", frequency=ScheduleFrequency.DAILY, cron_expression=None),
                 SimpleNamespace(source="bulk:sec_13f", frequency=ScheduleFrequency.CUSTOM,
                                 cron_expression="30 9 9 * *"),
             ]
-        elif calls[0] == 3:  # SLAs
+        elif calls[0] == 2:  # SLAs
             q.all.return_value = []
-        elif calls[0] == 4:  # every source that ever had a job
+        elif calls[0] == 3:  # every source that ever had a job
             q.distinct.return_value.all.return_value = [
                 SimpleNamespace(source="adhoc"), SimpleNamespace(source="fred"),
                 SimpleNamespace(source="bls"),
             ]
         return q
 
+    from unittest.mock import patch
+
     db = MagicMock()
     db.query.side_effect = query
-    result = get_freshness_dashboard(db=db)
+    last_success = {"adhoc": now - timedelta(hours=500), "fred": now - timedelta(hours=2)}
+    with patch("app.services.data_watchdog.last_success_by_source", return_value=last_success):
+        result = get_freshness_dashboard(db=db)
     by = {s["source"]: s for s in result["sources"]}
 
     assert by["adhoc"]["freshness"] == "unknown"

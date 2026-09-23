@@ -276,15 +276,22 @@ class JobMonitor:
         fresh. Never succeeded => critical; older than 1.5x its scheduled
         cadence => critical; otherwise older than 24h => info.
         """
-        from app.services.data_watchdog import STALL_FACTOR, schedule_cadence_hours
+        from app.services.data_watchdog import (
+            STALL_FACTOR,
+            last_success_by_source,
+            schedule_cadence_hours,
+        )
 
         now = datetime.utcnow()
-        rows = self.db.execute(text(
-            "SELECT source, "
-            "MAX(completed_at) FILTER (WHERE LOWER(status) = 'success') AS last_success_at, "
-            "MAX(created_at) AS last_job_at "
-            "FROM ingestion_jobs GROUP BY source"
-        )).fetchall()
+        # Success also counts linked job_queue rows, for workers that do not
+        # write the IngestionJob back (job:pe_mart_build) -- same as the watchdog.
+        last_success = last_success_by_source(self.db)
+        rows = [
+            (source, last_success.get(source), last_job_at)
+            for source, last_job_at in self.db.execute(text(
+                "SELECT source, MAX(created_at) AS last_job_at FROM ingestion_jobs GROUP BY source"
+            )).fetchall()
+        ]
 
         # Tightest active schedule per source, for the cadence threshold
         cadence: Dict[str, float] = {}

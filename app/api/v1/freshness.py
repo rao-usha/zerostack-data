@@ -8,14 +8,12 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.models import (
     IngestionJob,
     IngestionSchedule,
-    JobStatus,
     ScheduleFrequency,
     SourceFreshnessSLA,
 )
@@ -52,21 +50,18 @@ def get_freshness_dashboard(db: Session = Depends(get_db)):
       or ``unknown`` when there is no SLA and no schedule to judge against
       (SPEC_128: that used to be reported as ``fresh``).
     """
-    from app.services.data_watchdog import STALL_FACTOR, cron_cadence_hours
+    from app.services.data_watchdog import (
+        STALL_FACTOR,
+        cron_cadence_hours,
+        last_success_by_source,
+    )
 
     now = datetime.utcnow()
 
-    # 1. Last successful job per source (case-insensitive status match
-    #    because some jobs were written with uppercase status values)
-    last_success_subq = (
-        db.query(
-            IngestionJob.source,
-            func.max(IngestionJob.completed_at).label("last_success"),
-        )
-        .filter(func.lower(IngestionJob.status) == "success")
-        .group_by(IngestionJob.source)
-        .all()
-    )
+    # 1. Last successful run per source: successful ingestion_jobs (any status
+    #    case) plus linked job_queue successes for workers that do not write
+    #    the IngestionJob back -- the same evidence the watchdog uses.
+    last_success_map: dict[str, Optional[datetime]] = last_success_by_source(db)
 
     # 2. Expected cadence from active schedules (take the tightest per source)
     schedule_rows = (
@@ -99,9 +94,6 @@ def get_freshness_dashboard(db: Session = Depends(get_db)):
     # 4. Every source that ever had a job, so never-succeeded ones are listed
     attempted = {r.source for r in db.query(IngestionJob.source).distinct().all()}
 
-    last_success_map: dict[str, Optional[datetime]] = {
-        row.source: row.last_success for row in last_success_subq if row.last_success is not None
-    }
     all_sources = set(last_success_map) | set(cadence_map) | set(sla_map) | attempted
 
     # 5. Build per-source entries

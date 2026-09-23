@@ -9,8 +9,12 @@ Covers:
 """
 
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from datetime import datetime, timedelta
+
+# Last-success evidence comes from the shared helper (SPEC_128 review fix),
+# so the dashboard's db.query sequence is: schedules, SLAs, attempted sources.
+LAST_SUCCESS = "app.services.data_watchdog.last_success_by_source"
 
 from app.core.models import SourceFreshnessSLA
 
@@ -55,18 +59,12 @@ class TestFreshnessDashboardWithSLA:
             mock_q = MagicMock()
 
             if call_count[0] == 1:
-                # Last success query
-                row = MagicMock()
-                row.source = "fred"
-                row.last_success = last_success
-                mock_q.filter.return_value.group_by.return_value.all.return_value = [row]
-            elif call_count[0] == 2:
                 # Schedule query: fred is DAILY (grace = 36h, so 30h would be fresh)
                 row = MagicMock()
                 row.source = "fred"
                 row.frequency = ScheduleFrequency.DAILY
                 mock_q.filter.return_value.all.return_value = [row]
-            elif call_count[0] == 3:
+            elif call_count[0] == 2:
                 # SLA query: fred has 24h SLA (so 30h is STALE)
                 sla = MagicMock(spec=SourceFreshnessSLA)
                 sla.source = "fred"
@@ -76,7 +74,8 @@ class TestFreshnessDashboardWithSLA:
 
         db.query.side_effect = side_effect_query
 
-        result = get_freshness_dashboard(db=db)
+        with patch(LAST_SUCCESS, return_value={"fred": last_success}):
+            result = get_freshness_dashboard(db=db)
 
         assert result["total_sources"] == 1
         fred_entry = result["sources"][0]
@@ -105,21 +104,17 @@ class TestFreshnessDashboardWithSLA:
             if call_count[0] == 1:
                 row = MagicMock()
                 row.source = "fred"
-                row.last_success = last_success
-                mock_q.filter.return_value.group_by.return_value.all.return_value = [row]
-            elif call_count[0] == 2:
-                row = MagicMock()
-                row.source = "fred"
                 row.frequency = ScheduleFrequency.DAILY
                 mock_q.filter.return_value.all.return_value = [row]
-            elif call_count[0] == 3:
+            elif call_count[0] == 2:
                 # No SLAs
                 mock_q.all.return_value = []
             return mock_q
 
         db.query.side_effect = side_effect_query
 
-        result = get_freshness_dashboard(db=db)
+        with patch(LAST_SUCCESS, return_value={"fred": last_success}):
+            result = get_freshness_dashboard(db=db)
 
         fred_entry = result["sources"][0]
         assert fred_entry["expected_cadence_hours"] == 36  # DAILY grace
