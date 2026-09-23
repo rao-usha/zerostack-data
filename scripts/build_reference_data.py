@@ -8,7 +8,7 @@ Outputs:
 
 Run inside the API container (has pandas, openpyxl, httpx):
 
-    docker exec -e PGPASSWORD=Nex2026 nexdata-api-1 python /app/scripts/build_reference_data.py
+    docker exec -e PGPASSWORD="$DB_PASSWORD" nexdata-api-1 python /app/scripts/build_reference_data.py
 """
 
 from __future__ import annotations
@@ -301,7 +301,9 @@ def fetch_sec_sics() -> list[str]:
         lines = Path(sic_file).read_text(encoding="utf-8").splitlines()
         return [ln.strip() for ln in lines if ln.strip()]
     import sqlalchemy as sa
-    pw = os.environ.get("PGPASSWORD", "Nex2026")
+    pw = os.environ.get("PGPASSWORD")
+    if not pw:
+        raise SystemExit("PGPASSWORD is required to query the cloud DB (or set SEC_SIC_FILE)")
     host = os.environ.get("PGHOST", "host.docker.internal")
     port = os.environ.get("PGPORT", "5435")
     url = f"postgresql+psycopg2://nexdata:{pw}@{host}:{port}/nexdata"

@@ -1,0 +1,83 @@
+# gitleaks configuration (SPEC_129).
+#
+# CI runs `gitleaks git` over ONLY the commits a push or PR adds (see
+# .github/workflows/ci.yml, job `secrets`). The job is blocking: any new
+# secret fails the build.
+#
+# This file extends the default rule set. It allowlists two things, and
+# nothing else:
+#
+# 1. Commits already in published history that are KNOWN leaks. Scanning a
+#    range never reaches them today, but a rebase/force-push that re-scans
+#    history would, and failing forever on a secret that is already public
+#    helps no one. Listing a commit here is NOT remediation: as of SPEC_129
+#    these credentials are PENDING ROTATION (PLAN_086 Ops), not rotated.
+#    Allowlisting a commit only stops it being re-reported; the same secret in
+#    a new commit still fails. (The scripts/ copies of the Cloud SQL password
+#    were removed at HEAD in the SPEC_129 review fixes.)
+#
+#      a1483fc  .env.cloud / .env.test / docker-compose.yml: Cloud SQL
+#               `nexdata` password            -> rotate (PLAN_086 Ops)
+#      0360e3c  .kaggle/kaggle.json: Kaggle API key
+#                                             -> rotate in the Kaggle web UI (user)
+#      cda25ea  docs/LAUNCH_READINESS.md: credential-bearing DATABASE_URL
+#                                             -> same Cloud SQL password
+#      b893c2b, be1bb97, 6c43119, 0829878  scripts/*: same Cloud SQL password
+#               as a DATABASE_URL / PGPASSWORD default -> same rotation
+#
+# 2. Local-development placeholder credentials that are not secrets (the
+#    docker-compose Postgres default and doc/test examples).
+
+title = "nexdata gitleaks config"
+
+[extend]
+useDefault = true
+
+# The default rule set does NOT catch either of this repo's real leak shapes
+# (verified with gitleaks 8.21.2 over full history: neither a1483fc nor
+# 0360e3c is reported by the defaults). These two rules cover them.
+
+[[rules]]
+id = "db-url-password"
+description = "Password inside a database connection URL"
+regex = '''(?i)\b(?:postgres(?:ql)?(?:\+[a-z0-9]+)?|mysql(?:\+[a-z0-9]+)?|mongodb(?:\+srv)?|redis|amqp)://[^:/@\s'"]+:([^@\s'"]{4,})@'''
+secretGroup = 1
+keywords = ["postgres", "mysql", "mongodb", "redis", "amqp"]
+
+  [rules.allowlist]
+  # env/f-string interpolation and local-dev/test placeholders are not secrets
+  regexTarget = "secret"
+  regexes = [
+    '''^\$''',
+    '''^\{[^}]*\}$''',
+    '''^<[^>]*>$''',
+    '''^\*+$''',
+    '''^(?:password|pass|test|postgres|secret|changeme|nobody|nexdata|nexdata_dev_password|nexdata_password)$''',
+  ]
+
+[[rules]]
+id = "kaggle-api-key"
+description = "Kaggle API key (kaggle.json)"
+regex = '''"key"\s*:\s*"([a-f0-9]{32})"'''
+secretGroup = 1
+keywords = ['"key"']
+
+[allowlist]
+description = "Known historical leaks (pending rotation) and local-dev placeholders"
+commits = [
+  "a1483fc9913c6a051cd6de1e717f94e181d8a6f7",
+  "0360e3c7344930803f9556a9d1daef1c236a7fff",
+  "cda25ea14b7a4852027753e48d4521d305ba656a",
+  # the same Cloud SQL password as a script default (removed at HEAD by SPEC_129)
+  "b893c2b8f01d6ae658dea8b1759b578be804af4f",
+  "be1bb97df2cc67d64a0772a76cbc46bec3ccea95",
+  "6c43119b87627482c4269b94d5d4ac02dbd71073",
+  "0829878522540610584d17ce317ef85fe953186b",
+]
+# Match the regexes against the whole finding, not just the extracted secret:
+# the URL-shaped placeholder pattern below needs the `user:pass@` context.
+regexTarget = "match"
+regexes = [
+  '''nexdata_dev_password''',
+  '''://(user|test|postgres|nexdata_user):(password|pass|test|postgres|nexdata_password)@''',
+]

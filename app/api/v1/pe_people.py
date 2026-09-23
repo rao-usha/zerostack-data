@@ -466,7 +466,7 @@ async def get_person_deals(person_id: int, db: Session = Depends(get_db)):
                         "announced": row[6].isoformat() if row[6] else None,
                         "closed": row[7].isoformat() if row[7] else None,
                     },
-                    "enterprise_value_usd": float(row[8]) if row[8] else None,
+                    "enterprise_value_usd": float(row[8]) if row[8] is not None else None,
                     "involvement": {"role": row[9], "side": row[10], "firm": row[11]},
                 }
             )

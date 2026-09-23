@@ -14,13 +14,19 @@ merge keeps the LAST row per key within a batch.
 
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import io
+import logging
+import os
 from typing import Iterable, Iterator, List, Optional, Sequence, Tuple
 
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 from app.core.safe_sql import qi
+
+logger = logging.getLogger(__name__)
 
 STAGING_SCHEMA = "stg"
 _ALLOWED_TYPE_CHARS = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 (),_[]")
@@ -188,7 +194,139 @@ def staging_count(conn: Connection, name: str) -> int:
     return conn.execute(text(f"SELECT COUNT(*) FROM {_stg(name)}")).scalar() or 0
 
 
+# ---------------------------------------------------------------------------
+# Publish guard (SPEC_129)
+# ---------------------------------------------------------------------------
+
+PUBLISH_GUARD_OVERRIDE_ENV = "BULK_PUBLISH_GUARD_OVERRIDE"
+DEFAULT_MAX_DROP = 0.5
+
+
+class PublishGuardError(RuntimeError):
+    """A destructive replace would publish an empty or much smaller table."""
+
+
+# Per-job override: a job payload's ``publish_guard_override``, set by the
+# worker executors around one run. contextvars are copied into
+# asyncio.to_thread, so the value reaches that job's loader thread and no
+# other job running on the same worker.
+_job_override: contextvars.ContextVar[Tuple[str, ...]] = contextvars.ContextVar(
+    "publish_guard_override", default=()
+)
+_ALL = ("1", "true", "yes", "all", "*")
+
+
+def _normalize_override(value) -> Tuple[str, ...]:
+    if value is None or value is False:
+        return ()
+    if value is True:
+        return ("*",)
+    if isinstance(value, str):
+        value = value.split(",")
+    return tuple(str(v).strip().lower() for v in value if str(v).strip())
+
+
+@contextlib.contextmanager
+def publish_guard_override(value):
+    """Accept guard trips for the named tables (or ``True``/``"all"``) inside the block.
+
+    The bulk_ingest and pe_mart_build executors wrap one job in this with the
+    payload's ``publish_guard_override``, so an operator can accept one
+    legitimately smaller release by re-queuing a job, without changing any
+    container's environment.
+    """
+    token = _job_override.set(_normalize_override(value))
+    try:
+        yield
+    finally:
+        _job_override.reset(token)
+
+
+def _matches(wanted: Sequence[str], target: str) -> bool:
+    if any(w in _ALL for w in wanted):
+        return True
+    short = target.lower().split(".")[-1]
+    return short in wanted or target.lower() in wanted
+
+
+def _guard_overridden(target: str) -> bool:
+    job = _job_override.get()
+    if job and _matches(job, target):
+        return True
+    env = _normalize_override(os.environ.get(PUBLISH_GUARD_OVERRIDE_ENV, ""))
+    return bool(env) and _matches(env, target)
+
+
+def check_publish(
+    target: str,
+    new_rows: int,
+    current_rows: int,
+    max_drop: float = DEFAULT_MAX_DROP,
+    override: Optional[bool] = None,
+    allow_empty: bool = False,
+) -> None:
+    """Refuse to publish a replacement that is empty or shrinks ``target`` too far.
+
+    Call this BEFORE deleting published rows (a prune, or a delete of rows the
+    new batch no longer carries), inside the same transaction, so raising rolls
+    the whole load back and the bulk runner marks the release ``failed``.
+
+    - ``new_rows``: rows that will be published once the replace completes.
+    - ``current_rows``: rows published right now (before this load).
+    - Raises when ``new_rows == 0``, or when ``current_rows > 0`` and
+      ``new_rows < current_rows * (1 - max_drop)``.
+
+    - ``allow_empty``: an empty replacement of an EMPTY target is a no-op
+      rather than an error. Use it for derived marts whose sources can
+      legitimately be empty (a fresh database before the first Schedule D
+      load): a delete on an empty target destroys nothing. Raw loads such as
+      13F holdings keep the default, because an empty release is never real.
+
+    ``override`` defaults to the job payload's ``publish_guard_override`` (see
+    :func:`publish_guard_override`), then env ``BULK_PUBLISH_GUARD_OVERRIDE``:
+    ``1``/``all`` for every target, or a comma list of table names
+    (``sec_13f_holdings``). It is an operator decision, never a code default.
+    """
+    if override is None:
+        override = _guard_overridden(target)
+    new_rows, current_rows = int(new_rows or 0), int(current_rows or 0)
+    if allow_empty and new_rows == 0 and current_rows == 0:
+        return
+    problem = None
+    if new_rows == 0:
+        problem = f"replacement for {target} has 0 rows (currently {current_rows})"
+    elif current_rows > 0 and new_rows < current_rows * (1 - max_drop):
+        drop = 1 - new_rows / current_rows
+        problem = (
+            f"replacement for {target} would drop from {current_rows} to {new_rows} rows "
+            f"({drop:.0%} > {max_drop:.0%} tolerance)"
+        )
+    if problem is None:
+        return
+    if override:
+        logger.warning(f"[publish-guard] OVERRIDDEN: {problem}")
+        return
+    raise PublishGuardError(
+        f"{problem}. Refusing to publish; to accept it, re-queue the job with payload "
+        f"publish_guard_override=[\"{target.split('.')[-1]}\"]."
+    )
+
+
+def table_count(conn: Connection, table: str, where: str = "", params: Optional[dict] = None) -> int:
+    """COUNT(*) of a (possibly schema-qualified) table; 0 when it does not exist."""
+    if not conn.execute(text("SELECT to_regclass(:t)"), {"t": table}).scalar():
+        return 0
+    sql = f"SELECT COUNT(*) FROM {_qualified(table)}"
+    if where:
+        sql += f" WHERE {where}"
+    return int(conn.execute(text(sql), params or {}).scalar() or 0)
+
+
 __all__: List[str] = [
+    "PublishGuardError",
+    "check_publish",
+    "publish_guard_override",
+    "table_count",
     "create_staging",
     "copy_rows",
     "merge_staging",

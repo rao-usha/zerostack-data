@@ -4,7 +4,7 @@ Runs the canonical smoke query — "Houston building equipment contractors" —
 through AtlasService.explore() and prints a structural summary.
 
 Usage (from the api container, with cloud DB):
-    docker exec -e DATABASE_URL=postgresql://nexdata:Nex2026@host.docker.internal:5435/nexdata \
+    docker exec -e DATABASE_URL=postgresql://nexdata:$DB_PASSWORD@host.docker.internal:5435/nexdata \
         nexdata-api-1 python scripts/smoke_test_atlas.py
 """
 from __future__ import annotations
@@ -21,10 +21,10 @@ from sqlalchemy.orm import Session
 
 from app.services.atlas import AtlasService
 
-CLOUD_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://nexdata:Nex2026@127.0.0.1:5435/nexdata",
-)
+# No default: the credentials live in the environment, never in the repo.
+CLOUD_URL = os.environ.get("DATABASE_URL")
+if not CLOUD_URL:
+    sys.exit("DATABASE_URL is required (e.g. postgresql://nexdata:<password>@127.0.0.1:5435/nexdata)")
 QUERY = "Houston building equipment contractors"
 
 

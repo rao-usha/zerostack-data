@@ -347,7 +347,7 @@ async def list_lp_commitments(
                 "gp_name": c.gp_name,
                 "fund_name": c.fund_name,
                 "fund_vintage": c.fund_vintage,
-                "commitment_amount_usd": float(c.commitment_amount_usd) if c.commitment_amount_usd else None,
+                "commitment_amount_usd": float(c.commitment_amount_usd) if c.commitment_amount_usd is not None else None,
                 "status": c.status,
                 "data_source": c.data_source,
                 "as_of_date": c.as_of_date.isoformat() if c.as_of_date else None,

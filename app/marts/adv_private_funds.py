@@ -20,7 +20,14 @@ from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy import text
 
-from app.core.copy_loader import STAGING_SCHEMA, create_staging, drop_staging, merge_staging
+from app.core.copy_loader import (
+    STAGING_SCHEMA,
+    check_publish,
+    create_staging,
+    drop_staging,
+    merge_staging,
+    table_count,
+)
 from app.core.safe_sql import qi
 
 logger = logging.getLogger(__name__)
@@ -109,6 +116,10 @@ def build(conn, today: Optional[date] = None) -> Dict[str, int]:
 
     create_staging(conn, STAGING, COLUMNS)
     candidates = conn.execute(text(INSERT_STAGING_SQL), {"today": today}).rowcount
+    # The delete below removes every fund the staging set lacks, so emptied or
+    # truncated filing tables would wipe the mart. Refuse that (SPEC_129).
+    # Empty filings over an empty mart (no Schedule D load yet) is a no-op.
+    check_publish(TARGET, int(candidates or 0), table_count(conn, TARGET), allow_empty=True)
     inserted, updated = merge_staging(conn, STAGING, TARGET, COLUMN_NAMES, KEY_COLUMNS)
     deleted = conn.execute(text(DELETE_SQL)).rowcount
     drop_staging(conn, STAGING)

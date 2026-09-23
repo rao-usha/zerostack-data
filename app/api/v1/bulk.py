@@ -4,7 +4,7 @@ Bulk file ingestion endpoints (SPEC_107).
 Loads publisher bulk files (SEC data sets, ...) through the worker queue.
 """
 
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text
@@ -28,11 +28,18 @@ def run_bulk_source(
     source: str,
     since: Optional[str] = Query(None, description="Only releases on/after YYYY-MM-DD"),
     max_releases: Optional[int] = Query(None, ge=1, description="Cap releases processed this run"),
+    publish_guard_override: Optional[List[str]] = Query(
+        None,
+        description="Tables (e.g. sec_13f_holdings) whose publish guard this one job may "
+                    "bypass, to accept a legitimately much smaller release (SPEC_129)",
+    ),
     db: Session = Depends(get_db),
 ):
     if source not in list_sources():
         raise HTTPException(status_code=404, detail=f"Unknown bulk source: {source}")
     payload = {"bulk_source": source, "since": since, "max_releases": max_releases}
+    if isinstance(publish_guard_override, list) and publish_guard_override:  # not a bare Query()
+        payload["publish_guard_override"] = publish_guard_override
     result = submit_job(db=db, job_type="bulk_ingest", payload=payload)
     return {"source": source, **result}
 

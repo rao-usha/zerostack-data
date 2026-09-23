@@ -164,8 +164,31 @@ def _member(zf: zipfile.ZipFile, filename: str) -> Optional[str]:
     return None
 
 
+# Columns that must be in a member's header whenever the member is present
+# (SPEC_129). DictReader returns None for an absent column, so header drift
+# would otherwise load NULL on every row -- or, for TESTORLIVE, silently skip
+# every submission as non-LIVE. Keys plus what the marts read; not every
+# optional column, so a column the SEC adds or drops elsewhere never breaks a load.
+REQUIRED_HEADERS: Dict[str, Tuple[str, ...]] = {
+    "FORMDSUBMISSION.TSV": ("ACCESSIONNUMBER", "FILE_NUM", "FILING_DATE", "SUBMISSIONTYPE",
+                            "TESTORLIVE"),
+    "ISSUERS.TSV": ("ACCESSIONNUMBER", "ISSUER_SEQ_KEY", "IS_PRIMARYISSUER_FLAG", "CIK", "ENTITYNAME"),
+    "OFFERING.TSV": ("ACCESSIONNUMBER", "INDUSTRYGROUPTYPE", "INVESTMENTFUNDTYPE",
+                     "FEDERALEXEMPTIONS_ITEMS_LIST", "SALE_DATE", "TOTALOFFERINGAMOUNT",
+                     "TOTALAMOUNTSOLD"),
+    "RELATEDPERSONS.TSV": ("ACCESSIONNUMBER", "RELATEDPERSON_SEQ_KEY", "FIRSTNAME", "LASTNAME",
+                           "RELATIONSHIP_1"),
+    "RECIPIENTS.TSV": ("ACCESSIONNUMBER", "RECIPIENT_SEQ_KEY", "RECIPIENTNAME"),
+    "SIGNATURES.TSV": ("ACCESSIONNUMBER", "SIGNATURE_SEQ_KEY", "SIGNATURENAME"),
+}
+
+
 def iter_tsv(zip_path: Path | str, filename: str, required: bool = True) -> Iterator[Dict[str, str]]:
-    """Stream DictReader rows of one TSV member (matched by basename, any case)."""
+    """Stream DictReader rows of one TSV member (matched by basename, any case).
+
+    Raises ValueError when a required member is absent, or when a present
+    member's header lacks a ``REQUIRED_HEADERS`` column.
+    """
     with zipfile.ZipFile(zip_path) as zf:
         name = _member(zf, filename)
         if name is None:
@@ -175,8 +198,32 @@ def iter_tsv(zip_path: Path | str, filename: str, required: bool = True) -> Iter
         with zf.open(name) as raw:
             text = io.TextIOWrapper(raw, encoding="utf-8-sig", errors="replace", newline="")
             reader = csv.DictReader(text, delimiter="\t", quoting=csv.QUOTE_NONE)
+            # exact names: the iterators read r.get("ENTITYNAME"), so a padded
+            # or re-cased header is as good as absent
+            header = list(reader.fieldnames or [])
+            missing = [c for c in REQUIRED_HEADERS.get(filename.upper(), ()) if c not in header]
+            if missing:
+                raise ValueError(
+                    f"{Path(zip_path).name}: {filename} header is missing required column(s) "
+                    f"{missing}; refusing to load them as NULL"
+                )
             for row in reader:
                 yield row
+
+
+OPTIONAL_MEMBERS = frozenset({"RECIPIENTS.TSV", "SIGNATURES.TSV"})
+
+
+def validate_members(zip_path: Path | str) -> None:
+    """Check every required member and header up front, before any COPY starts.
+
+    ``iter_tsv`` enforces the same rules lazily, but a ValueError raised from
+    inside a COPY surfaces as a psycopg2 error. Failing here keeps the
+    release error readable and stages nothing.
+    """
+    for filename in REQUIRED_HEADERS:
+        for _ in iter_tsv(zip_path, filename, required=filename not in OPTIONAL_MEMBERS):
+            break
 
 
 def _acc(row: Dict[str, str]) -> Optional[str]:

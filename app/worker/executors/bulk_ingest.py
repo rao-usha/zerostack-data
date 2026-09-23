@@ -5,6 +5,9 @@ Payload:
     since: "YYYY-MM-DD"       optional lower bound for discovery
     max_releases: int         optional cap per run
     release_keys: [str]       optional explicit releases
+    publish_guard_override: [str] | true
+                              optional; accept a publish-guard trip (SPEC_129)
+                              for these tables, for this job only
 
 The blocking download/COPY work runs in a thread so the worker's heartbeat
 coroutine keeps running.
@@ -15,6 +18,7 @@ import logging
 
 from sqlalchemy.orm import Session
 
+from app.core.copy_loader import publish_guard_override
 from app.core.database import get_session_factory
 from app.core.models_queue import JobQueue
 from app.ingest.bulk.base import run_source
@@ -110,14 +114,16 @@ async def execute(job: JobQueue, db: Session):
         job.progress_message = f"Discovering {name} releases"
         db.commit()
 
-        summary = await asyncio.to_thread(
-            run_source,
-            source,
-            since=payload.get("since"),
-            max_releases=payload.get("max_releases"),
-            release_keys=payload.get("release_keys"),
-            progress=_progress_writer(job.id),
-        )
+        # to_thread copies the context, so the override reaches this job's loads only
+        with publish_guard_override(payload.get("publish_guard_override")):
+            summary = await asyncio.to_thread(
+                run_source,
+                source,
+                since=payload.get("since"),
+                max_releases=payload.get("max_releases"),
+                release_keys=payload.get("release_keys"),
+                progress=_progress_writer(job.id),
+            )
         logger.info(f"bulk_ingest {name} summary: { {k: v for k, v in summary.items() if k != 'releases'} }")
 
         attempted = summary["loaded"] + summary["failed"]
