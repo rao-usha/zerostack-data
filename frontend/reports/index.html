@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script src="/js/auth.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Zerostack Report Archive</title>
@@ -565,7 +566,8 @@ function selectTemplate(name) {
 // ── Open report ──────────────────────────────────────────────────────────────
 function openReport(id, format) {
   const url = `${API}/reports/${id}/download`;
-  window.open(url, '_blank');
+  // window.open cannot send the bearer token (SPEC_127)
+  NexdataAuth.openApiUrl(url, '_blank').catch(() => alert('Could not open report'));
 }
 
 // ── Generate modal ───────────────────────────────────────────────────────────

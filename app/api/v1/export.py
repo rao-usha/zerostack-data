@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.models import ExportJob, ExportFormat, ExportStatus
+from app.core.export_policy import is_exportable
 from app.core.export_service import ExportService
 
 logger = logging.getLogger(__name__)
@@ -213,6 +214,9 @@ def preview_table(
     col_meta = inspector.get_columns(table_name)
     column_names = [c["name"] for c in col_meta]
     column_types = {c["name"]: str(c["type"]) for c in col_meta}
+    # SPEC_127: auth/key/lead/credential tables look exactly like missing ones.
+    if not is_exportable(table_name, column_names):
+        raise HTTPException(status_code=404, detail=f"Table not found: {table_name}")
 
     # Validate sort column
     sort_col = None
@@ -340,6 +344,12 @@ def download_export(job_id: int, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=400, detail=f"Export not ready. Status: {job.status.value}"
         )
+
+    # SPEC_127: a file produced before the deny list existed is not served.
+    try:
+        service.get_table_columns(job.table_name)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Export file not found or expired")
 
     file_path = service.get_file_path(job_id)
     if not file_path:

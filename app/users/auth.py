@@ -9,7 +9,7 @@ import hmac
 import secrets
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 
 import jwt
 import bcrypt
@@ -43,6 +43,27 @@ PASSWORD_RESET_EXPIRE_HOURS = 24
 LOGIN_CODE_EXPIRE_MINUTES = 10
 LOGIN_CODE_MAX_ATTEMPTS = 5
 
+# Token audiences (SPEC_127). Protected routers accept only AUD_APP; the
+# playground's passwordless sign-in mints AUD_PLAYGROUND, which only the
+# playground quota recognises; AUD_STREAM is a short-lived token for
+# EventSource connections, which cannot send an Authorization header.
+AUD_APP = "nexdata-app"
+AUD_PLAYGROUND = "nexdata-playground"
+AUD_STREAM = "nexdata-stream"
+STREAM_TOKEN_EXPIRE_SECONDS = 300
+
+ROLE_ADMIN = "admin"
+ROLE_USER = "user"
+ROLES = (ROLE_ADMIN, ROLE_USER)
+
+# _ensure_tables runs ~15 DDL statements. Now that every protected request
+# authenticates, run them once per process per database, not per request.
+_ENSURED_URLS: set = set()
+
+
+def _sha256(value: str) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()
+
 
 class AuthService:
     """User authentication service."""
@@ -52,14 +73,28 @@ class AuthService:
         self._ensure_tables()
 
     def _ensure_tables(self):
-        """Create tables if they don't exist."""
+        """Create tables if they don't exist (once per process per database)."""
+        try:
+            url_key = str(self.db.get_bind().url)
+        except Exception:  # noqa: BLE001 — unusual binds just re-run the DDL
+            url_key = None
+        if url_key and url_key in _ENSURED_URLS:
+            return
+        self._create_tables()
+        if url_key:
+            _ENSURED_URLS.add(url_key)
+
+    def _create_tables(self):
         self.db.execute(
             text("""
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
                 email VARCHAR(255) NOT NULL UNIQUE,
-                password_hash VARCHAR(255) NOT NULL,
+                password_hash VARCHAR(255),
                 name VARCHAR(255),
+                role VARCHAR(20) NOT NULL DEFAULT 'user',
+                tier VARCHAR(20) DEFAULT 'free',
+                signup_source VARCHAR(100),
                 is_active BOOLEAN DEFAULT TRUE,
                 is_verified BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -74,7 +109,7 @@ class AuthService:
             CREATE TABLE IF NOT EXISTS password_reset_tokens (
                 id SERIAL PRIMARY KEY,
                 user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-                token VARCHAR(64) NOT NULL UNIQUE,
+                token_hash VARCHAR(64) NOT NULL UNIQUE,
                 expires_at TIMESTAMP NOT NULL,
                 used_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -88,6 +123,7 @@ class AuthService:
                 id SERIAL PRIMARY KEY,
                 user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
                 token_hash VARCHAR(64) NOT NULL UNIQUE,
+                audience VARCHAR(20) NOT NULL DEFAULT 'nexdata-app',
                 expires_at TIMESTAMP NOT NULL,
                 revoked_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -121,11 +157,6 @@ class AuthService:
         )
         self.db.execute(
             text("""
-            CREATE INDEX IF NOT EXISTS idx_reset_tokens_token ON password_reset_tokens(token)
-        """)
-        )
-        self.db.execute(
-            text("""
             CREATE INDEX IF NOT EXISTS idx_refresh_tokens_hash ON refresh_tokens(token_hash)
         """)
         )
@@ -146,6 +177,11 @@ class AuthService:
             "ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS tier VARCHAR(20) DEFAULT 'free'",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_source VARCHAR(100)",
+            # SPEC_127 — Alembic 0012 adds these on existing databases; repeated
+            # here so login keeps working if that migration has not run yet.
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user'",
+            "ALTER TABLE refresh_tokens ADD COLUMN IF NOT EXISTS audience "
+            "VARCHAR(20) NOT NULL DEFAULT 'nexdata-app'",
         ):
             try:
                 self.db.execute(text(migration))
@@ -159,56 +195,167 @@ class AuthService:
         salt = bcrypt.gensalt()
         return bcrypt.hashpw(password.encode(), salt).decode()
 
-    def _verify_password(self, password: str, hashed: str) -> bool:
-        """Verify password against hash."""
-        return bcrypt.checkpw(password.encode(), hashed.encode())
+    def _verify_password(self, password: str, hashed: Optional[str]) -> bool:
+        """Verify password against hash. Passwordless accounts never match."""
+        if not hashed:
+            return False
+        try:
+            return bcrypt.checkpw(password.encode(), hashed.encode())
+        except ValueError:  # malformed hash
+            return False
 
-    def _create_access_token(self, user_id: int, email: str) -> str:
-        """Create JWT access token."""
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    def _create_access_token(
+        self,
+        user_id: int,
+        email: str,
+        role: str = ROLE_USER,
+        audience: str = AUD_APP,
+    ) -> str:
+        """Create JWT access token for one audience (SPEC_127)."""
+        now = datetime.utcnow()
         payload = {
             "sub": str(user_id),
             "email": email,
+            "role": role,
             "type": "access",
-            "exp": expire,
-            "iat": datetime.utcnow(),
+            "aud": audience,
+            "exp": now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+            "iat": now,
         }
         return jwt.encode(payload, _get_secret_key(), algorithm=ALGORITHM)
 
-    def _create_refresh_token(self, user_id: int) -> str:
-        """Create and store refresh token."""
+    def create_stream_token(self, user_id: int, email: str, role: str) -> str:
+        """Short-lived token for EventSource (?stream_token=), SPEC_127."""
+        now = datetime.utcnow()
+        payload = {
+            "sub": str(user_id),
+            "email": email,
+            "role": role,
+            "type": "stream",
+            "aud": AUD_STREAM,
+            "exp": now + timedelta(seconds=STREAM_TOKEN_EXPIRE_SECONDS),
+            "iat": now,
+        }
+        return jwt.encode(payload, _get_secret_key(), algorithm=ALGORITHM)
+
+    def _create_refresh_token(self, user_id: int, audience: str = AUD_APP) -> str:
+        """Create and store a refresh token. Only its SHA-256 is stored."""
         token = secrets.token_urlsafe(32)
-        token_hash = secrets.token_hex(32)
         expires_at = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
 
         self.db.execute(
             text("""
-            INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
-            VALUES (:user_id, :token_hash, :expires_at)
+            INSERT INTO refresh_tokens (user_id, token_hash, audience, expires_at)
+            VALUES (:user_id, :token_hash, :audience, :expires_at)
         """),
-            {"user_id": user_id, "token_hash": token_hash, "expires_at": expires_at},
+            {
+                "user_id": user_id,
+                "token_hash": _sha256(token),
+                "audience": audience,
+                "expires_at": expires_at,
+            },
         )
         self.db.commit()
 
         return token
 
     def _issue_tokens_for_user(
-        self, user_id: int, email: str, name: Optional[str] = None
+        self,
+        user_id: int,
+        email: str,
+        name: Optional[str] = None,
+        role: str = ROLE_USER,
+        audience: str = AUD_APP,
     ) -> Dict[str, Any]:
         """Issue the standard access+refresh token bundle for a user.
 
         Shared by password login and passwordless sign-in so there is exactly
-        one place that mints tokens.
+        one place that mints tokens. The audience decides what the token can
+        reach: AUD_APP for the platform, AUD_PLAYGROUND for the playground.
         """
-        access_token = self._create_access_token(user_id, email)
-        refresh_token = self._create_refresh_token(user_id)
+        access_token = self._create_access_token(user_id, email, role, audience)
+        refresh_token = self._create_refresh_token(user_id, audience)
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
             "token_type": "bearer",
             "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            "user": {"id": user_id, "email": email, "name": name},
+            "user": {"id": user_id, "email": email, "name": name, "role": role},
         }
+
+    # ------------------------------------------------------------------
+    # Roles (SPEC_127)
+    # ------------------------------------------------------------------
+
+    def _sync_admin_role(self, user_id: int, email: str, is_verified: bool) -> str:
+        """Promote a verified ADMIN_EMAILS account to admin; return its role.
+
+        Unverified accounts are never promoted: with ALLOW_SIGNUP=true anyone
+        could otherwise register an admin's address first.
+        """
+        from app.core.config import get_settings
+
+        if is_verified and email.lower() in get_settings().admin_email_set():
+            self.db.execute(
+                text("UPDATE users SET role = :r WHERE id = :id AND role <> :r"),
+                {"r": ROLE_ADMIN, "id": user_id},
+            )
+            self.db.commit()
+        row = self.db.execute(
+            text("SELECT role FROM users WHERE id = :id"), {"id": user_id}
+        ).fetchone()
+        return (row[0] if row and row[0] else ROLE_USER)
+
+    def create_user(
+        self,
+        email: str,
+        password: str,
+        name: Optional[str] = None,
+        admin: bool = False,
+    ) -> Dict[str, Any]:
+        """Create or update a verified password user (scripts/create_user.py).
+
+        This is the bootstrap path while self-registration is closed. An
+        existing account (including a passwordless one) gets the new password
+        and is marked verified; admin=True promotes it, admin=False never
+        demotes. Returns {id, email, role, created}.
+        """
+        email = email.lower().strip()
+        if len(password) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        password_hash = self._hash_password(password)
+
+        existing = self.db.execute(
+            text("SELECT id FROM users WHERE email = :email"), {"email": email}
+        ).fetchone()
+        if existing:
+            user_id = existing[0]
+            self.db.execute(
+                text("""
+                UPDATE users SET password_hash = :ph, is_verified = TRUE,
+                    is_active = TRUE, name = COALESCE(:name, name),
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = :id
+            """),
+                {"ph": password_hash, "name": name, "id": user_id},
+            )
+        else:
+            user_id = self.db.execute(
+                text("""
+                INSERT INTO users (email, password_hash, name, is_verified, role, signup_source)
+                VALUES (:email, :ph, :name, TRUE, :role, 'create_user')
+                RETURNING id
+            """),
+                {"email": email, "ph": password_hash, "name": name, "role": ROLE_USER},
+            ).scalar()
+        if admin:
+            self.db.execute(
+                text("UPDATE users SET role = :r WHERE id = :id"),
+                {"r": ROLE_ADMIN, "id": user_id},
+            )
+        self.db.commit()
+        role = self._sync_admin_role(user_id, email, True)
+        return {"id": user_id, "email": email, "role": role, "created": not existing}
 
     # ------------------------------------------------------------------
     # Passwordless sign-in (PLAN_063 / SPEC_053)
@@ -349,7 +496,11 @@ class AuthService:
             raise ValueError("Account is not active")
 
         self._notify_lead_event("verified", email=email)
-        return self._issue_tokens_for_user(row[0], row[1], row[2])
+        # Passwordless sign-in is the playground's funnel: its tokens reach the
+        # playground only, never the platform routers (SPEC_127).
+        return self._issue_tokens_for_user(
+            row[0], row[1], row[2], role=ROLE_USER, audience=AUD_PLAYGROUND
+        )
 
     def verify_login_code(self, email: str, code: str) -> Dict[str, Any]:
         """Verify a 6-digit login code and issue tokens. Raises ValueError on
@@ -435,45 +586,36 @@ class AuthService:
         if len(password) < 8:
             raise ValueError("Password must be at least 8 characters")
 
-        # Hash password and create user
+        # Hash password and create user. Self-registered accounts are
+        # unverified users; ADMIN_EMAILS never promotes them (SPEC_127).
         password_hash = self._hash_password(password)
 
         result = self.db.execute(
             text("""
-            INSERT INTO users (email, password_hash, name)
-            VALUES (:email, :password_hash, :name)
+            INSERT INTO users (email, password_hash, name, role, signup_source)
+            VALUES (:email, :password_hash, :name, :role, 'register')
             RETURNING id, created_at
         """),
-            {"email": email.lower(), "password_hash": password_hash, "name": name},
+            {
+                "email": email.lower(),
+                "password_hash": password_hash,
+                "name": name,
+                "role": ROLE_USER,
+            },
         )
 
         row = result.fetchone()
         self.db.commit()
 
-        user_id = row[0]
-
-        # Generate tokens
-        access_token = self._create_access_token(user_id, email.lower())
-        refresh_token = self._create_refresh_token(user_id)
-
-        return {
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "token_type": "bearer",
-            "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            "user": {
-                "id": user_id,
-                "email": email.lower(),
-                "name": name,
-                "created_at": row[1].isoformat() if row[1] else None,
-            },
-        }
+        bundle = self._issue_tokens_for_user(row[0], email.lower(), name, ROLE_USER)
+        bundle["user"]["created_at"] = row[1].isoformat() if row[1] else None
+        return bundle
 
     def login(self, email: str, password: str) -> Dict[str, Any]:
         """Authenticate user and return tokens."""
         result = self.db.execute(
             text("""
-            SELECT id, email, password_hash, name, is_active
+            SELECT id, email, password_hash, name, is_active, is_verified
             FROM users WHERE email = :email
         """),
             {"email": email.lower()},
@@ -483,7 +625,7 @@ class AuthService:
         if not row:
             raise ValueError("Invalid email or password")
 
-        user_id, user_email, password_hash, name, is_active = row
+        user_id, user_email, password_hash, name, is_active, is_verified = row
 
         if not is_active:
             raise ValueError("Account is deactivated")
@@ -500,94 +642,105 @@ class AuthService:
         )
         self.db.commit()
 
-        # Generate tokens
-        access_token = self._create_access_token(user_id, user_email)
-        refresh_token = self._create_refresh_token(user_id)
+        role = self._sync_admin_role(user_id, user_email, bool(is_verified))
+        return self._issue_tokens_for_user(user_id, user_email, name, role)
 
-        return {
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "token_type": "bearer",
-            "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            "user": {"id": user_id, "email": user_email, "name": name},
-        }
+    def verify_token(
+        self, token: str, audiences: Tuple[str, ...] = (AUD_APP,)
+    ) -> Dict[str, Any]:
+        """Verify an access JWT for one of `audiences` and return user info.
 
-    def verify_token(self, token: str) -> Dict[str, Any]:
-        """Verify JWT and return user info."""
+        The default accepts platform tokens only; the playground passes
+        (AUD_APP, AUD_PLAYGROUND). Tokens minted before SPEC_127 have no `aud`
+        and are rejected. The role is re-read from the database so a demotion
+        or deactivation takes effect on the next request.
+        """
+        return self._verify(token, "access", audiences)
+
+    def verify_stream_token(self, token: str) -> Dict[str, Any]:
+        """Verify a short-lived EventSource token (SPEC_127)."""
+        return self._verify(token, "stream", (AUD_STREAM,))
+
+    def _verify(
+        self, token: str, token_type: str, audiences: Tuple[str, ...]
+    ) -> Dict[str, Any]:
         try:
-            payload = jwt.decode(token, _get_secret_key(), algorithms=[ALGORITHM])
-
-            if payload.get("type") != "access":
-                raise ValueError("Invalid token type")
-
-            user_id = int(payload["sub"])
-
-            # Get user
-            result = self.db.execute(
-                text("""
-                SELECT id, email, name, is_active FROM users WHERE id = :user_id
-            """),
-                {"user_id": user_id},
+            payload = jwt.decode(
+                token,
+                _get_secret_key(),
+                algorithms=[ALGORITHM],
+                audience=list(audiences),
+                options={"require": ["exp", "sub", "aud"]},
             )
-
-            row = result.fetchone()
-            if not row or not row[3]:  # not active
-                raise ValueError("User not found or inactive")
-
-            return {"user_id": row[0], "email": row[1], "name": row[2]}
-
         except jwt.ExpiredSignatureError:
             raise ValueError("Token has expired")
         except jwt.InvalidTokenError:
             raise ValueError("Invalid token")
 
-    def refresh_token(self, refresh_token: str) -> Dict[str, Any]:
-        """Refresh access token using refresh token."""
-        # For simplicity, we'll generate a new access token based on the refresh token
-        # In production, you'd validate the refresh token hash against the database
+        if payload.get("type") != token_type:
+            raise ValueError("Invalid token type")
 
-        # Get user from the token (simplified - in production use token hash lookup)
         try:
-            # Decode without verification to get user_id
-            # In real implementation, look up the token in the database
-            result = self.db.execute(
-                text("""
-                SELECT rt.user_id, u.email, u.name, u.is_active, rt.expires_at, rt.revoked_at
-                FROM refresh_tokens rt
-                JOIN users u ON rt.user_id = u.id
-                WHERE rt.revoked_at IS NULL
-                ORDER BY rt.created_at DESC
-                LIMIT 1
-            """)
-            )
+            user_id = int(payload["sub"])
+        except (TypeError, ValueError):
+            raise ValueError("Invalid token")
 
-            row = result.fetchone()
-            if not row:
-                raise ValueError("Invalid refresh token")
+        row = self.db.execute(
+            text("""
+            SELECT id, email, name, is_active, role FROM users WHERE id = :user_id
+        """),
+            {"user_id": user_id},
+        ).fetchone()
+        if not row or not row[3]:  # not active
+            raise ValueError("User not found or inactive")
 
-            user_id, email, name, is_active, expires_at, revoked_at = row
+        return {
+            "user_id": row[0],
+            "email": row[1],
+            "name": row[2],
+            "role": row[4] or ROLE_USER,
+            "aud": payload.get("aud"),
+        }
 
-            if not is_active:
-                raise ValueError("User inactive")
+    def refresh_token(self, refresh_token: str) -> Dict[str, Any]:
+        """Exchange a refresh token for a new access token.
 
-            if revoked_at:
-                raise ValueError("Token revoked")
-
-            if expires_at < datetime.utcnow():
-                raise ValueError("Refresh token expired")
-
-            # Generate new access token
-            access_token = self._create_access_token(user_id, email)
-
-            return {
-                "access_token": access_token,
-                "token_type": "bearer",
-                "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            }
-
-        except Exception as e:
-            logger.error(f"Refresh token error: {e}")
+        The token is looked up by its SHA-256. (Before SPEC_127 the lookup
+        ignored the token entirely and refreshed the most recent session in
+        the table.) The new access token keeps the session's audience, so a
+        playground session can never be refreshed into a platform session.
+        """
+        row = self.db.execute(
+            text("""
+            SELECT rt.user_id, u.email, u.is_active, u.role, rt.audience,
+                   rt.expires_at, rt.revoked_at
+            FROM refresh_tokens rt
+            JOIN users u ON rt.user_id = u.id
+            WHERE rt.token_hash = :token_hash
+        """),
+            {"token_hash": _sha256(refresh_token or "")},
+        ).fetchone()
+        if not row:
             raise ValueError("Invalid refresh token")
+
+        user_id, email, is_active, role, audience, expires_at, revoked_at = row
+        if not is_active:
+            raise ValueError("User inactive")
+        if revoked_at:
+            raise ValueError("Token revoked")
+        if expires_at < datetime.utcnow():
+            raise ValueError("Refresh token expired")
+        if audience not in (AUD_APP, AUD_PLAYGROUND):
+            raise ValueError("Invalid refresh token")
+
+        access_token = self._create_access_token(
+            user_id, email, role or ROLE_USER, audience
+        )
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        }
 
     def logout(self, user_id: int) -> bool:
         """Revoke all refresh tokens for user."""
@@ -606,7 +759,8 @@ class AuthService:
         """Get user by ID."""
         result = self.db.execute(
             text("""
-            SELECT id, email, name, is_active, is_verified, created_at, last_login_at
+            SELECT id, email, name, is_active, is_verified, created_at, last_login_at,
+                   role
             FROM users WHERE id = :user_id
         """),
             {"user_id": user_id},
@@ -624,6 +778,7 @@ class AuthService:
             "is_verified": row[4],
             "created_at": row[5].isoformat() if row[5] else None,
             "last_login_at": row[6].isoformat() if row[6] else None,
+            "role": row[7] or ROLE_USER,
         }
 
     def update_user(
@@ -688,14 +843,17 @@ class AuthService:
         """Create password reset token."""
         result = self.db.execute(
             text("""
-            SELECT id FROM users WHERE email = :email AND is_active = TRUE
+            SELECT id FROM users
+            WHERE email = :email AND is_active = TRUE AND password_hash IS NOT NULL
         """),
             {"email": email.lower()},
         )
 
         row = result.fetchone()
         if not row:
-            # Don't reveal if email exists
+            # Don't reveal if email exists. Passwordless (playground) accounts
+            # have no password to reset, and must not be able to acquire one
+            # this way and then sign in to the platform (SPEC_127).
             return None
 
         user_id = row[0]
@@ -704,10 +862,11 @@ class AuthService:
 
         self.db.execute(
             text("""
-            INSERT INTO password_reset_tokens (user_id, token, expires_at)
-            VALUES (:user_id, :token, :expires_at)
+            INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+            VALUES (:user_id, :token_hash, :expires_at)
         """),
-            {"user_id": user_id, "token": token, "expires_at": expires_at},
+            # Only the SHA-256 is stored (SPEC_127); the raw token goes to the user.
+            {"user_id": user_id, "token_hash": _sha256(token), "expires_at": expires_at},
         )
         self.db.commit()
 
@@ -721,9 +880,9 @@ class AuthService:
             text("""
             SELECT prt.id, prt.user_id, prt.expires_at, prt.used_at
             FROM password_reset_tokens prt
-            WHERE prt.token = :token
+            WHERE prt.token_hash = :token_hash
         """),
-            {"token": token},
+            {"token_hash": _sha256(token or "")},
         )
 
         row = result.fetchone()

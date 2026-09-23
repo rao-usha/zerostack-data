@@ -120,9 +120,9 @@ class PlaygroundQuota:
         if authorization and authorization.startswith("Bearer "):
             token = authorization[7:]
             try:
-                from app.users.auth import AuthService
+                from app.users.auth import AUD_APP, AUD_PLAYGROUND, AuthService
 
-                info = AuthService(db).verify_token(token)
+                info = AuthService(db).verify_token(token, audiences=(AUD_APP, AUD_PLAYGROUND))
                 user_id = info["user_id"]
                 email = info.get("email")
                 row = db.execute(
@@ -479,9 +479,11 @@ def get_quota(
     tier = "anonymous"
     if authorization and authorization.startswith("Bearer "):
         try:
-            from app.users.auth import AuthService
+            from app.users.auth import AUD_APP, AUD_PLAYGROUND, AuthService
 
-            info = AuthService(db).verify_token(authorization[7:])
+            info = AuthService(db).verify_token(
+                authorization[7:], audiences=(AUD_APP, AUD_PLAYGROUND)
+            )
             user_id = info["user_id"]
             row = db.execute(
                 text("SELECT tier FROM users WHERE id = :id"), {"id": user_id}

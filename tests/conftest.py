@@ -2,6 +2,12 @@
 Pytest configuration and shared fixtures.
 """
 import os
+
+# SPEC_127 made REQUIRE_AUTH default to true. Endpoint tests exercise route
+# behaviour, not auth, so the suite runs with auth off unless a test turns it
+# back on (tests/test_spec_127_access_lockdown.py does, per test).
+os.environ.setdefault("REQUIRE_AUTH", "false")
+
 import pytest
 from datetime import date, datetime, timedelta
 from sqlalchemy import create_engine

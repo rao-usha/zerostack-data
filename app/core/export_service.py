@@ -15,6 +15,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 from sqlalchemy import text, inspect
 
+from app.core.export_policy import is_exportable
 from app.core.models import ExportJob, ExportFormat, ExportStatus
 
 logger = logging.getLogger(__name__)
@@ -89,9 +90,10 @@ class ExportService:
         except Exception:
             pass
 
-        skip = {"alembic_version"}
         for table_name, columns in sorted(table_columns.items()):
-            if table_name.startswith("_") or table_name in skip:
+            # SPEC_127: auth, key, lead and credential-bearing tables are
+            # invisible, not merely refused.
+            if not is_exportable(table_name, columns):
                 continue
             tables.append(
                 {
@@ -107,11 +109,19 @@ class ExportService:
         return tables
 
     def get_table_columns(self, table_name: str) -> List[str]:
-        """Get column names for a table."""
+        """Get column names for an exportable table.
+
+        Raises ValueError("Table not found") for a table that does not exist
+        *or* is not exportable (SPEC_127) — the two are indistinguishable to
+        the caller on purpose.
+        """
         inspector = inspect(self.db.get_bind())
         if table_name not in inspector.get_table_names():
             raise ValueError(f"Table not found: {table_name}")
-        return [col["name"] for col in inspector.get_columns(table_name)]
+        columns = [col["name"] for col in inspector.get_columns(table_name)]
+        if not is_exportable(table_name, columns):
+            raise ValueError(f"Table not found: {table_name}")
+        return columns
 
     def create_export_job(
         self,
@@ -123,14 +133,11 @@ class ExportService:
         compress: bool = False,
     ) -> ExportJob:
         """Create a new export job."""
-        # Validate table exists
-        inspector = inspect(self.db.get_bind())
-        if table_name not in inspector.get_table_names():
-            raise ValueError(f"Table not found: {table_name}")
+        # Validate table exists and is exportable (SPEC_127)
+        valid_columns = self.get_table_columns(table_name)
 
         # Validate columns if specified
         if columns:
-            valid_columns = self.get_table_columns(table_name)
             invalid = set(columns) - set(valid_columns)
             if invalid:
                 raise ValueError(f"Invalid columns: {invalid}")
@@ -167,6 +174,10 @@ class ExportService:
         self.db.commit()
 
         try:
+            # Re-check at run time: a job queued before SPEC_127 must not
+            # export a table that is now denied.
+            self.get_table_columns(job.table_name)
+
             # Build query
             columns = job.columns if job.columns else ["*"]
             columns_str = (

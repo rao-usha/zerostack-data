@@ -13,7 +13,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
-from app.api.v1.auth import get_current_user
+from app.core.authz import (
+    log_auth_mode,
+    require_admin,
+    require_admin_for_writes,
+    require_admin_or_stream_token,
+    require_user,
+)
 from app.api.v1 import (
     jobs,
     census_geo,
@@ -1303,7 +1309,7 @@ Browse the endpoint sections below to see what's available:
         "name": "Nexdata External Data Ingestion",
         "url": "https://github.com/yourusername/nexdata",
     },
-    license_info={"name": "MIT", "url": "https://opensource.org/licenses/MIT"},
+    license_info={"name": "Proprietary. Copyright Nexdata. All rights reserved."},
     openapi_tags=[
         # ── Core / System ──────────────────────────────────────────────
         {"name": "Root", "description": "Service information and health checks"},
@@ -1514,28 +1520,39 @@ async def _unhandled_exception_handler(request: Request, exc: Exception):
     )
 
 
-# Auth dependency for protected routers
-# Set REQUIRE_AUTH=true to enforce JWT on all protected routes (default: off for dev)
-_require_auth = os.getenv("REQUIRE_AUTH", "false").lower() == "true"
-_auth = [Depends(get_current_user)] if _require_auth else []
+# Access policy (SPEC_127) — see app/core/authz.py and docs/specs/SPEC_127.
+# REQUIRE_AUTH defaults to true and is read per request; REQUIRE_AUTH=false is
+# local dev only and makes every route act as admin.
+#   _auth  = reads (GET/HEAD/OPTIONS) for any user, writes need admin
+#   _admin = admin for every method (ops: jobs, schedules, export, settings, ...)
+#   _user  = any signed-in user for every method
+_auth = [Depends(require_admin_for_writes)]
+_admin = [Depends(require_admin)]
+_user = [Depends(require_user)]
+log_auth_mode()
 
 # Public routers (no auth required)
 app.include_router(auth.router, prefix="/api/v1")  # login/register must be public
-app.include_router(public.router, prefix="/api/v1")  # has its own API key auth
-app.include_router(job_stream.router, prefix="/api/v1")  # SSE streaming
+app.include_router(public.router, prefix="/api/v1")  # API key auth (header, scope)
+# Job queue SSE + JSON — admin; EventSource passes ?stream_token= (SPEC_127)
+app.include_router(
+    job_stream.router,
+    prefix="/api/v1",
+    dependencies=[Depends(require_admin_or_stream_token)],
+)
 # Synthetic Data Playground (PLAN_063) — public, self-gated by PlaygroundQuota
 app.include_router(playground_router.router, prefix="/api/v1")
-# Playground admin (leads pipeline) — JWT-gated
-app.include_router(playground_admin_router.router, prefix="/api/v1", dependencies=_auth)
+# Playground admin (leads pipeline) — admin only
+app.include_router(playground_admin_router.router, prefix="/api/v1", dependencies=_admin)
 # Diligence Pack intake (PLAN_065 / SPEC_062) — public; self-validates inputs
 app.include_router(diligence_pack_router.router, prefix="/api/v1")
-# Nexdata Atlas (SPEC_064) — public interactive explorer; the primary product surface
+# Nexdata Atlas (SPEC_064) — public explorer; LLM/Places routes metered (atlas_quota)
 app.include_router(atlas_router.router, prefix="/api/v1")
-app.include_router(jobs_monitor.router, prefix="/api/v1", dependencies=_auth)  # Jobs dashboard
+app.include_router(jobs_monitor.router, prefix="/api/v1", dependencies=_admin)  # Jobs dashboard
 
 # Protected routers
 app.include_router(sources.router, prefix="/api/v1", dependencies=_auth)
-app.include_router(jobs.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(jobs.router, prefix="/api/v1", dependencies=_admin)
 app.include_router(census_geo.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(census_batch.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(metadata.router, prefix="/api/v1", dependencies=_auth)
@@ -1586,18 +1603,18 @@ app.include_router(census_cbp.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(foot_traffic.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(dunl.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(prediction_markets.router, prefix="/api/v1", dependencies=_auth)
-app.include_router(bulk.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(bulk.router, prefix="/api/v1", dependencies=_admin)
 app.include_router(entity_master.router, prefix="/api/v1", dependencies=_auth)
-app.include_router(pe_marts.router, prefix="/api/v1", dependencies=_auth)
-app.include_router(schedules.router, prefix="/api/v1", dependencies=_auth)
-app.include_router(webhooks.router, prefix="/api/v1", dependencies=_auth)
-app.include_router(chains.router, prefix="/api/v1", dependencies=_auth)
-app.include_router(rate_limits.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(pe_marts.router, prefix="/api/v1", dependencies=_admin)
+app.include_router(schedules.router, prefix="/api/v1", dependencies=_admin)
+app.include_router(webhooks.router, prefix="/api/v1", dependencies=_admin)
+app.include_router(chains.router, prefix="/api/v1", dependencies=_admin)
+app.include_router(rate_limits.router, prefix="/api/v1", dependencies=_admin)
 app.include_router(data_quality.router, prefix="/api/v1", dependencies=_auth)
-app.include_router(dq_review.router, prefix="/api/v1", dependencies=_auth)
-app.include_router(templates.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(dq_review.router, prefix="/api/v1", dependencies=_admin)
+app.include_router(templates.router, prefix="/api/v1", dependencies=_admin)
 app.include_router(lineage.router, prefix="/api/v1", dependencies=_auth)
-app.include_router(export.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(export.router, prefix="/api/v1", dependencies=_admin)
 app.include_router(uspto.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(agentic_research.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(alerts.router, prefix="/api/v1", dependencies=_auth)
@@ -1606,16 +1623,16 @@ app.include_router(discover.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(watchlists.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(analytics.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(compare.router, prefix="/api/v1", dependencies=_auth)
-app.include_router(api_keys.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(api_keys.router, prefix="/api/v1", dependencies=_admin)
 app.include_router(network.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(trends.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(enrichment.router, prefix="/api/v1", dependencies=_auth)
-app.include_router(import_portfolio.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(import_portfolio.router, prefix="/api/v1", dependencies=_admin)
 app.include_router(news.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(reports.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(deals.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(benchmarks.router, prefix="/api/v1", dependencies=_auth)
-app.include_router(workspaces.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(workspaces.router, prefix="/api/v1", dependencies=_user)
 app.include_router(form_d.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(corporate_registry.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(form_adv.router, prefix="/api/v1", dependencies=_auth)
@@ -1644,9 +1661,9 @@ app.include_router(pe_firms.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(pe_companies.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(pe_people.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(pe_deals.router, prefix="/api/v1", dependencies=_auth)
-app.include_router(pe_collection.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(pe_collection.router, prefix="/api/v1", dependencies=_admin)
 app.include_router(pe_benchmarks.router, prefix="/api/v1", dependencies=_auth)
-app.include_router(pe_import.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(pe_import.router, prefix="/api/v1", dependencies=_admin)
 app.include_router(pe_conviction.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(macro_cascade.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(synthetic_router.router, prefix="/api/v1", dependencies=_auth)
@@ -1662,7 +1679,7 @@ app.include_router(quarterly_diff.router, prefix="/api/v1", dependencies=_auth)
 # People & Org Chart Intelligence
 app.include_router(people.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(companies_leadership.router, prefix="/api/v1", dependencies=_auth)
-app.include_router(collection_jobs.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(collection_jobs.router, prefix="/api/v1", dependencies=_admin)
 app.include_router(people_portfolios.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(peer_sets.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(people_watchlists.router, prefix="/api/v1", dependencies=_auth)
@@ -1670,9 +1687,9 @@ app.include_router(people_analytics.router, prefix="/api/v1", dependencies=_auth
 app.include_router(people_reports.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(people_data_quality.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(people_dedup.router, prefix="/api/v1", dependencies=_auth)
-app.include_router(people_jobs.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(people_jobs.router, prefix="/api/v1", dependencies=_admin)
 app.include_router(board_interlocks.router, prefix="/api/v1", dependencies=_auth)
-app.include_router(evals.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(evals.router, prefix="/api/v1", dependencies=_admin)
 
 # Job Posting Intelligence
 app.include_router(job_postings.router, prefix="/api/v1", dependencies=_auth)
@@ -1730,22 +1747,22 @@ app.include_router(google_trends.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(ferc_energy.router, prefix="/api/v1", dependencies=_auth)
 
 # Collection Management
-app.include_router(source_configs.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(source_configs.router, prefix="/api/v1", dependencies=_admin)
 app.include_router(source_health.router, prefix="/api/v1", dependencies=_auth)
-app.include_router(audit.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(audit.router, prefix="/api/v1", dependencies=_admin)
 
 # Settings
-app.include_router(settings_router.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(settings_router.router, prefix="/api/v1", dependencies=_admin)
 
 
 # LLM Cost Tracking
-app.include_router(llm_costs.router, prefix="/api/v1", dependencies=_auth)
+app.include_router(llm_costs.router, prefix="/api/v1", dependencies=_admin)
 
 # Data Freshness Dashboard
 app.include_router(freshness.router, prefix="/api/v1", dependencies=_auth)
 
 # GraphQL API
-app.include_router(graphql_app, prefix="/graphql", tags=["graphql"])
+app.include_router(graphql_app, prefix="/graphql", tags=["graphql"], dependencies=_user)
 
 
 @app.get("/", tags=["Root"])

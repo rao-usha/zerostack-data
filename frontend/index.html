@@ -57,8 +57,6 @@
         .login-btn:hover { filter: brightness(1.1); }
         .login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
         .login-error { color: var(--error); font-size: 0.78rem; margin-top: 0.5rem; display: none; }
-        .login-dev-bypass { margin-top: 1rem; font-size: 0.72rem; color: var(--text-muted); }
-        .login-dev-bypass a { color: var(--primary); cursor: pointer; text-decoration: underline; }
 
         /* User menu */
         .user-menu { position: relative; display: flex; align-items: center; gap: 0.4rem; cursor: pointer; padding: 0.25rem 0.5rem; border-radius: 6px; transition: background 0.15s; }
@@ -1993,7 +1991,6 @@
             <input class="login-field" id="login-password" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')authLogin()">
             <button class="login-btn" id="login-btn" onclick="authLogin()">Sign In</button>
             <div class="login-error" id="login-error"></div>
-            <div class="login-dev-bypass">Development mode? <a onclick="authDevBypass()">Skip login</a></div>
         </div>
     </div>
 
@@ -4513,6 +4510,7 @@
     <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+    <script src="/js/auth.js"></script>
     <script>
         const API = '/api/v1';
 
@@ -4734,18 +4732,16 @@
             }
         });
 
-        // ===== Auth & Session =====
-        let _authToken = localStorage.getItem('nexdata_token') || null;
+        // ===== Auth & Session (SPEC_127) =====
+        // /js/auth.js attaches the bearer token to every /api fetch and calls
+        // window.nexdataOnUnauthorized on a 401. There is no dev bypass: with
+        // REQUIRE_AUTH=false on the API, requests simply succeed unauthenticated.
         let _authUser = null;
         try { _authUser = JSON.parse(localStorage.getItem('nexdata_user')); } catch(e) {}
-        const _authDevMode = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 
         function authInit() {
-            if (_authToken && _authUser) {
+            if (NexdataAuth.getToken() && _authUser) {
                 authApplySession();
-            } else if (_authDevMode) {
-                // Dev mode: auto-bypass login
-                authDevBypass();
             } else {
                 authShowLogin();
             }
@@ -4757,6 +4753,12 @@
 
         function authHideLogin() {
             document.getElementById('login-overlay').style.display = 'none';
+        }
+
+        function _authNextUrl() {
+            const next = new URLSearchParams(location.search).get('next');
+            // Same-origin paths only — never an open redirect.
+            return (next && next.startsWith('/') && !next.startsWith('//') && !next.includes('\\')) ? next : null;
         }
 
         async function authLogin() {
@@ -4783,33 +4785,25 @@
                 });
                 if (resp.ok) {
                     const data = await resp.json();
-                    _authToken = data.access_token || data.token;
                     _authUser = data.user || { email, name: email.split('@')[0] };
-                    localStorage.setItem('nexdata_token', _authToken);
-                    localStorage.setItem('nexdata_user', JSON.stringify(_authUser));
-                    authApplySession();
+                    NexdataAuth.setSession(data.access_token, _authUser);
+                    // Reload so every panel refetches with the new token.
+                    const next = _authNextUrl();
+                    if (next) location.href = next; else location.reload();
+                    return;
                 } else if (resp.status === 401 || resp.status === 403) {
                     errEl.textContent = 'Invalid email or password.';
-                    errEl.style.display = '';
                 } else {
-                    // Auth endpoint not implemented — use dev bypass
-                    authDevBypass();
+                    errEl.textContent = `Sign-in failed (HTTP ${resp.status}).`;
                 }
+                errEl.style.display = '';
             } catch (e) {
-                // Auth endpoint not available — use dev bypass
-                authDevBypass();
+                errEl.textContent = 'Cannot reach the API. Is the server running?';
+                errEl.style.display = '';
             } finally {
                 btn.disabled = false;
                 btn.textContent = 'Sign In';
             }
-        }
-
-        function authDevBypass() {
-            _authToken = 'dev-token';
-            _authUser = { email: 'dev@nexdata.com', name: 'Dev User', role: 'admin' };
-            localStorage.setItem('nexdata_token', _authToken);
-            localStorage.setItem('nexdata_user', JSON.stringify(_authUser));
-            authApplySession();
         }
 
         function authApplySession() {
@@ -4826,19 +4820,23 @@
         }
 
         function authLogout() {
-            _authToken = null;
             _authUser = null;
-            localStorage.removeItem('nexdata_token');
-            localStorage.removeItem('nexdata_user');
+            NexdataAuth.clearSession();
             document.getElementById('user-menu').style.display = 'none';
             document.getElementById('user-dropdown').classList.remove('open');
-            if (_authDevMode) {
-                showToast('Signed out', 'info');
-                authShowLogin();
-            } else {
-                authShowLogin();
-            }
+            authShowLogin();
         }
+
+        // Called by /js/auth.js when a protected request returns 401.
+        let _authExpiredShown = false;
+        window.nexdataOnUnauthorized = function() {
+            const wasSignedIn = !!NexdataAuth.getToken();
+            authLogout();
+            if (wasSignedIn && !_authExpiredShown) {
+                _authExpiredShown = true;
+                showToast('Session expired. Please sign in again.', 'error');
+            }
+        };
 
         function authToggleMenu(e) {
             e.stopPropagation();
@@ -4847,7 +4845,7 @@
         }
 
         function authShowProfile() {
-            showToast(`Signed in as ${_authUser?.email || 'unknown'}`, 'info');
+            showToast(`Signed in as ${_authUser?.email || 'unknown'}${_authUser?.role ? ' (' + _authUser.role + ')' : ''}`, 'info');
         }
 
         // Close user dropdown on outside click
@@ -4858,23 +4856,9 @@
             }
         });
 
-        // Auth header helper — wraps fetch with Authorization header
+        // Kept for existing callers; /js/auth.js already adds the header.
         function authFetch(url, opts = {}) {
-            if (_authToken && _authToken !== 'dev-token') {
-                opts.headers = opts.headers || {};
-                if (typeof opts.headers.set === 'function') {
-                    opts.headers.set('Authorization', `Bearer ${_authToken}`);
-                } else {
-                    opts.headers['Authorization'] = `Bearer ${_authToken}`;
-                }
-            }
-            return fetch(url, opts).then(resp => {
-                if (resp.status === 401) {
-                    authLogout();
-                    showToast('Session expired. Please sign in again.', 'error');
-                }
-                return resp;
-            });
+            return fetch(url, opts);
         }
 
         // ===== Toast Notifications =====
@@ -10072,8 +10056,10 @@
                 el.title = connected ? 'Live stream connected' : 'Stream disconnected — reconnecting...';
             }
         }
-        function _connectJobStream() {
-            const es = new EventSource('/api/v1/job-queue/stream');
+        async function _connectJobStream() {
+            // EventSource cannot send headers: use a short-lived stream token,
+            // fetched fresh for every (re)connect (SPEC_127).
+            const es = new EventSource(await NexdataAuth.streamUrl('/api/v1/job-queue/stream'));
 
             es.onopen = () => {
                 _sseBackoff = 1000;
@@ -12548,7 +12534,11 @@
             const downloadLink = document.getElementById('report-modal-download');
 
             modalTitle.textContent = title || 'Report Preview';
-            iframe.src = '/api/v1/reports/' + reportId + '/download';
+            // iframe navigations cannot send the bearer token (SPEC_127)
+            iframe.src = 'about:blank';
+            NexdataAuth.objectUrl('/api/v1/reports/' + reportId + '/download')
+                .then(obj => { iframe.src = obj; })
+                .catch(() => showToast('Could not load report preview', 'error'));
             downloadLink.href = '/api/v1/reports/' + reportId + '/download';
             modal.classList.add('visible');
 

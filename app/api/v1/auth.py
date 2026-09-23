@@ -79,24 +79,14 @@ class VerifyTokenRequest(BaseModel):
 
 
 def get_current_user(authorization: Optional[str] = Header(None)):
-    """Extract and validate JWT token from Authorization header."""
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Authorization header required")
+    """Extract and validate a platform JWT from the Authorization header.
 
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization format")
+    Always strict, whatever REQUIRE_AUTH says: endpoints using this need a
+    real user id. Playground and stream tokens are rejected (SPEC_127).
+    """
+    from app.core.authz import authenticate_bearer
 
-    token = authorization[7:]  # Remove "Bearer " prefix
-
-    db = next(get_db())
-    try:
-        auth_service = AuthService(db)
-        user_info = auth_service.verify_token(token)
-        return user_info
-    except ValueError as e:
-        raise HTTPException(status_code=401, detail=str(e))
-    finally:
-        db.close()
+    return authenticate_bearer(authorization)
 
 
 # Endpoints
@@ -104,7 +94,18 @@ def get_current_user(authorization: Optional[str] = Header(None)):
 
 @router.post("/register")
 def register(request: RegisterRequest):
-    """Register a new user account."""
+    """Register a new user account.
+
+    Closed unless ALLOW_SIGNUP=true (SPEC_127). While closed, accounts are
+    created by an admin with `python scripts/create_user.py`.
+    """
+    from app.core.config import get_settings
+
+    if not get_settings().allow_signup:
+        raise HTTPException(
+            status_code=403,
+            detail="Self-registration is disabled. Ask an administrator for an account.",
+        )
     db = next(get_db())
     try:
         auth_service = AuthService(db)
@@ -156,6 +157,26 @@ def refresh_token(request: RefreshTokenRequest):
         raise HTTPException(status_code=401, detail=str(e))
     finally:
         db.close()
+
+
+@router.post("/stream-token")
+def issue_stream_token(current_user: dict = Depends(get_current_user)):
+    """Issue a short-lived token for EventSource streams (SPEC_127).
+
+    EventSource cannot send an Authorization header, so SSE routes accept
+    `?stream_token=<token>` instead. The token expires after a few minutes and
+    is only checked when the stream connects; request a new one per connect.
+    """
+    from app.users.auth import STREAM_TOKEN_EXPIRE_SECONDS
+
+    db = next(get_db())
+    try:
+        token = AuthService(db).create_stream_token(
+            current_user["user_id"], current_user["email"], current_user["role"]
+        )
+    finally:
+        db.close()
+    return {"stream_token": token, "expires_in": STREAM_TOKEN_EXPIRE_SECONDS}
 
 
 @router.get("/me")

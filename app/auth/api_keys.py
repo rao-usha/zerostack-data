@@ -17,6 +17,24 @@ from app.core.database import get_db
 
 
 # ============================================================================
+# Scopes (SPEC_127)
+# ============================================================================
+
+# Ordered: a key satisfies any scope at or below its own.
+SCOPE_LEVELS = {"read": 1, "write": 2, "admin": 3}
+
+
+def scope_allows(key_scope: Optional[str], required: str) -> bool:
+    """True when a key with `key_scope` may call an endpoint needing `required`.
+
+    Unknown scopes on either side fail closed.
+    """
+    have = SCOPE_LEVELS.get((key_scope or "").strip().lower())
+    need = SCOPE_LEVELS.get((required or "").strip().lower())
+    return have is not None and need is not None and have >= need
+
+
+# ============================================================================
 # Pydantic Models
 # ============================================================================
 
