@@ -25,11 +25,21 @@ def queue_build(
     publish_guard_override: Optional[List[str]] = Query(
         None, description="Tables whose publish guard this one build may bypass (SPEC_129)"
     ),
+    input_override: Optional[List[str]] = Query(
+        None, description="Input sources (or 'all') this build may use although their "
+                          "latest release failed or is stale (SPEC_126a)"
+    ),
+    gate_override: Optional[List[str]] = Query(
+        None, description="Ship gates (or 'all') this build may fail and still commit (SPEC_126a)"
+    ),
     db: Session = Depends(get_db),
 ):
     payload = {"skip_firms": skip_firms, "skip_funds": skip_funds}
     if isinstance(publish_guard_override, list) and publish_guard_override:  # not a bare Query()
         payload["publish_guard_override"] = publish_guard_override
+    for key, value in (("input_override", input_override), ("gate_override", gate_override)):
+        if isinstance(value, list) and value:
+            payload[key] = value
     return submit_job(db=db, job_type="pe_mart_build", payload=payload)
 
 

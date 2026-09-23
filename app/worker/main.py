@@ -344,7 +344,13 @@ async def execute_job(job: JobQueue, db: Session):
         job.status = QueueJobStatus.SUCCESS
         job.completed_at = datetime.utcnow()
         job.progress_pct = 100.0
-        job.progress_message = "Completed"
+        # SPEC_126a: an executor that landed only part of its work leaves a
+        # PARTIAL: error_message on a successful job; keep that visible.
+        from app.core.ingestion_job_sync import is_partial
+
+        job.progress_message = (
+            "Completed with partial failures" if is_partial(job.error_message) else "Completed"
+        )
         db.commit()
         _write_back_ingestion_job(job, succeeded=True)
 

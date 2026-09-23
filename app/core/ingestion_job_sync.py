@@ -36,6 +36,19 @@ WRITABLE_INGESTION_STATUSES = ("pending", "running", "blocked")
 SWEEP_GRACE_MINUTES = 10
 ORPHAN_HOURS = 24
 
+# SPEC_126a: a run where some units failed and some landed (bulk_ingest with
+# mixed release outcomes). Both job_queue and ingestion_jobs stay 'success' --
+# data did land, the schedule watermark must advance, and a new status value
+# would break every status comparison -- and carry this prefix in
+# error_message. The failed raw.source_release rows raise the watchdog's
+# failed_release alert.
+PARTIAL_PREFIX = "PARTIAL:"
+
+
+def is_partial(error_message: Optional[str]) -> bool:
+    """True when a successful job's error_message marks a partial failure."""
+    return bool(error_message) and str(error_message).startswith(PARTIAL_PREFIX)
+
 
 def linked_ingestion_job_id(job_table_id: Any, payload: Any) -> Optional[int]:
     """The ``ingestion_jobs.id`` a queue job reports to, or None.

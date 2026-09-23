@@ -13,6 +13,9 @@ Every 15 minutes (APScheduler, registered from the app lifespan) it checks:
 - **releases**      ``raw.source_release`` rows that failed in the last 24h
 - **failure spike** many failed ``job_queue`` rows in the last hour
 - **SLA**           ``source_freshness_sla`` rows that are violated
+- **mart_build**    a mart's latest build was refused on its inputs or failed
+                    its ship gates (SPEC_126a). Partial bulk runs surface
+                    through **releases** (their failed release rows).
 
 Each finding has a stable key. ``watchdog_alerts`` holds its state so an alert
 is sent once, reminded at most every 24h, and followed by a ``resolved``
@@ -392,6 +395,34 @@ def rule_sla(db: Session, now: datetime) -> List[Finding]:
     return findings
 
 
+def rule_mart_builds(db: Session, now: datetime) -> List[Finding]:
+    """SPEC_126a: a mart whose latest real (non-dry-run) build was refused on
+    its inputs or failed its ship gates. Open until the next successful build:
+    the previous mart is still being served, but it is going stale."""
+    if db.execute(text("SELECT to_regclass('core.mart_build')")).scalar() is None:
+        return []
+    rows = db.execute(text(
+        "SELECT DISTINCT ON (mart) id, mart, status, started_at, "
+        "LEFT(COALESCE(refusal_reason, error, ''), 300) AS reason "
+        "FROM core.mart_build WHERE NOT dry_run AND status <> 'running' "
+        "ORDER BY mart, id DESC"
+    )).mappings().all()
+    findings = []
+    for r in rows:
+        if r["status"] not in ("failed", "refused"):
+            continue
+        findings.append(Finding(
+            key=f"mart_build:{r['mart']}",
+            rule="mart_build",
+            severity="critical",
+            message=(f"Mart '{r['mart']}' build #{r['id']} {r['status']}: {r['reason']}"
+                     if r["reason"] else f"Mart '{r['mart']}' build #{r['id']} {r['status']}"),
+            details={"mart": r["mart"], "build_id": r["id"], "status": r["status"],
+                     "started_at": r["started_at"].isoformat() if r["started_at"] else None},
+        ))
+    return findings
+
+
 class _Row:
     """Attribute access over a mapping row, for schedule_cadence_hours."""
 
@@ -408,6 +439,7 @@ RULES: List[Tuple[str, Callable[[Session, datetime], List[Finding]]]] = [
     ("failed_release", rule_failed_releases),
     ("failure_spike", rule_failure_spike),
     ("sla", rule_sla),
+    ("mart_build", rule_mart_builds),
 ]
 
 

@@ -9,6 +9,10 @@ Payload:
                               optional; accept a publish-guard trip (SPEC_129)
                               for these tables, for this job only
 
+Outcome (SPEC_126a): every attempted release failed -> job failed; some
+failed and some loaded -> job success with a ``PARTIAL:`` error_message on the
+queue row and the IngestionJob (``summary["status"] == "partial"``).
+
 The blocking download/COPY work runs in a thread so the worker's heartbeat
 coroutine keeps running.
 """
@@ -20,6 +24,7 @@ from sqlalchemy.orm import Session
 
 from app.core.copy_loader import publish_guard_override
 from app.core.database import get_session_factory
+from app.core.ingestion_job_sync import PARTIAL_PREFIX
 from app.core.models_queue import JobQueue
 from app.ingest.bulk.base import run_source
 from app.ingest.bulk.registry import get_source
@@ -69,8 +74,14 @@ def _start_ingestion_job(ingestion_job_id) -> None:
         db.close()
 
 
-def _finish_ingestion_job(ingestion_job_id, summary, error: str = None) -> None:
-    """Mirror the outcome onto the linked ingestion_jobs row (scheduled runs)."""
+def _finish_ingestion_job(ingestion_job_id, summary, error: str = None,
+                          partial: str = None) -> None:
+    """Mirror the outcome onto the linked ingestion_jobs row (scheduled runs).
+
+    ``partial`` (SPEC_126a): success with some releases failed -- the row is
+    SUCCESS (rows landed; the schedule watermark advances) and carries the
+    ``PARTIAL:`` message in error_message.
+    """
     if not ingestion_job_id:
         return
     from datetime import datetime
@@ -84,7 +95,7 @@ def _finish_ingestion_job(ingestion_job_id, summary, error: str = None) -> None:
             return
         ing.status = JobStatus.FAILED if error else JobStatus.SUCCESS
         ing.rows_inserted = summary.get("rows", 0)
-        ing.error_message = error
+        ing.error_message = error or partial
         ing.completed_at = datetime.utcnow()
         db.commit()
     except Exception as e:
@@ -108,6 +119,7 @@ async def execute(job: JobQueue, db: Session):
     # block its schedule until the stuck-job timeout.
     summary: dict = {}
     error = None
+    partial = None
     finished = False
     try:
         job.progress_pct = 1.0
@@ -130,6 +142,15 @@ async def execute(job: JobQueue, db: Session):
         if attempted and summary["loaded"] == 0:
             error = f"All {summary['failed']} {name} release(s) failed: {summary['errors'][:3]}"
             raise RuntimeError(error)
+        if summary["failed"]:
+            # SPEC_126a tri-state: some loaded, some failed -> partial, not success
+            partial = (
+                f"{PARTIAL_PREFIX} {summary['failed']} of {attempted} {name} release(s) "
+                f"failed: {summary['errors'][:3]}"
+            )[:2000]
+            summary["status"] = "partial"
+        else:
+            summary["status"] = "success"
         finished = True
     except Exception as e:
         if error is None:
@@ -138,8 +159,12 @@ async def execute(job: JobQueue, db: Session):
     finally:
         if not finished and error is None:
             error = f"bulk_ingest {name} interrupted before completion"
-        _finish_ingestion_job(ingestion_job_id, summary, error=error)
+        _finish_ingestion_job(ingestion_job_id, summary, error=error, partial=partial)
 
+    if partial:
+        # the queue row stays 'success' (status enum unchanged); the worker keeps
+        # this visible as "Completed with partial failures"
+        job.error_message = partial
     if summary["rows"] == 0:
         job.progress_message = (
             f"warning: 0 rows loaded ({summary['skipped']} already loaded, {summary['failed']} failed)"
