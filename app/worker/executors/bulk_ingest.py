@@ -123,6 +123,7 @@ async def execute(job: JobQueue, db: Session):
                 max_releases=payload.get("max_releases"),
                 release_keys=payload.get("release_keys"),
                 progress=_progress_writer(job.id),
+                force=bool(payload.get("force")),
             )
         logger.info(f"bulk_ingest {name} summary: { {k: v for k, v in summary.items() if k != 'releases'} }")
 
@@ -140,7 +141,9 @@ async def execute(job: JobQueue, db: Session):
             error = f"bulk_ingest {name} interrupted before completion"
         _finish_ingestion_job(ingestion_job_id, summary, error=error)
 
-    if summary["rows"] == 0 and summary.get("unchanged"):
+    if summary.get("locked"):
+        job.progress_message = f"skipped: another {name} run is in progress"
+    elif summary["rows"] == 0 and summary.get("unchanged"):
         job.progress_message = (
             f"unchanged upstream: {summary['unchanged']} snapshot(s) not modified "
             f"({summary['failed']} failed, {summary['skipped']} already loaded)"

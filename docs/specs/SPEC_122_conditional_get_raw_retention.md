@@ -140,6 +140,46 @@ the CHECK constraint allows without a migration.
 | T10 | executor progress message shows unchanged/bytes | unit |
 | T11 | cleanup endpoint delegates with dry_run default True | unit |
 | T12 | `bulk_raw_retention` setting default 2, env override | unit |
+| F1 | watchdog `failed_release` ignores `superseded:` rows | PG |
+| F2 | unchanged run bumps the prior row's `loaded_at` | PG |
+| F3 | parser_version bump / `force=True` reload an unchanged snapshot | PG |
+| F4 | failed snapshot's file kept while no newer load; failed-superseded kept until `purge_failed`; stuck-superseded newer than every load kept | PG |
+| F5 | run_source / cleanup skip while another holder has the source lock; lock released after | PG |
+| F6 | executor passes `force`, reports `locked`; endpoints pass `force` / `purge_failed` | unit |
+
+## Review fixes (spec-122-fix)
+
+1. **Watchdog noise.** `rule_failed_releases` excludes rows whose `error`
+   starts `superseded:` (literal in the SQL; the watchdog does not import the
+   bulk registry). A real failure alerted when it happened.
+2. **One freshness signal: `loaded_at`.** An unchanged run (304 / equal ETag /
+   equal sha256) sets the prior loaded row's `loaded_at` (and `updated_at`)
+   to now. `loaded_at` now means "content confirmed current as of", so
+   SPEC_126a's `check_source` (`MAX(loaded_at)`) and SPEC_124 need no change.
+3. **Parser changes reload.** `_prior_loaded` only matches a release loaded
+   with the current `parser_version`, so a bump re-downloads and re-merges.
+   `run_source(force=True)` (worker payload `force`, `POST /bulk/{source}/run?force=true`)
+   skips the conditional headers and the ETag/sha256 comparison.
+4. **Superseded files are not deleted early.** A superseded file is eligible
+   only once newer content has loaded: a loaded release with a later key, or
+   a loaded release whose `loaded_at` is after the file's `fetched_at` (an
+   unchanged re-verification counts). A superseded release that had
+   **failed** (not just stuck `fetched`/`discovered`/`staged`) is kept for
+   diagnosis until an operator passes `purge_failed`
+   (`--purge-failed` / `POST /bulk/raw/cleanup?purge_failed=true`).
+   Protected entries carry a `reason`.
+5. **Per-source lock.** `run_source` holds `pg_try_advisory_lock(122,
+   hashtext(source))` on an AUTOCOMMIT connection (no long open transaction)
+   for the whole run; a second run returns `locked=True` without
+   discovering, superseding, pruning or merging. The executor reports
+   `skipped: another <source> run is in progress`. `cleanup` takes the same
+   lock per source and reports `skipped` for a busy source.
+
+Not changed: automatic retention stays snapshot-only; archive sources are
+pruned only by an explicit `--source` cleanup, where "newest N" orders by
+`loaded_at` (most recently loaded), not by release date. Unchanged days are
+not persisted as rows (the minted row is deleted); the durable trace is the
+prior row's bumped `loaded_at`, plus job progress.
 
 ## Test environment note
 
@@ -152,7 +192,10 @@ so the suite ran on a host Python 3.11 venv with an embedded PostgreSQL
 
 1. After deploy, dry-run then apply the one-time cleanup:
    `python -m app.ingest.bulk.retention` (lists files + `bytes_to_free`), then
-   `--apply`. This also supersedes the two stuck `fetched` snapshot rows.
+   `--apply`. This also supersedes the two stuck `fetched` snapshot rows;
+   their files are freed once a newer snapshot has loaded or been re-verified
+   (otherwise listed under `protected` with a reason; the next scheduled run
+   frees them). Superseded releases that had failed need `--purge-failed`.
 2. The first run of each snapshot source after deploy compares against the
    newest loaded release's stored ETag; check the job progress message for
    `unchanged upstream` / `MB saved` to confirm SEC answers 304.

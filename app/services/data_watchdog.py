@@ -307,12 +307,18 @@ def rule_stalled_schedules(db: Session, now: datetime) -> List[Finding]:
 
 
 def rule_failed_releases(db: Session, now: datetime) -> List[Finding]:
-    """raw.source_release rows that failed in the last 24h, one alert per source."""
+    """raw.source_release rows that failed in the last 24h, one alert per source.
+
+    Rows superseded by a newer snapshot (SPEC_122: status 'failed', error
+    starting 'superseded:') are housekeeping, not failures; a real failure
+    alerted when it happened.
+    """
     if not _has_source_release(db):
         return []
     rows = db.execute(text(
         "SELECT source, release_key, LEFT(COALESCE(error, ''), 300) AS error "
         "FROM raw.source_release WHERE status = 'failed' AND updated_at >= :since "
+        "AND COALESCE(error, '') NOT LIKE 'superseded:%' "
         "ORDER BY source, updated_at DESC"
     ), {"since": now - timedelta(hours=24)}).mappings().all()
 

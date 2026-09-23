@@ -34,6 +34,11 @@ def run_bulk_source(
         description="Tables (e.g. sec_13f_holdings) whose publish guard this one job may "
                     "bypass, to accept a legitimately much smaller release (SPEC_129)",
     ),
+    force: bool = Query(
+        False,
+        description="Snapshot sources: skip the conditional GET / unchanged check and "
+                    "re-download and re-merge (e.g. after a parser fix) (SPEC_122)",
+    ),
     db: Session = Depends(get_db),
 ):
     if source not in list_sources():
@@ -41,6 +46,8 @@ def run_bulk_source(
     payload = {"bulk_source": source, "since": since, "max_releases": max_releases}
     if isinstance(publish_guard_override, list) and publish_guard_override:  # not a bare Query()
         payload["publish_guard_override"] = publish_guard_override
+    if force is True:  # not a bare Query()
+        payload["force"] = True
     result = submit_job(db=db, job_type="bulk_ingest", payload=payload)
     return {"source": source, **result}
 
@@ -110,6 +117,8 @@ def cleanup_raw_files(
     keep: Optional[int] = Query(None, ge=1, description="Loaded files to keep per source "
                                                         "(default BULK_RAW_RETENTION)"),
     dry_run: bool = Query(True, description="List files and bytes to free without deleting"),
+    purge_failed: bool = Query(False, description="Also delete files of superseded releases "
+                                                  "whose load failed (kept for diagnosis by default)"),
 ):
     """SPEC_122: supersede stale snapshot rows, then keep the newest ``keep``
     loaded raw files per source. Files of unloaded releases are never deleted."""
@@ -118,4 +127,5 @@ def cleanup_raw_files(
         unknown = sorted(set(sources) - set(list_sources()))
         if unknown:
             raise HTTPException(status_code=404, detail=f"Unknown bulk source(s): {unknown}")
-    return run_raw_cleanup(sources=sources, keep=keep, dry_run=dry_run)
+    return run_raw_cleanup(sources=sources, keep=keep, dry_run=dry_run,
+                           purge_failed=purge_failed is True)

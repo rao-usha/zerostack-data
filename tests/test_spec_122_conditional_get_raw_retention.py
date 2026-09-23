@@ -182,7 +182,8 @@ def _rows(engine, source="fake_snap"):
         return {
             r["release_key"]: dict(r)
             for r in conn.execute(text(
-                "SELECT release_key, status, etag, last_modified, bytes, local_path, error, updated_at "
+                "SELECT release_key, status, etag, last_modified, bytes, local_path, error, updated_at, "
+                "loaded_at, parser_version "
                 "FROM raw.source_release WHERE source = :s"), {"s": source}).mappings()
         }
 
@@ -304,9 +305,9 @@ def test_stale_fetched_snapshot_superseded_and_pruned_pg(pg_engine, tmp_path):
     stuck.write_bytes(ZIP_V2)
     with pg_engine.begin() as conn:
         conn.execute(text(
-            "INSERT INTO raw.source_release (source, release_key, url, status, local_path, bytes) "
-            "VALUES ('fake_snap', 'snapshot:2026-01-02', :u, 'fetched', :p, :b)"),
-            {"u": URL, "p": str(stuck), "b": len(ZIP_V2)})
+            "INSERT INTO raw.source_release (source, release_key, url, status, local_path, bytes, "
+            "fetched_at) VALUES ('fake_snap', 'snapshot:2026-01-02', :u, 'fetched', :p, :b, :f)"),
+            {"u": URL, "p": str(stuck), "b": len(ZIP_V2), "f": datetime.utcnow() - timedelta(hours=1)})
 
     cls.key = "snapshot:2026-01-03"
     r = _run(src, pg_engine, server, tmp_path)
@@ -353,7 +354,8 @@ def test_retention_keeps_newest_and_protects_unloaded_pg(pg_engine, tmp_path):
         ("snapshot:2026-01-03", "loaded", 2, None, 300),
         ("snapshot:2026-01-04", "fetched", None, None, 400),
         ("snapshot:2026-01-05", "failed", None, "HTTPError: boom", 500),
-        ("snapshot:2025-12-31", "failed", None, f"{SUPERSEDED_PREFIX} old", 600),
+        ("snapshot:2025-12-31", "failed", None,
+         f"{SUPERSEDED_PREFIX} newer snapshot snapshot:2026-01-01 discovered; was fetched", 600),
     ])
     orphan = tmp_path / "fake_snap" / "stray" / "snap.zip.part"
     orphan.parent.mkdir(parents=True)
@@ -417,11 +419,12 @@ def test_cleanup_supersedes_and_dry_run_pg(pg_engine, tmp_path):
     paths = _seed(pg_engine, tmp_path, [
         ("snapshot:2026-01-01", "loaded", 0, None, 100),
         ("snapshot:2026-01-02", "fetched", None, None, 200),
+        ("snapshot:2026-01-03", "loaded", 2, None, 300),
     ])
     src = _snap_source()()
     with patch("app.ingest.bulk.retention.get_source", return_value=src):
         dry = cleanup(pg_engine, ["fake_snap"], raw_root=tmp_path, keep=2, dry_run=True,
-                      current_key="snapshot:2026-01-03")
+                      current_key="snapshot:2026-01-04")
         res = dry["sources"]["fake_snap"]
         assert res["superseded"] == ["snapshot:2026-01-02"]
         assert [d["release_key"] for d in res["deleted"]] == ["snapshot:2026-01-02"]
@@ -430,7 +433,7 @@ def test_cleanup_supersedes_and_dry_run_pg(pg_engine, tmp_path):
         assert paths["snapshot:2026-01-02"].exists()
 
         real = cleanup(pg_engine, ["fake_snap"], raw_root=tmp_path, keep=2, dry_run=False,
-                       current_key="snapshot:2026-01-03")
+                       current_key="snapshot:2026-01-04")
     assert real["bytes_freed"] == 200
     row = _rows(pg_engine)["snapshot:2026-01-02"]
     assert row["status"] == "failed" and row["error"].startswith(SUPERSEDED_PREFIX)
@@ -483,3 +486,213 @@ def test_cleanup_endpoint_defaults_to_dry_run():
 
         with pytest.raises(HTTPException):
             bulk.cleanup_raw_files(source=["nope"], keep=None, dry_run=True)
+
+
+# ---------------------------------------------------------------------------
+# Review fixes (spec-122-fix)
+# ---------------------------------------------------------------------------
+
+@pg
+def test_unchanged_bumps_prior_loaded_at_pg(pg_engine, tmp_path):
+    """F2: 'confirmed current' lands in loaded_at, the freshness signal consumers read."""
+    from sqlalchemy import text
+
+    cls = _snap_source()
+    src = cls()
+    server = FakeServer()
+    _run(src, pg_engine, server, tmp_path)
+    with pg_engine.begin() as conn:  # pretend the load happened 10 days ago
+        conn.execute(text("UPDATE raw.source_release SET loaded_at = loaded_at - INTERVAL '10 days'"))
+    old = _rows(pg_engine)["snapshot:2026-01-01"]["loaded_at"]
+    cls.key = "snapshot:2026-01-02"
+    r2 = _run(src, pg_engine, server, tmp_path)
+    assert r2["unchanged"] == 1
+    new = _rows(pg_engine)["snapshot:2026-01-01"]["loaded_at"]
+    assert new - old > timedelta(days=9)
+
+
+@pg
+def test_parser_version_bump_reloads_unchanged_snapshot_pg(pg_engine, tmp_path):
+    """F3: a prior loaded by an older parser is not a valid 'unchanged' baseline."""
+    cls = _snap_source()
+    src = cls()
+    server = FakeServer()
+    _run(src, pg_engine, server, tmp_path)
+    cls.parser_version = "2"
+    cls.key = "snapshot:2026-01-02"
+    r2 = _run(src, pg_engine, server, tmp_path)
+    assert r2["unchanged"] == 0 and r2["loaded"] == 1
+    assert "if-none-match" not in server.requests[-1]
+    assert len(cls.loads) == 2
+    assert _rows(pg_engine)["snapshot:2026-01-02"]["parser_version"] == "2"
+    # same parser again: the conditional path is back on
+    cls.key = "snapshot:2026-01-03"
+    r3 = _run(src, pg_engine, server, tmp_path)
+    assert r3["unchanged"] == 1
+
+
+@pg
+def test_force_skips_conditional_and_equality_pg(pg_engine, tmp_path):
+    """F3: force=True re-downloads and re-merges an unchanged snapshot."""
+    cls = _snap_source()
+    src = cls()
+    server = FakeServer()
+    _run(src, pg_engine, server, tmp_path)
+    cls.key = "snapshot:2026-01-02"
+    r2 = _run(src, pg_engine, server, tmp_path, force=True)
+    assert r2["loaded"] == 1 and r2["unchanged"] == 0
+    assert "if-none-match" not in server.requests[-1]
+    assert len(cls.loads) == 2
+
+
+@pg
+def test_failed_snapshot_file_survives_until_newer_load_pg(pg_engine, tmp_path):
+    """F4: D fails (e.g. publish guard), D+1 fails too -> D's raw file is kept."""
+    from app.ingest.bulk.retention import SUPERSEDED_PREFIX, apply_retention
+
+    cls = _snap_source()
+
+    class Failing(cls):
+        fail = False
+
+        def load(self, conn, release, path):
+            if type(self).fail:
+                raise RuntimeError("publish guard: 90% drop")
+            return super().load(conn, release, path)
+
+    src = Failing()
+    server = FakeServer()
+    _run(src, pg_engine, server, tmp_path)  # day 1 loads V1
+    Failing.fail = True
+    server.body, server.etag = ZIP_V2, '"e2"'
+    Failing.key = "snapshot:2026-01-02"
+    r2 = _run(src, pg_engine, server, tmp_path)
+    assert r2["failed"] == 1
+    d2 = Path(_rows(pg_engine)["snapshot:2026-01-02"]["local_path"])
+    assert d2.exists()
+
+    server.body, server.etag = ZIP_V2 + b"c", '"e3"'
+    Failing.key = "snapshot:2026-01-03"
+    r3 = _run(src, pg_engine, server, tmp_path)
+    assert r3["failed"] == 1
+    assert _rows(pg_engine)["snapshot:2026-01-02"]["error"].startswith(SUPERSEDED_PREFIX)
+    assert d2.exists()  # no newer release loaded: keep it
+    assert "snapshot:2026-01-02" in {p["release_key"] for p in r3["retention"]["protected"]}
+
+    # day 4 loads fine; day 2 failed for a real error -> kept until an operator purges
+    Failing.fail = False
+    server.body, server.etag = ZIP_V2 + b"d", '"e4"'
+    Failing.key = "snapshot:2026-01-04"
+    r4 = _run(src, pg_engine, server, tmp_path)
+    assert r4["loaded"] == 1
+    assert d2.exists()
+
+    out = apply_retention(pg_engine, "fake_snap", tmp_path, keep=2, purge_failed=True)
+    assert "snapshot:2026-01-02" in {d["release_key"] for d in out["deleted"]}
+    assert not d2.exists()
+
+
+@pg
+def test_superseded_stuck_file_needs_newer_load_pg(pg_engine, tmp_path):
+    """F4: a superseded 'fetched' row newer than every load keeps its file."""
+    from app.ingest.bulk.retention import SUPERSEDED_PREFIX, apply_retention
+
+    note = f"{SUPERSEDED_PREFIX} newer snapshot snapshot:2026-01-03 discovered; was fetched"
+    paths = _seed(pg_engine, tmp_path, [
+        ("snapshot:2026-01-01", "loaded", 0, None, 100),
+        ("snapshot:2026-01-02", "failed", None, note, 200),
+    ])
+    out = apply_retention(pg_engine, "fake_snap", tmp_path, keep=2)
+    assert out["deleted"] == []
+    assert paths["snapshot:2026-01-02"].exists()
+
+
+@pg
+def test_run_source_skips_when_source_locked_pg(pg_engine, tmp_path):
+    """F5: a second concurrent run of the same source does nothing."""
+    from sqlalchemy import text
+
+    from app.ingest.bulk.base import source_lock
+    from app.ingest.bulk.retention import cleanup
+
+    cls = _snap_source()
+    src = cls()
+    server = FakeServer()
+    _run(src, pg_engine, server, tmp_path)
+    paths = _seed(pg_engine, tmp_path, [("snapshot:2025-12-01", "fetched", None, None, 100)])
+    cls.key = "snapshot:2026-01-02"
+    with source_lock(pg_engine, "fake_snap") as held:
+        assert held
+        r = _run(src, pg_engine, server, tmp_path)
+        assert r["locked"] is True and r["loaded"] == 0 and r["unchanged"] == 0
+        assert len(server.requests) == 1  # no fetch
+        assert _rows(pg_engine)["snapshot:2025-12-01"]["status"] == "fetched"  # not superseded
+        with patch("app.ingest.bulk.retention.get_source", return_value=src):
+            out = cleanup(pg_engine, ["fake_snap"], raw_root=tmp_path, dry_run=False,
+                          current_key="snapshot:2026-01-02")
+        assert "skipped" in out["sources"]["fake_snap"]
+        assert paths["snapshot:2025-12-01"].exists()
+    # lock released: a later run proceeds
+    r = _run(src, pg_engine, server, tmp_path)
+    assert r["locked"] is False and r["unchanged"] == 1
+    with pg_engine.connect() as conn:
+        held = conn.execute(text(
+            "SELECT COUNT(*) FROM pg_locks WHERE locktype = 'advisory' AND classid = 122")).scalar()
+    assert held == 0
+
+
+@pg
+def test_watchdog_ignores_superseded_releases_pg(pg_engine):
+    """F1: superseding is housekeeping, not a failed_release alert."""
+    from sqlalchemy import text
+    from sqlalchemy.orm import Session
+
+    from app.ingest.bulk.retention import SUPERSEDED_PREFIX
+    from app.services.data_watchdog import rule_failed_releases
+
+    with pg_engine.begin() as conn:
+        conn.execute(text(
+            "INSERT INTO raw.source_release (source, release_key, url, status, error) VALUES "
+            "('fake_snap', 'snapshot:2026-01-01', :u, 'failed', :sup), "
+            "('fake_other', 'x', :u, 'failed', 'HTTPError: boom')"),
+            {"u": URL, "sup": f"{SUPERSEDED_PREFIX} newer snapshot discovered; was fetched"})
+    with Session(pg_engine) as db:
+        findings = rule_failed_releases(db, datetime.utcnow())
+    assert [f.details["source"] for f in findings] == ["fake_other"]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_executor_passes_force_and_reports_locked():
+    from app.worker.executors import bulk_ingest
+
+    job = MagicMock(payload={"bulk_source": "sec_companyfacts", "force": True})
+    seen = {}
+
+    async def fake_to_thread(fn, *args, **kwargs):
+        seen.update(kwargs)
+        return {"loaded": 0, "failed": 0, "skipped": 0, "rows": 0, "errors": ["busy"],
+                "unchanged": 0, "locked": True, "releases": []}
+
+    with patch.object(bulk_ingest.asyncio, "to_thread", fake_to_thread), \
+         patch.object(bulk_ingest, "get_source", return_value=MagicMock()):
+        await bulk_ingest.execute(job, MagicMock())
+    assert seen["force"] is True
+    assert "another sec_companyfacts run" in job.progress_message
+
+
+@pytest.mark.unit
+def test_run_endpoint_force_flag():
+    from app.api.v1 import bulk
+
+    with patch.object(bulk, "submit_job", return_value={"job_id": 1}) as sj, \
+         patch.object(bulk, "list_sources", return_value=["sec_companyfacts"]):
+        bulk.run_bulk_source("sec_companyfacts", since=None, max_releases=None,
+                             publish_guard_override=None, force=True, db=MagicMock())
+        assert sj.call_args.kwargs["payload"]["force"] is True
+        bulk.run_bulk_source("sec_companyfacts", since=None, max_releases=None,
+                             publish_guard_override=None, force=False, db=MagicMock())
+        assert "force" not in sj.call_args.kwargs["payload"]
+        with patch.object(bulk, "run_raw_cleanup", return_value={}) as rc:
+            bulk.cleanup_raw_files(source=None, keep=None, dry_run=True, purge_failed=True)
+            assert rc.call_args.kwargs["purge_failed"] is True

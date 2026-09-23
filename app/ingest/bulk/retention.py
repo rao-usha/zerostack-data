@@ -8,7 +8,12 @@ newest ``keep`` *loaded* files per source and deletes older loaded ones.
 Never deleted:
 - the file of a release that is not ``loaded`` (``discovered``/``fetched``/
   ``staged``/``failed`` -- a later run resumes from it), unless the release is
-  marked superseded;
+  marked superseded AND newer content has since loaded (a loaded release with
+  a later key, or one whose ``loaded_at`` -- bumped when an unchanged upstream
+  is re-verified -- is after this file was fetched). A superseded release
+  that had *failed* (e.g. a publish-guard trip) is kept even then until an
+  operator passes ``purge_failed`` (``--purge-failed``): SEC keeps no history
+  of these rolling files, so that copy is the only evidence of what failed;
 - the newest loaded file (``keep`` is clamped to >= 1);
 - anything outside ``<raw_root>/<source>/``;
 - files no release row references (reported as ``orphans``; one may be an
@@ -20,9 +25,15 @@ after a newer one would regress data. ``supersede_stale`` gives such rows an
 honest terminal state: ``status='failed'`` with ``error`` starting
 ``SUPERSEDED_PREFIX`` (the status CHECK constraint has no ``superseded``).
 
+Superseded rows are excluded from the watchdog's failed-release alert (their
+failure, if any, alerted when it happened).
+
+Retention, supersede and cleanup run under the same per-source advisory lock
+as ``run_source`` (``base.source_lock``), so they never act on a running load.
+
 One-time cleanup (dry-run unless ``--apply``)::
 
-    python -m app.ingest.bulk.retention [--source NAME ...] [--keep N] [--apply]
+    python -m app.ingest.bulk.retention [--source NAME ...] [--keep N] [--purge-failed] [--apply]
 """
 
 from __future__ import annotations
@@ -31,6 +42,7 @@ import argparse
 import json
 import logging
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
@@ -42,10 +54,19 @@ from app.ingest.bulk.registry import get_source, list_sources
 logger = logging.getLogger(__name__)
 
 SUPERSEDED_PREFIX = "superseded:"
+_WAS_STATUS = re.compile(r"; was (\w+)")
 
 
 def _is_superseded(row: Dict[str, Any]) -> bool:
     return row["status"] != "loaded" and (row.get("error") or "").startswith(SUPERSEDED_PREFIX)
+
+
+def _status_before_supersede(row: Dict[str, Any]) -> str:
+    """The status a superseded row had (``failed`` when unknown: be conservative)."""
+    if not _is_superseded(row):
+        return row["status"]
+    m = _WAS_STATUS.search(row.get("error") or "")
+    return m.group(1) if m else "failed"
 
 
 def _inside(path: Path, root: Path) -> bool:
@@ -104,11 +125,13 @@ def apply_retention(
     keep: Optional[int] = None,
     dry_run: bool = False,
     assume_superseded: Iterable[str] = (),
+    purge_failed: bool = False,
 ) -> Dict[str, Any]:
     """Delete raw files beyond the newest ``keep`` loaded ones for ``source``.
 
     ``assume_superseded``: keys to treat as superseded (dry-run of a cleanup
-    that would supersede them first).
+    that would supersede them first). ``purge_failed``: also delete superseded
+    files whose load had failed (operator cleanup only).
     """
     from app.core.config import get_settings
 
@@ -125,21 +148,33 @@ def apply_retention(
             dict(r)
             for r in conn.execute(
                 text(
-                    "SELECT release_key, status, local_path, error, loaded_at "
-                    "FROM raw.source_release WHERE source = :s AND local_path IS NOT NULL"
+                    "SELECT release_key, status, local_path, error, loaded_at, fetched_at "
+                    "FROM raw.source_release WHERE source = :s"
                 ),
                 {"s": source},
             ).mappings()
         ]
+    loaded_rows = [r for r in rows if r["status"] == "loaded"]
+    newest_loaded_key = max((r["release_key"] for r in loaded_rows), default=None)
+    newest_loaded_at = max((r["loaded_at"] for r in loaded_rows if r["loaded_at"]), default=None)
+    rows = [r for r in rows if r["local_path"]]
+
+    def newer_loaded(row) -> bool:
+        if newest_loaded_key is not None and row["release_key"] < newest_loaded_key:
+            return True
+        return bool(newest_loaded_at and row.get("fetched_at") and newest_loaded_at > row["fetched_at"])
 
     result: Dict[str, Any] = {
         "source": source, "keep": keep, "dry_run": dry_run, "kept": [], "protected": [],
         "deleted": [], "orphans": [], "bytes_to_free": 0, "bytes_freed": 0, "errors": [],
     }
 
-    def entry(row, path):
-        return {"release_key": row["release_key"], "status": row["status"],
+    def entry(row, path, reason=None):
+        item = {"release_key": row["release_key"], "status": row["status"],
                 "path": str(path), "bytes": _size(path)}
+        if reason:
+            item["reason"] = reason
+        return item
 
     referenced = set()
     on_disk = []
@@ -165,11 +200,18 @@ def apply_retention(
     for row, path in on_disk:
         if row["status"] == "loaded":
             continue
+        reason = "not loaded"
         if _is_superseded(row) or row["release_key"] in assume:
-            doomed.append((row, path))
-        else:
-            keep_paths.add(str(path.resolve()))
-            result["protected"].append(entry(row, path))
+            was = row["status"] if row["release_key"] in assume else _status_before_supersede(row)
+            if not newer_loaded(row):
+                reason = "superseded, but no newer release has loaded yet"
+            elif was == "failed" and not purge_failed:
+                reason = "superseded after a failed load; kept for diagnosis (purge_failed to delete)"
+            else:
+                doomed.append((row, path))
+                continue
+        keep_paths.add(str(path.resolve()))
+        result["protected"].append(entry(row, path, reason))
 
     seen = set()
     for row, path in doomed:
@@ -221,11 +263,15 @@ def cleanup(
     keep: Optional[int] = None,
     dry_run: bool = True,
     current_key: Optional[str] = None,
+    purge_failed: bool = False,
 ) -> Dict[str, Any]:
     """One-time / on-demand cleanup: supersede stale snapshots, then apply retention.
 
-    ``sources`` defaults to the snapshot sources. Dry-run changes nothing.
+    ``sources`` defaults to the snapshot sources. Dry-run changes nothing. A
+    source whose bulk run is in progress (lock held) is skipped.
     """
+    from app.ingest.bulk.base import source_lock
+
     if engine is None:
         from app.core.database import get_engine
 
@@ -234,17 +280,23 @@ def cleanup(
     out: Dict[str, Any] = {"dry_run": dry_run, "sources": {}, "bytes_to_free": 0, "bytes_freed": 0}
     for name in names:
         src = get_source(name)
-        superseded: List[str] = []
-        if getattr(src, "snapshot", False):
-            cur = current_key
-            if cur is None:
-                keys = [r.release_key for r in src.discover(None)]  # snapshot discover is offline
-                cur = max(keys) if keys else None
-            if cur:
-                superseded = supersede_stale(engine, name, cur, dry_run=dry_run)
-        res = apply_retention(engine, name, raw_root, keep=keep, dry_run=dry_run,
-                              assume_superseded=superseded if dry_run else ())
-        res["superseded"] = superseded
+        with source_lock(engine, name) as acquired:
+            if not acquired:
+                out["sources"][name] = {"skipped": f"a {name} bulk run is in progress",
+                                        "bytes_to_free": 0, "bytes_freed": 0}
+                continue
+            superseded: List[str] = []
+            if getattr(src, "snapshot", False):
+                cur = current_key
+                if cur is None:
+                    keys = [r.release_key for r in src.discover(None)]  # snapshot discover is offline
+                    cur = max(keys) if keys else None
+                if cur:
+                    superseded = supersede_stale(engine, name, cur, dry_run=dry_run)
+            res = apply_retention(engine, name, raw_root, keep=keep, dry_run=dry_run,
+                                  assume_superseded=superseded if dry_run else (),
+                                  purge_failed=purge_failed)
+            res["superseded"] = superseded
         out["sources"][name] = res
         out["bytes_to_free"] += res["bytes_to_free"]
         out["bytes_freed"] += res["bytes_freed"]
@@ -256,10 +308,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--source", action="append", help="Bulk source (repeatable). Default: snapshot sources")
     parser.add_argument("--keep", type=int, default=None, help="Loaded files to keep (default BULK_RAW_RETENTION)")
     parser.add_argument("--raw-root", default=None, help="Raw root (default settings.bulk_raw_dir)")
+    parser.add_argument("--purge-failed", action="store_true",
+                        help="Also delete files of superseded releases whose load failed")
     parser.add_argument("--apply", action="store_true", help="Actually delete (otherwise dry-run)")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO)
-    out = cleanup(sources=args.source, raw_root=args.raw_root, keep=args.keep, dry_run=not args.apply)
+    out = cleanup(sources=args.source, raw_root=args.raw_root, keep=args.keep, dry_run=not args.apply,
+                  purge_failed=args.purge_failed)
     print(json.dumps(out, indent=2, default=str))
     return 0
 
