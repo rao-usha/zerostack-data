@@ -116,3 +116,6 @@ scripts/probe_*.py
 .env.cloud
 .env.test
 CLOUD_DB_SETUP.md
+
+# Kaggle API credentials (mounted into the api container, never committed)
+.kaggle/

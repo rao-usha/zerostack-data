@@ -219,7 +219,7 @@ The cheapest, sanest path. Total cost ~$20-50/month for the first year of low-tr
      --min-instances 0 --max-instances 3 \
      --memory 1Gi --cpu 1 \
      --add-cloudsql-instances PROJECT:us-central1:nexdata-cloud-sql \
-     --set-env-vars DATABASE_URL=postgresql+psycopg2://nexdata:Nex2026@/nexdata?host=/cloudsql/...
+     --set-env-vars DATABASE_URL=postgresql+psycopg2://nexdata:${DB_PASSWORD}@/nexdata?host=/cloudsql/...
    ```
 5. **Update `atlas.html`** — change `const API = '/api/v1/atlas'` to
    `'https://api.nexdata.io/api/v1/atlas'` (or use a relative `/api`
