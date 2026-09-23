@@ -1183,7 +1183,7 @@ def test_redact_masks_secrets():
     assert "ABCSECRET123" not in out and "t0k" not in out
     assert "api_key=***" in out and "frequency=monthly" in out
     assert "SECRET" not in redact("Authorization: Bearer SECRETTOKEN.abc")
-    assert redact("postgresql://user:hunter2@db:5432/x") == "postgresql://user:***@db:5432/x"
+    assert redact("postgresql://user:hunter2@db:5432/x") == "postgresql://user:***@db:5432/x"  # gitleaks:allow (redaction fixture, not a credential)
     assert redact("monkey=1 donkey=2") == "monkey=1 donkey=2"
     assert redact(None) is None
 
