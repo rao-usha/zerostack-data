@@ -87,7 +87,7 @@ jobs:
 
   secrets:
     # Blocking. Scans only the commits this push / PR adds, so the known,
-    # rotated historical leaks (see .gitleaks.toml) cannot fail every build,
+    # historical leaks (pending rotation, see .gitleaks.toml) cannot fail every build,
     # while any NEW secret does.
     runs-on: ubuntu-latest
 

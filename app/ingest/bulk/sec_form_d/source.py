@@ -449,6 +449,7 @@ class SecFormDDataSets(BulkSource):
         self.ensure_ddl(conn)
         path = Path(path)
         rk = release.release_key
+        p.validate_members(path)  # SPEC_129: fail before staging anything
         skip = p.non_live_accessions(path)
         if skip:
             logger.info(f"[bulk:sec_form_d] {rk}: skipping {len(skip)} non-LIVE submissions")

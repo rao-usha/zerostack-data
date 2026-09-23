@@ -9,6 +9,7 @@ from contextlib import nullcontext
 
 from sqlalchemy.orm import Session
 
+from app.core.copy_loader import publish_guard_override
 from app.core.database import get_engine
 from app.core.models_queue import JobQueue
 
@@ -68,13 +69,15 @@ async def execute(job: JobQueue, db: Session):
     job.progress_message = "Building PE marts from SEC data"
     db.commit()
 
-    summary = await asyncio.to_thread(
-        run_pe_marts,
-        skip_firms=bool(payload.get("skip_firms")),
-        skip_funds=bool(payload.get("skip_funds")),
-        skip_people=bool(payload.get("skip_people")),
-        dry_run=bool(payload.get("dry_run")),
-    )
+    # publish_guard_override (SPEC_129): accept a guard trip for this job only
+    with publish_guard_override(payload.get("publish_guard_override")):
+        summary = await asyncio.to_thread(
+            run_pe_marts,
+            skip_firms=bool(payload.get("skip_firms")),
+            skip_funds=bool(payload.get("skip_funds")),
+            skip_people=bool(payload.get("skip_people")),
+            dry_run=bool(payload.get("dry_run")),
+        )
 
     firms = summary.get("firms", {})
     funds = summary.get("funds", {})

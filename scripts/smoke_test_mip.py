@@ -23,10 +23,10 @@ from sqlalchemy.orm import Session
 
 from app.reports.templates.market_intelligence_pack import MarketIntelligencePackTemplate
 
-CLOUD_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://nexdata:Nex2026@127.0.0.1:5435/nexdata",
-)
+# No default: the credentials live in the environment, never in the repo.
+CLOUD_URL = os.environ.get("DATABASE_URL")
+if not CLOUD_URL:
+    sys.exit("DATABASE_URL is required (e.g. postgresql://nexdata:<password>@127.0.0.1:5435/nexdata)")
 
 # Sample: Building equipment contractors × Houston.
 # We initially picked 3323 (Architectural & Structural Metals Mfg) but the

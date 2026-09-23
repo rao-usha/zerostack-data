@@ -46,6 +46,7 @@ from app.ingest.bulk.sec_13f.parse import (
     iter_holdings,
     iter_other_managers,
     parse_index,
+    validate_members,
 )
 
 logger = logging.getLogger(__name__)
@@ -181,11 +182,12 @@ class Sec13FDataSets(BulkSource):
                          release_key: str, loaded_at: datetime) -> int:
         all_cols = list(columns) + [c for c, _ in META_COLUMNS]
         create_staging(conn, stg, [(c, types[c]) for c in columns] + META_COLUMNS)
-        try:
-            copy_rows(conn, stg, all_cols, _tuples(rows, columns, release_key, loaded_at))
-            inserted, updated = merge_staging(conn, stg, target, all_cols, keys)
-        finally:
-            drop_staging(conn, stg)
+        # No try/finally: after a failed COPY the transaction is aborted, so a
+        # cleanup DROP would itself fail and mask the real error. The rollback
+        # removes the staging table anyway.
+        copy_rows(conn, stg, all_cols, _tuples(rows, columns, release_key, loaded_at))
+        inserted, updated = merge_staging(conn, stg, target, all_cols, keys)
+        drop_staging(conn, stg)
         return inserted + updated
 
     def load(self, conn, release: Release, path: Path) -> Dict[str, int]:
@@ -199,6 +201,7 @@ class Sec13FDataSets(BulkSource):
         out: Dict[str, int] = {}
 
         with zipfile.ZipFile(path) as zf:
+            validate_members(zf)  # SPEC_129: fail before staging anything
             out["sec_13f_filings"] = self._stage_and_merge(
                 conn, "sec_13f_filings", FILINGS_TABLE, FILING_COLUMNS, FILING_TYPES,
                 ["accession_number"], iter_filings(zf, fallback), key, loaded_at)

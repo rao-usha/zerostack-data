@@ -118,7 +118,8 @@ def build(conn, today: Optional[date] = None) -> Dict[str, int]:
     candidates = conn.execute(text(INSERT_STAGING_SQL), {"today": today}).rowcount
     # The delete below removes every fund the staging set lacks, so emptied or
     # truncated filing tables would wipe the mart. Refuse that (SPEC_129).
-    check_publish(TARGET, int(candidates or 0), table_count(conn, TARGET))
+    # Empty filings over an empty mart (no Schedule D load yet) is a no-op.
+    check_publish(TARGET, int(candidates or 0), table_count(conn, TARGET), allow_empty=True)
     inserted, updated = merge_staging(conn, STAGING, TARGET, COLUMN_NAMES, KEY_COLUMNS)
     deleted = conn.execute(text(DELETE_SQL)).rowcount
     drop_staging(conn, STAGING)

@@ -6,6 +6,8 @@ rows are tagged (`data_sources` contains "SEC ADV", `data_source = 'SEC Form D'`
 and hand-entered rows are never touched.
 """
 
+from typing import List, Optional
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -20,9 +22,14 @@ router = APIRouter(prefix="/pe/marts", tags=["PE Intelligence - Marts"])
 def queue_build(
     skip_firms: bool = Query(False),
     skip_funds: bool = Query(False),
+    publish_guard_override: Optional[List[str]] = Query(
+        None, description="Tables whose publish guard this one build may bypass (SPEC_129)"
+    ),
     db: Session = Depends(get_db),
 ):
     payload = {"skip_firms": skip_firms, "skip_funds": skip_funds}
+    if isinstance(publish_guard_override, list) and publish_guard_override:  # not a bare Query()
+        payload["publish_guard_override"] = publish_guard_override
     return submit_job(db=db, job_type="pe_mart_build", payload=payload)
 
 

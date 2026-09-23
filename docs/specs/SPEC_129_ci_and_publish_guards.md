@@ -28,7 +28,7 @@ Stop the ways data can vanish, or look wrong, without anyone being told:
 - [ ] CI runs on Python 3.11, sets `TEST_PG_URL` to the service Postgres, and
       brings a blank database to `alembic` head before tests.
 - [ ] CI has a blocking secret-scan job that scans only the push / PR commit
-      range, so the known (rotated) historical leak cannot fail every build.
+      range, so the known historical leaks (pending rotation) cannot fail every build.
 - [ ] The Docker smoke step checks something real (the image imports the app).
 - [ ] A 13F release missing a required member or header **fails** (release
       `failed`, transaction rolled back, holdings untouched).
@@ -184,4 +184,33 @@ rewrite across `pe_*.py`; computed locals checked by hand for divide-by-zero).
 
 ## Feedback History
 
-_No corrections yet._
+### Review round 1 (spec-129-fix)
+
+- **Empty-to-empty mart rebuild failed.** `check_publish(..., 0, 0)` raised, so
+  `adv_private_funds.build` (and the monthly `pe_mart_build`) failed on any DB
+  with no Schedule D rows yet. Added `allow_empty=True` for the mart only: an
+  empty replacement of an empty target is a no-op. Raw loads (13F holdings)
+  keep the strict default. Tests: `test_allow_empty_*`, PG
+  `test_adv_private_funds_empty_sources_empty_mart_is_noop`,
+  `test_pe_marts_run_on_empty_adv_does_not_fail`.
+- **Override never reached the workers.** The env var is not in the worker's
+  compose environment. Added a per-job override: payload
+  `publish_guard_override: ["sec_13f_holdings"]` (or `true`), exposed as a
+  query param on `POST /bulk/{source}/run` and `POST /pe/marts/build`. The
+  executors set a contextvar that `asyncio.to_thread` carries into the loader
+  thread, so it applies to that job only. The env var stays as a fallback
+  for scripts and local runs. The guard error message now names the payload
+  override.
+- **Guard errors were masked.** Running the PG tests showed that a parse guard
+  raising inside a COPY aborted the transaction, and the `finally: drop_staging`
+  in the 13F loader then failed with `InFailedSqlTransaction`, hiding the real
+  message. Both loaders now call `validate_members()` up front (members and
+  headers checked before anything is staged), and the 13F loader drops staging
+  only on success (rollback removes it otherwise).
+- **Secrets.** The Cloud SQL password was still a default in five scripts; they
+  now require `DATABASE_URL` / `PGPASSWORD`. `.gitleaks.toml` says "pending
+  rotation", not "rotated". Run locally with gitleaks 8.21.2, the default
+  rules caught neither of the repo's real leak shapes (DB-URL password, Kaggle
+  key), so two custom rules were added (`db-url-password`, `kaggle-api-key`),
+  and the allowlist uses `regexTarget = "match"`. The four script commits that
+  carried the password were added to the commit allowlist.

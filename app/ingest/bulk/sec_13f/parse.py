@@ -180,6 +180,18 @@ REQUIRED_HEADERS: Dict[str, tuple] = {
 }
 
 
+def validate_members(zf: zipfile.ZipFile) -> None:
+    """Check every required member and header up front, before any COPY starts.
+
+    ``iter_tsv`` enforces the same rules lazily, but a ValueError raised from
+    inside a COPY aborts the transaction and surfaces as a psycopg2 error (or
+    is masked by cleanup SQL). Failing here keeps the release error readable.
+    """
+    for basename in REQUIRED_HEADERS:
+        for _ in iter_tsv(zf, basename.replace(".TSV", ".tsv")):
+            break
+
+
 def iter_tsv(zf: zipfile.ZipFile, basename: str) -> Iterator[Dict[str, Optional[str]]]:
     """Stream one TSV member as dicts keyed by upper-case header. Blank -> None.
 

@@ -211,6 +211,21 @@ def iter_tsv(zip_path: Path | str, filename: str, required: bool = True) -> Iter
                 yield row
 
 
+OPTIONAL_MEMBERS = frozenset({"RECIPIENTS.TSV", "SIGNATURES.TSV"})
+
+
+def validate_members(zip_path: Path | str) -> None:
+    """Check every required member and header up front, before any COPY starts.
+
+    ``iter_tsv`` enforces the same rules lazily, but a ValueError raised from
+    inside a COPY surfaces as a psycopg2 error. Failing here keeps the
+    release error readable and stages nothing.
+    """
+    for filename in REQUIRED_HEADERS:
+        for _ in iter_tsv(zip_path, filename, required=filename not in OPTIONAL_MEMBERS):
+            break
+
+
 def _acc(row: Dict[str, str]) -> Optional[str]:
     return clean(row.get("ACCESSIONNUMBER"))
 

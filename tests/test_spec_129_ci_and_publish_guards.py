@@ -417,7 +417,10 @@ class TestCiWorkflow:
         assert "scripts/ci/bootstrap_db.py" in runs
         # migrate before tests
         order = [i for i, s in enumerate(test_job["steps"]) if "bootstrap_db" in str(s.get("run", ""))]
-        tests = [i for i, s in enumerate(test_job["steps"]) if "pytest" in str(s.get("run", ""))]
+        # a step that RUNS pytest (not the one that pip-installs it)
+        tests = [i for i, s in enumerate(test_job["steps"])
+                 if any(ln.strip().startswith(("pytest", "python -m pytest"))
+                        for ln in str(s.get("run", "")).splitlines())]
         assert order and tests and order[0] < tests[0]
 
     def test_secret_scan_is_blocking(self, ci):
@@ -738,3 +741,191 @@ def test_quarantine_skips_absent_tables():
         assert result["roots"][0]["live"] == 0 and result["roots"][0].get("absent") is True
     finally:
         engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Review fixes (SPEC_129 fix round)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestGuardReviewFixes:
+    def test_allow_empty_accepts_empty_over_empty_only(self, monkeypatch):
+        """R1/R2: a derived mart over empty sources is a no-op, not a failure."""
+        from app.core.copy_loader import PublishGuardError, check_publish
+
+        monkeypatch.delenv("BULK_PUBLISH_GUARD_OVERRIDE", raising=False)
+        check_publish("public.sec_adv_private_funds", 0, 0, allow_empty=True)
+        # emptying or shrinking a published mart is still refused
+        with pytest.raises(PublishGuardError):
+            check_publish("public.sec_adv_private_funds", 0, 100, allow_empty=True)
+        with pytest.raises(PublishGuardError):
+            check_publish("public.sec_adv_private_funds", 10, 100, allow_empty=True)
+
+    def test_job_override_is_scoped(self, monkeypatch):
+        """R3: the per-job override works without env and ends with the block."""
+        from app.core.copy_loader import PublishGuardError, check_publish, publish_guard_override
+
+        monkeypatch.delenv("BULK_PUBLISH_GUARD_OVERRIDE", raising=False)
+        with publish_guard_override(["sec_13f_holdings"]):
+            check_publish("public.sec_13f_holdings", 0, 3_800_000)
+            with pytest.raises(PublishGuardError):
+                check_publish("public.sec_adv_private_funds", 0, 100)
+        with pytest.raises(PublishGuardError):
+            check_publish("public.sec_13f_holdings", 0, 3_800_000)
+        with publish_guard_override(None):
+            with pytest.raises(PublishGuardError):
+                check_publish("public.sec_13f_holdings", 0, 3_800_000)
+        with publish_guard_override(True):
+            check_publish("public.sec_adv_private_funds", 0, 100)
+        with publish_guard_override("sec_13f_holdings, other"):
+            check_publish("public.sec_13f_holdings", 0, 3_800_000)
+
+    def test_error_message_names_payload_override(self, monkeypatch):
+        from app.core.copy_loader import PublishGuardError, check_publish
+
+        monkeypatch.delenv("BULK_PUBLISH_GUARD_OVERRIDE", raising=False)
+        with pytest.raises(PublishGuardError, match="publish_guard_override"):
+            check_publish("public.sec_13f_holdings", 0, 10)
+
+    def test_bulk_executor_passes_payload_override_to_loader_thread(self, monkeypatch):
+        """R3: the payload override reaches run_source's thread, and only that job."""
+        from unittest.mock import MagicMock
+
+        from app.core import copy_loader
+        from app.worker.executors import bulk_ingest
+
+        monkeypatch.delenv("BULK_PUBLISH_GUARD_OVERRIDE", raising=False)
+        seen = []
+
+        def fake_run_source(source, **kw):
+            seen.append(copy_loader._guard_overridden("public.sec_13f_holdings"))
+            return {"loaded": 1, "failed": 0, "skipped": 0, "rows": 5, "errors": []}
+
+        monkeypatch.setattr(bulk_ingest, "run_source", fake_run_source)
+        monkeypatch.setattr(bulk_ingest, "get_source", lambda name: object())
+        monkeypatch.setattr(bulk_ingest, "_progress_writer", lambda job_id: None)
+        job = MagicMock(payload={"bulk_source": "sec_13f",
+                                 "publish_guard_override": ["sec_13f_holdings"]})
+        asyncio.run(bulk_ingest.execute(job, MagicMock()))
+        job2 = MagicMock(payload={"bulk_source": "sec_13f"})
+        asyncio.run(bulk_ingest.execute(job2, MagicMock()))
+        assert seen == [True, False]
+        assert copy_loader._guard_overridden("public.sec_13f_holdings") is False
+
+    def test_mart_executor_passes_payload_override(self, monkeypatch):
+        from unittest.mock import MagicMock
+
+        from app.core import copy_loader
+        from app.worker.executors import pe_marts
+
+        monkeypatch.delenv("BULK_PUBLISH_GUARD_OVERRIDE", raising=False)
+        seen = []
+
+        def fake(**kw):
+            seen.append(copy_loader._guard_overridden("public.sec_adv_private_funds"))
+            return {}
+
+        monkeypatch.setattr(pe_marts, "run_pe_marts", fake)
+        job = MagicMock(payload={"publish_guard_override": ["sec_adv_private_funds"]})
+        asyncio.run(pe_marts.execute(job, MagicMock()))
+        assert seen == [True]
+
+    def test_bulk_api_puts_override_in_payload(self, monkeypatch):
+        from app.api.v1 import bulk
+
+        captured = {}
+        monkeypatch.setattr(bulk, "list_sources", lambda: ["sec_13f"])
+        monkeypatch.setattr(bulk, "submit_job",
+                            lambda db, job_type, payload: captured.update(payload) or {"job_id": 1})
+        bulk.run_bulk_source("sec_13f", since=None, max_releases=None,
+                             publish_guard_override=["sec_13f_holdings"], db=None)
+        assert captured["publish_guard_override"] == ["sec_13f_holdings"]
+        captured.clear()
+        bulk.run_bulk_source("sec_13f", since=None, max_releases=None,
+                             publish_guard_override=None, db=None)
+        assert "publish_guard_override" not in captured
+
+
+@pytest.mark.unit
+class TestEagerMemberValidation:
+    """Found by running the PG test: a guard raised INSIDE the COPY aborted the
+    transaction, and the cleanup DROP then masked it with InFailedSqlTransaction."""
+
+    def test_13f_validate_members(self, tmp_path):
+        from app.ingest.bulk.sec_13f.parse import validate_members
+
+        with zipfile.ZipFile(_13f_zip(tmp_path / "ok.zip")) as zf:
+            validate_members(zf)
+        with zipfile.ZipFile(_13f_zip(tmp_path / "a.zip", drop=("INFOTABLE.tsv",))) as zf:
+            with pytest.raises(ValueError, match="INFOTABLE"):
+                validate_members(zf)
+        path = _13f_zip(tmp_path / "b.zip", rename={"OTHERMANAGER2.tsv": ("SEQUENCENUMBER", "SEQ")})
+        with zipfile.ZipFile(path) as zf:
+            with pytest.raises(ValueError, match="SEQUENCENUMBER"):
+                validate_members(zf)
+        with zipfile.ZipFile(_13f_zip(tmp_path / "c.zip", drop=("OTHERMANAGER2.tsv",))) as zf:
+            validate_members(zf)  # optional member may be absent
+
+    def test_form_d_validate_members(self, tmp_path):
+        from app.ingest.bulk.sec_form_d import parse as p
+        from tests.test_spec_108_sec_form_d_bulk import build_zip
+
+        good = build_zip(tmp_path / "good.zip")
+        p.validate_members(good)
+        p.validate_members(_rewrite_zip(good, tmp_path / "slim.zip", drop=("RECIPIENTS.tsv",)))
+        with pytest.raises(ValueError, match="OFFERING"):
+            p.validate_members(_rewrite_zip(good, tmp_path / "nooff.zip", drop=("OFFERING.tsv",)))
+        with pytest.raises(ValueError, match="ENTITYNAME"):
+            p.validate_members(_rewrite_zip(good, tmp_path / "bad.zip",
+                                            rename={"ISSUERS.tsv": ("ENTITYNAME", "ENTITY_NAME")}))
+
+
+@pytest.mark.unit
+def test_no_hardcoded_cloud_sql_password():
+    """R4: the Cloud SQL password must not sit in code or scripts at HEAD."""
+    needle = "Nex" + "2026"
+    offenders = []
+    for top in ("app", "scripts", "tests", "alembic"):
+        for path in (REPO / top).rglob("*"):
+            if path.is_file() and path.suffix in (".py", ".sh", ".md", ".ini", ".toml", ".yml", ".yaml"):
+                if needle in path.read_text(encoding="utf-8", errors="ignore"):
+                    offenders.append(str(path.relative_to(REPO)))
+    assert offenders == []
+
+
+@pytest.mark.unit
+def test_gitleaks_allowlist_targets_whole_match():
+    """R5: allowlist regexes default to the extracted secret; the URL pattern needs the match."""
+    import tomllib
+
+    raw = (REPO / ".gitleaks.toml").read_text(encoding="utf-8")
+    cfg = tomllib.loads(raw)
+    assert cfg["allowlist"]["regexTarget"] == "match"
+    assert "pending rotation" in raw.lower()
+
+
+@pg
+def test_adv_private_funds_empty_sources_empty_mart_is_noop(pgmart, monkeypatch):
+    """R1/R2: a fresh DB (no Schedule D rows, empty mart) builds without raising."""
+    from sqlalchemy import text
+
+    from app.marts import adv_private_funds
+
+    monkeypatch.delenv("BULK_PUBLISH_GUARD_OVERRIDE", raising=False)
+    with pgmart.begin() as conn:
+        adv_private_funds.build(conn, today=date(2026, 9, 20))
+    with pgmart.connect() as conn:
+        assert conn.execute(text("SELECT COUNT(*) FROM sec_adv_private_funds")).scalar() == 0
+
+
+@pg
+def test_pe_marts_run_on_empty_adv_does_not_fail(pgmart, monkeypatch):
+    """R1: the scheduled pe_mart_build must run every stage before any ADV data exists."""
+    from app.worker.executors import pe_marts
+
+    monkeypatch.delenv("BULK_PUBLISH_GUARD_OVERRIDE", raising=False)
+    monkeypatch.setattr(pe_marts, "get_engine", lambda: pgmart)
+    summary = pe_marts.run_pe_marts(skip_people=True)
+    assert "adv_private_funds" in summary and "funds" in summary
+    dry = pe_marts.run_pe_marts(skip_people=True, dry_run=True)
+    assert dry["dry_run"] is True and "funds" in dry

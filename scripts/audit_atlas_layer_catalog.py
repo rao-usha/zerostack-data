@@ -36,10 +36,10 @@ import psycopg2.extras
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("catalog-audit")
 
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://nexdata:Nex2026@host.docker.internal:5435/nexdata",
-)
+# No default: the credentials live in the environment, never in the repo.
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if not DATABASE_URL:
+    sys.exit("DATABASE_URL is required (e.g. postgresql://nexdata:<password>@host.docker.internal:5435/nexdata)")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Domain mapping — table-name prefix / pattern → domain. Order matters
