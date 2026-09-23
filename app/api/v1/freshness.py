@@ -142,14 +142,59 @@ def get_freshness_dashboard(db: Session = Depends(get_db)):
         s["source"],
     ))
 
+    # 6. Catalog producers with no job, schedule or SLA at all: never run.
+    #    Listed apart so ``sources`` keeps its meaning (SPEC_124).
+    never_run = [
+        {"source": src, "datasets": keys, "freshness": "never_run"}
+        for src, (aliases, keys) in sorted(_catalog_job_sources().items())
+        if not aliases & all_sources
+    ]
+
     return {
         "total_sources": len(sources),
         "stale_count": counts["stale"] + counts["never_succeeded"],
         "never_succeeded_count": counts["never_succeeded"],
         "fresh_count": counts["fresh"],
         "unknown_count": counts["unknown"],
+        "never_run_count": len(never_run),
         "sources": sources,
+        "never_run": never_run,
     }
+
+
+def _catalog_job_sources() -> dict[str, tuple[set, list[str]]]:
+    """Job source of each catalog producer -> (the ``ingestion_jobs.source``
+    spellings it may have run under, its dataset keys).
+
+    bulk:<name> and job:<type> are their own job source. dispatch:<key> runs
+    as ``<base>`` + ``config.dataset`` (the run endpoint's spelling) or as the
+    whole key (``sec:formadv``). api:/collector: producers never write
+    ingestion_jobs.
+    """
+    try:
+        from app.catalog.registry import get_catalog
+
+        specs = get_catalog()
+    except Exception as e:  # the dashboard must not fail on the catalog
+        logger.warning(f"freshness: catalog unavailable: {type(e).__name__}")
+        return {}
+    out: dict[str, tuple[set, list[str]]] = {}
+    for spec in specs:
+        for producer in spec.producers:
+            base = producer.split("#", 1)[0]
+            kind, _, value = base.partition(":")
+            if kind in ("bulk", "job"):
+                source, aliases = base, {base}
+            elif kind == "dispatch":
+                source = value.split(":", 1)[0]
+                aliases = {source, value}
+            else:
+                continue
+            known, keys = out.setdefault(source, (set(), []))
+            known.update(aliases)
+            if spec.key not in keys:
+                keys.append(spec.key)
+    return out
 
 
 # =============================================================================

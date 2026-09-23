@@ -245,6 +245,24 @@ def last_success_for_schedule(db: Session, schedule_id: int) -> Optional[datetim
     return _max_ts(ingestion, linked)
 
 
+def last_success_by_schedule(db: Session) -> Dict[int, datetime]:
+    """``last_success_for_schedule`` for every schedule in one statement.
+
+    Same evidence, same per-schedule strictness; used by the dataset status
+    API (SPEC_124), which must not loop a query per schedule.
+    """
+    rows = db.execute(text(
+        "SELECT schedule_id, MAX(ts) FROM ("
+        "  SELECT schedule_id, completed_at AS ts FROM ingestion_jobs"
+        "  WHERE schedule_id IS NOT NULL AND LOWER(status) = 'success'"
+        "  UNION ALL"
+        f"  SELECT j.schedule_id, q.completed_at FROM job_queue q {_LINKED_QUEUE_JOIN}"
+        "  WHERE j.schedule_id IS NOT NULL AND LOWER(q.status) = 'success'"
+        ") s WHERE ts IS NOT NULL GROUP BY schedule_id"
+    )).all()
+    return {int(r[0]): r[1] for r in rows}
+
+
 def last_success_by_source(db: Session, sources: Optional[List[str]] = None) -> Dict[str, datetime]:
     """Newest successful run per source: successful ``ingestion_jobs`` rows, plus
     successful queue rows properly linked to an IngestionJob (for workers that

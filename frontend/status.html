@@ -1,0 +1,1395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dataset Status</title>
+    <!--
+      SPEC_125 — dataset status page. Read-only view of GET /api/v1/datasets/status
+      (SPEC_124): three clocks, one status per dataset. No run / pause controls in v1
+      (PLAN_085 rev_01). Palette and classes follow index.html (dark only, like the console).
+    -->
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --primary: #6366f1;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-input: #334155;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --accent: #06b6d4;
+            --orange: #f97316;
+            --violet: #a78bfa;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        a { color: var(--accent); }
+        .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+        .muted { color: var(--text-muted); }
+        .small { font-size: 0.75rem; }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            padding: 1rem 2rem;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+        }
+        .logo { display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; }
+        .logo h1 {
+            font-size: 1.5rem;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .tagline { color: var(--text-muted); font-size: 0.875rem; }
+        .header-right { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; font-size: 0.8rem; color: var(--text-muted); }
+        .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); display: inline-block; margin-right: 0.35rem; vertical-align: middle; }
+        .live-dot.live { background: #4ade80; }
+        .live-dot.reconnecting { background: var(--warning); }
+        .live-dot.polling { background: var(--text-muted); }
+        #generated-at .stale-flag { display: none; }
+        #generated-at.stale { color: var(--warning); }
+        #generated-at.stale .stale-flag { display: inline; }
+        .nav-link { color: var(--text-muted); text-decoration: none; border: 1px solid var(--border); padding: 0.35rem 0.75rem; border-radius: 6px; }
+        .nav-link:hover { color: var(--text); background: var(--bg-input); }
+
+        .content { padding: 2rem; max-width: 1400px; margin: 0 auto; padding-bottom: 5rem; }
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .card-title { font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; }
+        .card-sub { font-size: 0.8rem; color: var(--text-muted); margin: -0.6rem 0 1rem; }
+        .btn {
+            padding: 0.45rem 0.9rem;
+            background: var(--primary);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+        .btn-secondary { background: var(--bg-input); border: 1px solid var(--border); color: var(--text); }
+        .btn-secondary:hover { background: var(--border); }
+        .loading { text-align: center; padding: 2rem; color: var(--text-muted); }
+        .empty { text-align: center; padding: 2rem; color: var(--text-muted); }
+
+        .notice { border-radius: 8px; padding: 0.65rem 0.9rem; font-size: 0.82rem; margin-bottom: 1rem; border: 1px solid var(--border); background: var(--bg-card); }
+        .notice.warn { border-color: rgba(245,158,11,0.5); color: var(--warning); }
+        .notice.error { border-color: rgba(239,68,68,0.5); color: var(--error); }
+        .notice.info { color: var(--text-muted); }
+
+        /* Banner */
+        .headline { display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+        .headline-value { font-size: 2.75rem; font-weight: 700; color: var(--warning); line-height: 1; }
+        .headline-value .of { font-size: 1.1rem; color: var(--text-muted); font-weight: 500; }
+        .headline-text { font-size: 0.95rem; color: var(--text); max-width: 46rem; }
+        .headline-text .muted { display: block; font-size: 0.8rem; margin-top: 0.25rem; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 0.75rem; }
+        .stat-card { background: var(--bg-input); padding: 0.85rem 0.5rem; border-radius: 8px; text-align: center; cursor: pointer; border: 1px solid transparent; transition: border-color 0.15s; font: inherit; color: inherit; }
+        .stat-card:hover { border-color: var(--text-muted); }
+        .stat-card.active { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary) inset; }
+        .stat-card.zero { opacity: 0.45; }
+        .stat-value { font-size: 1.6rem; font-weight: 700; color: var(--primary); }
+        .stat-label { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-top: 0.15rem; }
+        .worker-line { margin-top: 1rem; font-size: 0.8rem; color: var(--text-muted); }
+
+        /* Status badges (extends the console's .job-status-badge) */
+        .job-status-badge { padding: 0.15rem 0.55rem; border-radius: 10px; font-size: 0.7rem; font-weight: 600; white-space: nowrap; display: inline-block; }
+        .job-status-badge.success, .st-current { background: rgba(34,197,94,0.15); color: var(--success); }
+        .job-status-badge.failed, .st-failing { background: rgba(239,68,68,0.15); color: var(--error); }
+        .job-status-badge.running, .job-status-badge.claimed, .st-awaiting_upstream { background: rgba(6,182,212,0.15); color: var(--accent); }
+        .job-status-badge.pending, .st-dormant, .st-unknown { background: rgba(148,163,184,0.15); color: var(--text-muted); }
+        .st-never_run { background: transparent; color: var(--text-muted); border: 1px dashed rgba(148,163,184,0.6); }
+        .st-behind, .st-partial, .job-status-badge.partial, .job-status-badge.refused { background: rgba(245,158,11,0.15); color: var(--warning); }
+        .st-stalled { background: rgba(249,115,22,0.15); color: var(--orange); }
+        .st-blocked { background: rgba(167,139,250,0.15); color: var(--violet); }
+        .stat-value.st-text-current { color: var(--success); }
+        .stat-value.st-text-awaiting_upstream { color: var(--accent); }
+        .stat-value.st-text-behind, .stat-value.st-text-partial { color: var(--warning); }
+        .stat-value.st-text-stalled { color: var(--orange); }
+        .stat-value.st-text-failing { color: var(--error); }
+        .stat-value.st-text-blocked { color: var(--violet); }
+        .stat-value.st-text-dormant, .stat-value.st-text-never_run, .stat-value.st-text-unknown { color: var(--text-muted); }
+
+        .rights { padding: 0.12rem 0.45rem; border-radius: 6px; font-size: 0.68rem; font-weight: 600; white-space: nowrap; border: 1px solid var(--border); color: var(--text-muted); display: inline-block; }
+        .rights.open { color: var(--success); border-color: rgba(34,197,94,0.4); }
+        .rights.attribution { color: var(--accent); border-color: rgba(6,182,212,0.4); }
+        .rights.restricted { color: var(--warning); border-color: rgba(245,158,11,0.4); }
+
+        /* Lag strip (health-bar palette from the console) */
+        .lag-list { display: grid; gap: 0.4rem; }
+        .lag-row { display: grid; grid-template-columns: minmax(0, 15rem) minmax(0, 1fr) 7.5rem; align-items: center; gap: 0.75rem; font-size: 0.8rem; cursor: pointer; }
+        .lag-row:hover .lag-name { color: var(--text); }
+        .lag-name { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .health-bar-bg { width: 100%; height: 10px; background: rgba(255,255,255,0.08); border-radius: 5px; overflow: hidden; display: block; position: relative; }
+        .health-bar-fill { height: 100%; border-radius: 5px; transition: width 0.3s; min-width: 3px; }
+        .health-bar-fill.green { background: #4ade80; }
+        .health-bar-fill.yellow { background: #fbbf24; }
+        .health-bar-fill.orange { background: #f97316; }
+        .health-bar-fill.red { background: #ef4444; }
+        .lag-tick { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.25); }
+        .lag-val { text-align: right; color: var(--text-muted); white-space: nowrap; }
+        .lag-legend { display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.72rem; color: var(--text-muted); margin-top: 0.75rem; }
+
+        /* Filters */
+        .filters { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; }
+        .filters input, .filters select {
+            padding: 0.45rem 0.7rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 0.8rem;
+            min-width: 0;
+        }
+        .filters input { flex: 1 1 12rem; }
+        .filters input:focus, .filters select:focus { outline: none; border-color: var(--primary); }
+        .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+        .seg button { background: transparent; color: var(--text-muted); border: none; padding: 0.45rem 0.7rem; font-size: 0.78rem; cursor: pointer; }
+        .seg button.active { background: var(--primary); color: white; }
+        .filter-count { font-size: 0.78rem; color: var(--text-muted); }
+
+        /* Main table: fixed layout so wide expansions never widen the page */
+        .ds-table { width: 100%; border-collapse: collapse; }
+        .ds-table th { text-align: left; padding: 0.5rem; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border); font-weight: 500; }
+        .ds-table td { padding: 0.55rem 0.5rem; border-bottom: 1px solid rgba(51,65,85,0.5); font-size: 0.82rem; vertical-align: top; }
+        .st-table { table-layout: fixed; }
+        .st-table th.c-kind { width: 6rem; }
+        .st-table th.c-status { width: 8rem; }
+        .st-table th.c-cov { width: 6.5rem; }
+        .st-table th.c-lag { width: 4.5rem; }
+        .st-table th.c-last { width: 6rem; }
+        .st-table th.c-next { width: 7rem; }
+        .st-table th.c-rows { width: 5.5rem; text-align: right; }
+        .st-table th.c-rights { width: 6.5rem; }
+        .st-table td.c-rows { text-align: right; font-variant-numeric: tabular-nums; }
+        .st-table td { overflow-wrap: anywhere; }
+        .ds-row { cursor: pointer; }
+        .ds-row:hover { background: rgba(99,102,241,0.08); }
+        .ds-row.expanded { background: rgba(99,102,241,0.06); }
+        .ds-row.flash { animation: flash 1.6s ease-out; }
+        @keyframes flash { from { background: rgba(6,182,212,0.25); } to { background: transparent; } }
+        .ds-name { font-weight: 500; }
+        .ds-key { font-size: 0.7rem; color: var(--text-muted); }
+        .group-row td { background: var(--bg); color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; padding: 0.6rem 0.5rem 0.4rem; }
+        .cell-sub { display: block; font-size: 0.68rem; color: var(--text-muted); margin-top: 0.1rem; }
+        .caret { display: inline-block; width: 0.9rem; color: var(--text-muted); transition: transform 0.15s; }
+        .ds-row.expanded .caret { transform: rotate(90deg); }
+
+        /* Row expansion */
+        .detail-row > td { background: rgba(15,23,42,0.55); padding: 1rem; }
+        .dt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr)); gap: 1rem; }
+        .dt-section { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 0.8rem 0.9rem; min-width: 0; }
+        .dt-section.wide { grid-column: 1 / -1; }
+        .dt-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); font-weight: 600; margin-bottom: 0.5rem; }
+        .kv { display: grid; grid-template-columns: minmax(0, 9rem) minmax(0, 1fr); gap: 0.25rem 0.75rem; font-size: 0.78rem; }
+        .kv dt { color: var(--text-muted); }
+        .kv dd { overflow-wrap: anywhere; }
+        .reason { font-size: 0.85rem; margin-bottom: 0.75rem; }
+        .reason-list { list-style: none; font-size: 0.78rem; display: grid; gap: 0.3rem; }
+        .reason-list li { padding-left: 0.9rem; position: relative; overflow-wrap: anywhere; }
+        .reason-list li::before { content: ''; position: absolute; left: 0; top: 0.45rem; width: 5px; height: 5px; border-radius: 50%; background: var(--text-muted); }
+        .reason-list.blockers li::before { background: var(--violet); }
+        .reason-list.warnings li::before { background: var(--warning); }
+        .code-tag { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.7rem; color: var(--text-muted); }
+        .scroll-x { overflow-x: auto; max-width: 100%; }
+        .mini-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+        .mini-table th { text-align: left; color: var(--text-muted); font-weight: 500; padding: 0.25rem 0.4rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
+        .mini-table td { padding: 0.3rem 0.4rem; border-bottom: 1px solid rgba(51,65,85,0.4); vertical-align: top; }
+        .mini-table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .err-text { color: var(--error); font-size: 0.72rem; overflow-wrap: anywhere; }
+        .gate { display: inline-block; font-size: 0.68rem; padding: 0.1rem 0.4rem; border-radius: 6px; margin: 0 0.25rem 0.25rem 0; border: 1px solid var(--border); }
+        .gate.pass { color: var(--success); border-color: rgba(34,197,94,0.35); }
+        .gate.fail { color: var(--error); border-color: rgba(239,68,68,0.45); }
+        .gate.skip { color: var(--text-muted); }
+        .build { border-top: 1px solid var(--border); padding-top: 0.5rem; margin-top: 0.5rem; font-size: 0.78rem; }
+        .build:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+        .info-note { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.5rem; }
+
+        @media (max-width: 1150px) {
+            .st-table .c-kind { display: none; }
+        }
+        @media (max-width: 900px) {
+            .content { padding: 1rem; }
+            .header { padding: 0.9rem 1rem; }
+            .st-table .c-next, .st-table .c-rows { display: none; }
+            .lag-row { grid-template-columns: minmax(0, 9rem) minmax(0, 1fr) 5.5rem; }
+        }
+        @media (max-width: 640px) {
+            .card { padding: 1rem; }
+            .st-table .c-cov, .st-table .c-last, .st-table .c-rights { display: none; }
+            .st-table th.c-status { width: 7rem; }
+            .st-table th.c-lag { width: 4rem; }
+            .headline-value { font-size: 2.2rem; }
+            .lag-row { grid-template-columns: minmax(0, 1fr) 4.5rem; }
+            .lag-row .health-bar-bg { grid-column: 1 / -1; grid-row: 2; }
+            .kv { grid-template-columns: minmax(0, 1fr); }
+            .kv dt { margin-top: 0.3rem; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">
+            <h1>Dataset status</h1>
+            <span class="tagline">Is each dataset current, and if not, why</span>
+        </div>
+        <div class="header-right">
+            <span id="live-state"><span class="live-dot" id="live-dot"></span><span id="live-text">connecting</span></span>
+            <span id="generated-at"></span>
+            <button class="btn btn-secondary" id="reload-btn" type="button">Reload</button>
+            <a class="nav-link" href="/index.html">Console</a>
+        </div>
+    </header>
+
+    <main class="content">
+        <div id="notices"></div>
+
+        <section class="card" id="banner">
+            <div class="loading">Loading dataset status...</div>
+        </section>
+
+        <section class="card" id="lag-card">
+            <div class="card-title">Coverage lag against cadence</div>
+            <div class="card-sub">How far each dataset's data lags the period it should cover by now, measured in cadence periods. Only datasets with an SLO and a coverage query can be measured.</div>
+            <div id="lag-strip" class="loading">Loading...</div>
+        </section>
+
+        <section class="card">
+            <div class="card-title">Datasets</div>
+            <div class="filters">
+                <input id="f-search" type="search" placeholder="Search name, key or source" aria-label="Search datasets">
+                <select id="f-kind" aria-label="Kind"><option value="">All kinds</option></select>
+                <span class="seg" role="group" aria-label="View">
+                    <button type="button" data-view="operator" class="active" title="Every catalog dataset, with blockers and run history">Operator</button>
+                    <button type="button" data-view="public" title="Only datasets published as ga or beta">Public</button>
+                </span>
+                <span class="filter-count" id="filter-count"></span>
+            </div>
+            <table class="ds-table st-table">
+                <thead>
+                    <tr>
+                        <th class="c-name">Dataset</th>
+                        <th class="c-kind">Kind</th>
+                        <th class="c-status">Status</th>
+                        <th class="c-cov">Coverage through</th>
+                        <th class="c-lag">Lag</th>
+                        <th class="c-last">Last run</th>
+                        <th class="c-next">Next run</th>
+                        <th class="c-rows">Rows</th>
+                        <th class="c-rights">Rights</th>
+                    </tr>
+                </thead>
+                <tbody id="ds-body">
+                    <tr><td colspan="9" class="loading">Loading...</td></tr>
+                </tbody>
+            </table>
+        </section>
+    </main>
+
+    <script src="/js/auth.js"></script>
+
+    <script id="status-core">
+    /* Pure helpers, no DOM: exercised by tests/test_spec_125 under node. */
+    (function () {
+        'use strict';
+
+        var STATUS_ORDER = ['current', 'awaiting_upstream', 'behind', 'stalled', 'failing',
+                            'partial', 'blocked', 'dormant', 'never_run', 'unknown'];
+        // Most urgent first, for sorting rows inside a kind group.
+        var SEVERITY = ['failing', 'blocked', 'stalled', 'behind', 'partial', 'never_run',
+                        'dormant', 'unknown', 'awaiting_upstream', 'current'];
+        var ATTENTION = ['dormant', 'never_run', 'stalled'];
+        var KIND_ORDER = ['derived_mart', 'entity', 'filings', 'holdings', 'timeseries',
+                          'reference', 'geo', 'other'];
+        // Same periods as app/services/dataset_status.CADENCE_HOURS.
+        var CADENCE_DAYS = { daily: 1, weekly: 7, monthly: 31, quarterly: 92, annual: 366 };
+        var LAG_CAP = 3;
+
+        function esc(value) {
+            if (value === null || value === undefined) return '';
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        /** The finding: datasets nothing is collecting. */
+        function attentionCount(summary) {
+            summary = summary || {};
+            return ATTENTION.reduce(function (n, s) { return n + (summary[s] || 0); }, 0);
+        }
+
+        function countByStatus(datasets) {
+            var out = {};
+            STATUS_ORDER.forEach(function (s) { out[s] = 0; });
+            (datasets || []).forEach(function (d) { out[d.status] = (out[d.status] || 0) + 1; });
+            return out;
+        }
+
+        /** Coverage lag in cadence periods (capped), or null when there is no
+         *  coverage expectation to measure against. */
+        function lagUnits(ds) {
+            var c = (ds && ds.clocks) || {};
+            if (!c.expected_through || c.lag_days === null || c.lag_days === undefined) return null;
+            var days = CADENCE_DAYS[ds.cadence];
+            if (!days) return null;
+            return Math.min(LAG_CAP, Math.max(0, c.lag_days) / days);
+        }
+
+        /** Queue job_type -> the producer prefix its datasets carry. */
+        function producerPrefixForJobType(jobType) {
+            if (jobType === 'bulk_ingest') return 'bulk:';
+            if (jobType === 'ingestion') return 'dispatch:';
+            if (jobType === 'site_intel') return 'collector:';
+            return 'job:' + (jobType || '');
+        }
+
+        function matchesPrefix(producer, prefix) {
+            if (!producer || !prefix) return false;
+            if (prefix.charAt(prefix.length - 1) === ':') return producer.indexOf(prefix) === 0;
+            var base = producer.split('#')[0];
+            return base === prefix;
+        }
+
+        function severityRank(status) {
+            var i = SEVERITY.indexOf(status);
+            return i === -1 ? 99 : i;
+        }
+
+        /** [[kind, datasets[]], ...] in KIND_ORDER, unknown kinds last (alphabetical);
+         *  rows most urgent first, then by name. */
+        function groupByKind(datasets) {
+            var groups = {};
+            (datasets || []).forEach(function (d) {
+                var k = d.kind || 'other';
+                (groups[k] = groups[k] || []).push(d);
+            });
+            var kinds = Object.keys(groups).sort(function (a, b) {
+                var ia = KIND_ORDER.indexOf(a), ib = KIND_ORDER.indexOf(b);
+                ia = ia === -1 ? 1000 : ia; ib = ib === -1 ? 1000 : ib;
+                return ia !== ib ? ia - ib : (a < b ? -1 : a > b ? 1 : 0);
+            });
+            return kinds.map(function (k) {
+                var rows = groups[k].slice().sort(function (a, b) {
+                    var r = severityRank(a.status) - severityRank(b.status);
+                    if (r) return r;
+                    var na = String(a.display_name || a.key).toLowerCase();
+                    var nb = String(b.display_name || b.key).toLowerCase();
+                    return na < nb ? -1 : na > nb ? 1 : 0;
+                });
+                return [k, rows];
+            });
+        }
+
+        /** Keys whose payload differs between two status responses (incl. added/removed). */
+        function changedKeys(oldList, newList) {
+            var before = {}, out = new Set();
+            (oldList || []).forEach(function (d) { before[d.key] = JSON.stringify(d); });
+            (newList || []).forEach(function (d) {
+                if (before[d.key] !== JSON.stringify(d)) out.add(d.key);
+                delete before[d.key];
+            });
+            Object.keys(before).forEach(function (k) { out.add(k); });
+            return out;
+        }
+
+        /** GET /jobs filter for a producer's recent runs, or null when its runs
+         *  are not ingestion_jobs rows (collectors, in-process api routers).
+         *  The server resolves `producer=` with the same job -> producer map the
+         *  status API uses, so a bare dispatch key (dispatch:treasury) never
+         *  picks up its qualified siblings (dispatch:treasury:auctions) and
+         *  split jobs (<source>:split_<n>) are included. */
+        function jobsQueryFor(producer) {
+            if (!producer) return null;
+            var base = producer.split('#')[0];
+            if (/^(bulk|job|dispatch):./.test(base)) return { producer: base };
+            return null;
+        }
+
+        function parseIso(iso) {
+            if (!iso) return null;
+            var s = /[zZ]|[+-]\d\d:?\d\d$/.test(iso) || iso.length <= 10 ? iso : iso + 'Z';
+            var t = Date.parse(s);
+            return isNaN(t) ? null : t;
+        }
+        function humanSpan(ms) {
+            var a = Math.abs(ms) / 1000;
+            if (a < 90) return Math.round(a) + 's';
+            if (a < 5400) return Math.round(a / 60) + 'm';
+            if (a < 129600) return Math.round(a / 3600) + 'h';
+            if (a < 86400 * 60) return Math.round(a / 86400) + 'd';
+            if (a < 86400 * 730) return Math.round(a / (86400 * 30.4)) + 'mo';
+            return (a / (86400 * 365)).toFixed(1) + 'y';
+        }
+
+        /** The text a [data-rel] time cell shows at `now` (ms): "5m ago",
+         *  "in 2h", "3h overdue". `rel` is 'ago' or 'until'. */
+        function relText(iso, rel, now) {
+            var t = parseIso(iso);
+            if (t === null) return '';
+            var d = rel === 'until' ? t - now : now - t;
+            var h = humanSpan(d);
+            if (rel === 'until') return d >= 0 ? 'in ' + h : h + ' overdue';
+            return d >= 0 ? h + ' ago' : 'in ' + h;
+        }
+
+        /** Whether a status body generated at `generatedAt` is older than maxAgeMs. */
+        function isStale(generatedAt, now, maxAgeMs) {
+            var t = parseIso(generatedAt);
+            return t !== null && now - t > maxAgeMs;
+        }
+
+        /** The live-update plan for a status body: SSE only when queue jobs
+         *  emit events (worker mode) and the viewer may open the stream. */
+        function livePlan(data, admin) {
+            var w = (data && data.worker) || {};
+            if (w.worker_mode === false) {
+                return { sse: false, retry: false, reason: 'in-process mode (WORKER_MODE=0): jobs emit no queue events' };
+            }
+            if (!admin) return { sse: false, retry: false, reason: 'the job stream needs the admin role' };
+            return { sse: true, retry: true, reason: null };
+        }
+
+        /** How many datasets' coverage the server has not computed yet (its
+         *  stale-while-revalidate cache was cold): worth an early re-fetch. */
+        function pendingCoverage(datasets) {
+            return (datasets || []).filter(function (d) {
+                var e = (d.clocks || {}).coverage_error;
+                return e === 'deadline' || e === 'timeout';
+            }).length;
+        }
+
+        /** core.mart_build `mart` for a producer, or null. */
+        function martFor(producer) {
+            var base = (producer || '').split('#')[0];
+            if (base === 'job:pe_mart_build') return 'pe_marts';
+            if (base === 'job:entity_resolve') return 'entity_resolve';
+            return null;
+        }
+
+        function bulkSourceFor(producer) {
+            var base = (producer || '').split('#')[0];
+            return base.indexOf('bulk:') === 0 ? base.slice('bulk:'.length) : null;
+        }
+
+        window.StatusCore = {
+            STATUS_ORDER: STATUS_ORDER,
+            ATTENTION: ATTENTION,
+            CADENCE_DAYS: CADENCE_DAYS,
+            LAG_CAP: LAG_CAP,
+            esc: esc,
+            attentionCount: attentionCount,
+            countByStatus: countByStatus,
+            lagUnits: lagUnits,
+            producerPrefixForJobType: producerPrefixForJobType,
+            matchesPrefix: matchesPrefix,
+            groupByKind: groupByKind,
+            changedKeys: changedKeys,
+            jobsQueryFor: jobsQueryFor,
+            parseIso: parseIso,
+            humanSpan: humanSpan,
+            relText: relText,
+            isStale: isStale,
+            livePlan: livePlan,
+            pendingCoverage: pendingCoverage,
+            martFor: martFor,
+            bulkSourceFor: bulkSourceFor,
+        };
+    })();
+    </script>
+
+    <script>
+    (function () {
+        'use strict';
+
+        const C = window.StatusCore;
+        const esc = C.esc;
+
+        // Every call this page makes is a GET (v1 is read-only).
+        const ENDPOINTS = {
+            status: '/api/v1/datasets/status',
+            catalog: '/api/v1/catalog',
+            martBuilds: '/api/v1/pe/marts/builds',
+            releases: '/api/v1/bulk/releases',   // admin
+            jobs: '/api/v1/jobs',                // admin
+            stream: '/api/v1/job-queue/stream',  // admin, via stream token
+        };
+        const FALLBACK_POLL_MS = 90000;   // reload cadence only when SSE is unavailable
+        const SSE_RETRY_MS = 300000;      // try the stream again while polling
+        // A slow clock that always runs: re-render relative times, flag a stale
+        // snapshot, retry a failed load, and re-fetch at least every
+        // SAFETY_REFRESH_MS even while SSE is up (time alone moves statuses,
+        // api/scheduler work emits no queue events, and the coverage cache
+        // revalidates in the background).
+        const TICK_MS = 60000;
+        const SAFETY_REFRESH_MS = 300000;
+        const STALE_AFTER_MS = 600000;      // flag the snapshot as stale past this age
+        const COVERAGE_CATCHUP_MS = 20000;  // one early re-fetch while coverage is still computing
+        const COVERAGE_CATCHUP_MAX = 3;
+        const REFRESH_DEBOUNCE_MS = 2500;
+        const SSE_MAX_FAILS = 3;
+
+        const STATUS_HELP = {
+            current: 'coverage meets expectation',
+            awaiting_upstream: 'everything published is loaded; next release not due (not a warning)',
+            behind: 'upstream published data we have not loaded, or coverage is below expectation',
+            stalled: 'a schedule should have fired and has not succeeded',
+            failing: 'the latest run in the last 30 days failed',
+            partial: 'the latest run in the last 30 days succeeded only in part',
+            blocked: 'missing API key, no live worker, or a refused mart build',
+            dormant: 'no active schedule and not in the nightly batch',
+            never_run: 'no run in any store and no rows',
+            unknown: 'no expectation to judge against (no SLO, ad hoc, or coverage unavailable)',
+        };
+
+        // ---- state ---------------------------------------------------------
+        const state = {
+            data: null,            // GET /datasets/status body
+            byKey: new Map(),      // key -> dataset status
+            catalog: new Map(),    // key -> catalog entry (rights, SLO, rerun)
+            view: 'operator',
+            status: null,          // status filter from the banner
+            kind: '',
+            search: '',
+            expanded: new Set(),
+            extras: new Map(),     // key -> {runs, releases, builds}
+            activeJobs: new Map(), // queue job id -> job_type
+        };
+
+        function viewerIsAdmin() {
+            const token = NexdataAuth.getToken();
+            // No token: REQUIRE_AUTH=false local dev (a synthetic admin), or a
+            // signed-out viewer the first 401 sends to the login page.
+            if (!token) return true;
+            const p = NexdataAuth.decodePayload(token) || {};
+            return p.role === 'admin';
+        }
+        const isAdmin = viewerIsAdmin();
+
+        // ---- formatting ----------------------------------------------------
+        function parseTs(iso) {
+            if (!iso) return null;
+            const s = /[zZ]|[+-]\d\d:?\d\d$/.test(iso) || iso.length <= 10 ? iso : iso + 'Z';
+            const t = Date.parse(s);
+            return isNaN(t) ? null : t;
+        }
+        function ago(iso) { return C.relText(iso, 'ago', Date.now()); }
+        function until(iso) { return C.relText(iso, 'until', Date.now()); }
+        /** A relative time that retick() keeps current. */
+        function relSpan(iso, kind) {
+            return `<span title="${esc(iso)}" data-ts="${esc(iso)}" data-rel="${kind}">${esc(C.relText(iso, kind, Date.now()))}</span>`;
+        }
+        function timeCell(iso, rel) {
+            if (!iso) return '<span class="muted">&mdash;</span>';
+            return relSpan(iso, rel === until ? 'until' : 'ago');
+        }
+        function retick() {
+            const now = Date.now();
+            document.querySelectorAll('[data-rel]').forEach(el => {
+                el.textContent = C.relText(el.getAttribute('data-ts'), el.getAttribute('data-rel'), now);
+            });
+            const g = document.getElementById('generated-at');
+            if (g && state.data) g.classList.toggle('stale', C.isStale(state.data.generated_at, now, STALE_AFTER_MS));
+        }
+        function fmtNum(n) {
+            if (n === null || n === undefined) return '&mdash;';
+            return Number(n).toLocaleString();
+        }
+        function fmtBytes(b) {
+            if (b === null || b === undefined) return '&mdash;';
+            const u = ['B', 'KB', 'MB', 'GB', 'TB'];
+            let i = 0, v = Number(b);
+            while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+            return (i ? v.toFixed(1) : v) + ' ' + u[i];
+        }
+        function fmtDuration(s) {
+            if (s === null || s === undefined) return '';
+            return C.humanSpan(s * 1000);
+        }
+        function statusBadge(status) {
+            return `<span class="job-status-badge st-${esc(status)}" title="${esc(STATUS_HELP[status] || '')}">${esc(String(status).replace(/_/g, ' '))}</span>`;
+        }
+        function runBadge(status) {
+            if (!status) return '';
+            const s = String(status).toLowerCase();
+            const cls = s === 'success' ? 'success' : s === 'failed' ? 'failed'
+                : (s === 'running' || s === 'claimed') ? 'running'
+                : (s === 'partial' || s === 'refused') ? 'partial' : 'pending';
+            return `<span class="job-status-badge ${cls}">${esc(s)}</span>`;
+        }
+        function yesNo(v) { return v ? 'yes' : 'no'; }
+
+        // ---- fetch ---------------------------------------------------------
+        async function getJson(url) {
+            let resp;
+            try {
+                resp = await fetch(url);
+            } catch (e) {
+                return { error: 'network error' };
+            }
+            if (resp.status === 403) return { forbidden: true };
+            if (!resp.ok) return { error: 'HTTP ' + resp.status };
+            const truncated = !!(resp.headers && resp.headers.get && resp.headers.get('X-Producer-Scan-Truncated') === 'true');
+            try { return { data: await resp.json(), truncated: truncated }; } catch (e) { return { error: 'bad JSON' }; }
+        }
+
+        // ---- notices -------------------------------------------------------
+        const notices = { load: null, degraded: null, live: null };
+        function renderNotices() {
+            const el = document.getElementById('notices');
+            el.innerHTML = ['load', 'degraded', 'live']
+                .map(k => notices[k])
+                .filter(Boolean)
+                .map(n => `<div class="notice ${n.cls}">${n.html}</div>`)
+                .join('');
+        }
+
+        // ---- view filtering ------------------------------------------------
+        function inView(d) {
+            return state.view !== 'public' || d.status_public === 'ga' || d.status_public === 'beta';
+        }
+        function visibleDatasets() {
+            if (!state.data) return [];
+            const q = state.search.trim().toLowerCase();
+            return state.data.datasets.filter(d => {
+                if (!inView(d)) return false;
+                if (state.status && d.status !== state.status) return false;
+                if (state.kind && d.kind !== state.kind) return false;
+                if (q) {
+                    const hay = [d.key, d.display_name, d.source, d.producer].join(' ').toLowerCase();
+                    if (hay.indexOf(q) === -1) return false;
+                }
+                return true;
+            });
+        }
+
+        // ---- banner --------------------------------------------------------
+        function renderBanner() {
+            const el = document.getElementById('banner');
+            const all = state.data.datasets.filter(inView);
+            const counts = C.countByStatus(all);
+            const attention = C.attentionCount(counts);
+            const parts = C.ATTENTION.map(s => `${counts[s] || 0} ${s.replace(/_/g, ' ')}`).join(' &middot; ');
+            const w = state.data.worker || {};
+            const workerText = w.worker_mode
+                ? `${fmtNum(w.live_workers)} live worker${w.live_workers === 1 ? '' : 's'} (queue mode)` +
+                  (w.last_heartbeat_at ? `, last heartbeat ${relSpan(w.last_heartbeat_at, 'ago')}` : '')
+                : 'in-process mode (WORKER_MODE off): jobs run inside the API';
+            const cards = C.STATUS_ORDER.map(s => {
+                const n = counts[s] || 0;
+                const cls = ['stat-card', n ? '' : 'zero', state.status === s ? 'active' : ''].join(' ');
+                return `<button type="button" class="${cls}" data-status="${esc(s)}" title="${esc(STATUS_HELP[s])}">
+                    <div class="stat-value st-text-${esc(s)}">${fmtNum(n)}</div>
+                    <div class="stat-label">${esc(s.replace(/_/g, ' '))}</div>
+                </button>`;
+            }).join('');
+            el.innerHTML = `
+                <div class="headline">
+                    <div class="headline-value">${fmtNum(attention)}<span class="of"> / ${fmtNum(all.length)}</span></div>
+                    <div class="headline-text">datasets nothing is collecting
+                        <span class="muted">${parts}. Dormant: no schedule. Never run: no run and no rows. Stalled: a schedule that stopped succeeding.</span>
+                    </div>
+                </div>
+                <div class="stats-grid">${cards}</div>
+                <div class="worker-line">Workers: ${workerText}</div>`;
+            el.querySelectorAll('.stat-card').forEach(b => b.addEventListener('click', () => {
+                const s = b.getAttribute('data-status');
+                state.status = state.status === s ? null : s;
+                renderBanner();
+                renderTable();
+            }));
+        }
+
+        // ---- lag strip -----------------------------------------------------
+        function renderLagStrip() {
+            const el = document.getElementById('lag-strip');
+            el.classList.remove('loading');
+            const all = state.data.datasets.filter(inView);
+            const measured = [], lastSuccess = [];
+            let none = 0;
+            all.forEach(d => {
+                const u = C.lagUnits(d);
+                if (u !== null) measured.push([d, u]);
+                else if (d.clocks && d.clocks.expectation_basis === 'last_success') lastSuccess.push(d);
+                else none++;
+            });
+            measured.sort((a, b) => b[1] - a[1] || (b[0].clocks.lag_days - a[0].clocks.lag_days));
+            const rows = measured.map(([d, u]) => {
+                const pct = (u / C.LAG_CAP) * 100;
+                const color = u === 0 ? 'green' : u < 1 ? 'yellow' : u < 2 ? 'orange' : 'red';
+                const lag = d.clocks.lag_days;
+                const units = u >= C.LAG_CAP ? `&ge;${C.LAG_CAP}` : u.toFixed(1);
+                const tip = `${d.display_name}: coverage through ${d.clocks.coverage_through}, expected ${d.clocks.expected_through} (${d.cadence})`;
+                return `<div class="lag-row" data-jump="${esc(d.key)}" title="${esc(tip)}">
+                    <span class="lag-name">${esc(d.display_name)}</span>
+                    <span class="health-bar-bg">
+                        <span class="lag-tick" style="left:33.33%"></span><span class="lag-tick" style="left:66.66%"></span>
+                        <span class="health-bar-fill ${color}" style="display:block;width:${pct.toFixed(1)}%"></span>
+                    </span>
+                    <span class="lag-val">${fmtNum(lag)} d &middot; ${units}&times;</span>
+                </div>`;
+            }).join('');
+            const foot = [];
+            if (lastSuccess.length) foot.push(`${lastSuccess.length} judged on last success instead (no coverage query): ${lastSuccess.map(d => esc(d.display_name)).join(', ')}`);
+            if (none) foot.push(`${none} with no expectation (no SLO, ad hoc cadence, or coverage unavailable) are not drawn`);
+            el.innerHTML = (rows ? `<div class="lag-list">${rows}</div>` : '<div class="empty">No dataset in this view has a coverage expectation yet.</div>') +
+                `<div class="lag-legend"><span>bar = lag &divide; cadence, ticks at 1&times; and 2&times;, capped at ${C.LAG_CAP}&times;</span>${foot.map(f => `<span>${f}</span>`).join('')}</div>`;
+            el.querySelectorAll('[data-jump]').forEach(r => r.addEventListener('click', () => jumpTo(r.getAttribute('data-jump'))));
+        }
+
+        function jumpTo(key) {
+            state.status = null; state.kind = ''; state.search = '';
+            document.getElementById('f-search').value = '';
+            document.getElementById('f-kind').value = '';
+            renderBanner();
+            renderTable();
+            if (!state.expanded.has(key)) toggleRow(key);
+            const tr = rowEl(key);
+            if (tr) tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        // ---- table ---------------------------------------------------------
+        function rowEl(key) {
+            return document.querySelector(`tr.ds-row[data-key="${CSS.escape(key)}"]`);
+        }
+        function detailEl(key) {
+            return document.querySelector(`tr.detail-row[data-detail-for="${CSS.escape(key)}"]`);
+        }
+
+        function coverageCell(d) {
+            const c = d.clocks || {};
+            if (c.coverage_through) {
+                return `<span title="expected ${esc(c.expected_through || 'none')}">${esc(c.coverage_through)}</span>`;
+            }
+            if (c.coverage_error) return `<span class="muted" title="coverage unavailable">${esc(c.coverage_error.replace(/_/g, ' '))}</span>`;
+            return '<span class="muted">&mdash;</span>';
+        }
+        function lagCell(d) {
+            const c = d.clocks || {};
+            if (c.lag_days !== null && c.lag_days !== undefined) {
+                const u = C.lagUnits(d);
+                const col = u === null || u === 0 ? '' : u < 1 ? 'color:var(--warning)' : 'color:var(--error)';
+                return `<span style="${col}">${fmtNum(c.lag_days)} d</span>`;
+            }
+            if (c.expectation_basis === 'last_success') return '<span class="muted" title="judged on last success">n/a</span>';
+            if (!c.expected_through) return '<span class="muted" title="no SLO or ad hoc cadence">no SLO</span>';
+            return '<span class="muted">&mdash;</span>';
+        }
+        function nextRunCell(d) {
+            const s = d.schedule;
+            if (!s) return '<span class="muted">no schedule</span>';
+            if (!s.active) return `<span class="muted">inactive</span><span class="cell-sub">${esc(s.cron || '')}</span>`;
+            const label = s.kind === 'batch' ? 'nightly batch' : (s.next_run_source || 'no next run');
+            if (!s.next_run_at) return `<span class="muted">&mdash;</span><span class="cell-sub">${esc(label)}</span>`;
+            return `${timeCell(s.next_run_at, until)}<span class="cell-sub">${esc(label)}</span>`;
+        }
+        function lastRunCell(d) {
+            const c = d.clocks || {};
+            if (!c.last_run_at) return '<span class="muted">never</span>';
+            const st = (c.last_run_status || '').toLowerCase();
+            const color = st === 'failed' || st === 'refused' ? 'var(--error)' : st === 'partial' ? 'var(--warning)' : '';
+            return `${timeCell(c.last_run_at, ago)}<span class="cell-sub" style="${color ? 'color:' + color : ''}">${esc(st)}</span>`;
+        }
+        function rightsCell(d) {
+            const cat = state.catalog.get(d.key);
+            const r = cat && cat.rights;
+            if (!r) return '<span class="muted">&mdash;</span>';
+            const eff = r.effective_redistribution || 'internal_only';
+            const tip = `license: ${r.license || 'unknown'}; declared: ${r.redistribution}; reviewed: ${yesNo(r.reviewed)}` +
+                (r.reviewed ? '' : ' (unreviewed rights are internal only)');
+            return `<span class="rights ${esc(eff)}" title="${esc(tip)}">${esc(eff.replace(/_/g, ' '))}</span>`;
+        }
+        function rowsCell(d) {
+            if (d.rows_total === null || d.rows_total === undefined) return '<span class="muted">&mdash;</span>';
+            return `<span title="${d.rows_exact ? 'exact count' : 'planner estimate'}">${d.rows_exact ? '' : '~'}${fmtNum(d.rows_total)}</span>`;
+        }
+
+        function rowHtml(d) {
+            const expanded = state.expanded.has(d.key);
+            return `<tr class="ds-row${expanded ? ' expanded' : ''}" data-key="${esc(d.key)}" tabindex="0" aria-expanded="${expanded}">
+                <td class="c-name"><span class="caret">&#9656;</span><span class="ds-name">${esc(d.display_name)}</span>
+                    <span class="cell-sub mono ds-key">${esc(d.key)}</span></td>
+                <td class="c-kind">${esc(d.kind)}</td>
+                <td class="c-status" title="${esc(d.status_reason)}">${statusBadge(d.status)}${d.blockers && d.blockers.length ? `<span class="cell-sub">${d.blockers.length} blocker${d.blockers.length === 1 ? '' : 's'}</span>` : ''}</td>
+                <td class="c-cov">${coverageCell(d)}</td>
+                <td class="c-lag">${lagCell(d)}</td>
+                <td class="c-last">${lastRunCell(d)}</td>
+                <td class="c-next">${nextRunCell(d)}</td>
+                <td class="c-rows">${rowsCell(d)}</td>
+                <td class="c-rights">${rightsCell(d)}</td>
+            </tr>`;
+        }
+        function detailRowHtml(d) {
+            return `<tr class="detail-row" data-detail-for="${esc(d.key)}"><td colspan="9">${detailHtml(d)}</td></tr>`;
+        }
+
+        function renderTable() {
+            const body = document.getElementById('ds-body');
+            if (!state.data) return;
+            const rows = visibleDatasets();
+            const inViewCount = state.data.datasets.filter(inView).length;
+            document.getElementById('filter-count').textContent =
+                rows.length === inViewCount ? `${rows.length} datasets` : `${rows.length} of ${inViewCount} datasets`;
+            if (!rows.length) {
+                const why = state.view === 'public' && !state.data.datasets.some(inView)
+                    ? 'No dataset is published as ga or beta yet.' : 'No dataset matches these filters.';
+                body.innerHTML = `<tr><td colspan="9" class="empty">${why}</td></tr>`;
+                return;
+            }
+            let html = '';
+            C.groupByKind(rows).forEach(([kind, list]) => {
+                html += `<tr class="group-row"><td colspan="9">${esc(kind.replace(/_/g, ' '))} &middot; ${list.length}</td></tr>`;
+                list.forEach(d => {
+                    html += rowHtml(d);
+                    if (state.expanded.has(d.key)) html += detailRowHtml(d);
+                });
+            });
+            body.innerHTML = html;
+        }
+
+        /** Re-render one dataset's row (and its expansion) in place. */
+        function replaceRow(d) {
+            const tr = rowEl(d.key);
+            if (!tr) return false;
+            tr.insertAdjacentHTML('beforebegin', rowHtml(d));
+            const fresh = tr.previousElementSibling;
+            tr.remove();
+            fresh.classList.add('flash');
+            const det = detailEl(d.key);
+            if (det) det.outerHTML = detailRowHtml(d);
+            return true;
+        }
+
+        function toggleRow(key) {
+            const d = state.byKey.get(key);
+            if (!d) return;
+            if (state.expanded.has(key)) {
+                state.expanded.delete(key);
+                const det = detailEl(key);
+                if (det) det.remove();
+                const tr = rowEl(key);
+                if (tr) { tr.classList.remove('expanded'); tr.setAttribute('aria-expanded', 'false'); }
+                return;
+            }
+            state.expanded.add(key);
+            const tr = rowEl(key);
+            if (tr) {
+                tr.classList.add('expanded');
+                tr.setAttribute('aria-expanded', 'true');
+                tr.insertAdjacentHTML('afterend', detailRowHtml(d));
+            }
+            loadExtras(d);
+        }
+
+        // ---- row expansion -------------------------------------------------
+        function kvHtml(pairs) {
+            return '<dl class="kv">' + pairs
+                .filter(p => p[1] !== undefined)
+                .map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v === null || v === '' ? '<span class="muted">&mdash;</span>' : v}</dd>`)
+                .join('') + '</dl>';
+        }
+        function reasonsHtml(list, cls) {
+            if (!list || !list.length) return '<div class="muted small">none</div>';
+            return `<ul class="reason-list ${cls}">` + list.map(r =>
+                `<li><span class="code-tag">${esc(r.code)}</span> ${esc(r.message)}</li>`).join('') + '</ul>';
+        }
+        function sectionHtml(title, body, wide) {
+            return `<div class="dt-section${wide ? ' wide' : ''}"><div class="dt-title">${title}</div>${body}</div>`;
+        }
+        function pendingHtml(slot) {
+            if (slot === undefined) return '<div class="muted small">Loading...</div>';
+            if (slot.forbidden) return '<div class="muted small">Admin only.</div>';
+            if (slot.error) return `<div class="err-text">Could not load (${esc(slot.error)}).</div>`;
+            return null;
+        }
+
+        function detailHtml(d) {
+            const cat = state.catalog.get(d.key) || {};
+            const c = d.clocks || {};
+            const extras = state.extras.get(d.key) || {};
+            const operator = state.view === 'operator';
+            const parts = [];
+
+            // Why this status
+            let why = `<div class="reason">${statusBadge(d.status)} ${esc(d.status_reason)}</div>`;
+            if (cat.description) why += `<div class="small muted" style="margin-bottom:0.5rem">${esc(cat.description)}</div>`;
+            why += kvHtml([
+                ['Source', esc(d.source)],
+                ['Producer', `<span class="mono">${esc(d.producer)}</span>`],
+                ['Grain', esc(d.grain)],
+                ['Published as', esc(d.status_public)],
+            ]);
+            parts.push(sectionHtml('Status', why));
+
+            // Clocks
+            parts.push(sectionHtml('Clocks', kvHtml([
+                ['Last run', c.last_run_at ? `${timeCell(c.last_run_at, ago)} ${runBadge(c.last_run_status)} <span class="muted small">${esc(c.last_run_store || '')}${c.last_run_duration_s != null ? ' &middot; ' + esc(fmtDuration(c.last_run_duration_s)) : ''}</span>` : null],
+                ['Last success', c.last_success_at ? timeCell(c.last_success_at, ago) : null],
+                ['Last publish', c.last_publish_at ? timeCell(c.last_publish_at, ago) : (d.producer.indexOf('bulk:') === 0 ? null : '<span class="muted">not a bulk source</span>')],
+                ['Coverage through', c.coverage_through ? esc(c.coverage_through) : (c.coverage_error ? `<span class="muted">unavailable: ${esc(c.coverage_error)}</span>` : null)],
+                ['Expected through', c.expected_through ? esc(c.expected_through) : '<span class="muted">no expectation</span>'],
+                ['Judged on', c.expectation_basis ? esc(c.expectation_basis.replace(/_/g, ' ')) : null],
+                ['Lag', c.lag_days != null ? `${fmtNum(c.lag_days)} days` : null],
+            ])));
+
+            // Cadence + schedule
+            const s = d.schedule;
+            const sched = [
+                ['Cadence', esc(d.cadence)],
+                ['SLO lag', cat.slo_lag_hours != null ? `${fmtNum(cat.slo_lag_hours)} h` : '<span class="muted">none</span>'],
+                ['Rerun policy', cat.rerun ? esc(cat.rerun.replace(/_/g, ' ')) : null],
+            ];
+            if (s) {
+                sched.push(
+                    ['Schedule', s.kind === 'batch' ? 'nightly batch' : esc(s.name || ('#' + s.schedule_id))],
+                    ['Cron', s.cron ? `<span class="mono">${esc(s.cron)}</span>` : null],
+                    ['Active', yesNo(s.active)],
+                    ['Next run', s.next_run_at ? `${timeCell(s.next_run_at, until)} <span class="muted small">(${esc(s.next_run_source || 'unknown source')})</span>` : null],
+                    ['Schedule last success', s.last_success_at ? timeCell(s.last_success_at, ago) : null],
+                    ['Missed runs (30d)', s.missed_runs_30d != null ? fmtNum(s.missed_runs_30d) : null],
+                );
+            } else {
+                sched.push(['Schedule', '<span class="muted">none: dormant unless in the nightly batch</span>']);
+            }
+            parts.push(sectionHtml('Cadence', kvHtml(sched)));
+
+            // Blockers + run verdict (information only)
+            if (operator) {
+                const v = d.can_run || {};
+                let body = '<div class="dt-title" style="margin-top:0">Blockers</div>' + reasonsHtml(d.blockers, 'blockers');
+                body += `<div class="dt-title" style="margin-top:0.75rem">Run verdict: ${v.allowed ? '<span style="color:var(--success)">would be allowed</span>' : '<span style="color:var(--violet)">would be refused</span>'}</div>`;
+                body += reasonsHtml(v.blockers, 'blockers');
+                if (v.warnings && v.warnings.length) body += reasonsHtml(v.warnings, 'warnings');
+                body += kvHtml([
+                    ['Run path', v.run_path ? esc(v.run_path) : null],
+                    ['Estimated time', v.estimated_duration_s != null ? esc(fmtDuration(v.estimated_duration_s)) : null],
+                    ['Estimated download', v.estimated_bytes != null ? fmtBytes(v.estimated_bytes) : null],
+                ]);
+                body += '<div class="info-note">Information only: runs are not started from this page (admin API, audited).</div>';
+                parts.push(sectionHtml('Blockers and run verdict', body));
+            }
+
+            // Tables
+            const tables = (d.tables || []).map(t => `<tr>
+                    <td class="mono">${esc(t.name)}</td>
+                    <td>${t.exists ? '' : '<span class="muted">missing</span>'}</td>
+                    <td class="num">${t.rows == null ? '&mdash;' : (t.rows_exact ? '' : '~') + fmtNum(t.rows)}</td>
+                    <td class="num">${fmtBytes(t.bytes)}</td></tr>`).join('');
+            parts.push(sectionHtml('Tables', tables
+                ? `<div class="scroll-x"><table class="mini-table"><thead><tr><th>Table</th><th></th><th>Rows</th><th>Size</th></tr></thead><tbody>${tables}</tbody></table></div>` +
+                  (d.rows_exact ? '' : '<div class="info-note">~ planner estimate</div>')
+                : '<div class="muted small">No declared tables.</div>'));
+
+            // Releases (bulk)
+            if (C.bulkSourceFor(d.producer)) {
+                const r = d.releases;
+                let body = r ? kvHtml([
+                    ['Loaded', fmtNum(r.loaded)],
+                    ['Published, not loaded', fmtNum(r.unloaded)],
+                    ['Failed', fmtNum(r.failed)],
+                    ['Superseded', `${fmtNum(r.superseded)} <span class="muted small">(failed but replaced: not failures)</span>`],
+                    ['Latest release', r.latest_release_key ? `<span class="mono">${esc(r.latest_release_key)}</span>` : null],
+                ]) : '';
+                if (operator) body += `<div style="margin-top:0.6rem">${releasesHtml(extras.releases)}</div>`;
+                parts.push(sectionHtml('Releases', body, true));
+            }
+
+            // Mart builds
+            if (C.martFor(d.producer)) {
+                parts.push(sectionHtml(`Mart builds (${esc(C.martFor(d.producer))})`, buildsHtml(extras.builds), true));
+            }
+
+            // Recent runs
+            if (operator) {
+                const q = C.jobsQueryFor(d.producer);
+                parts.push(sectionHtml('Recent runs', q ? runsHtml(extras.runs)
+                    : '<div class="muted small">This producer\'s runs are not ingestion jobs; the last run above comes from its own store.</div>', true));
+            }
+
+            return `<div class="dt-grid">${parts.join('')}</div>`;
+        }
+
+        function releasesHtml(slot) {
+            const p = pendingHtml(slot);
+            if (p) return p;
+            const list = (slot.data && slot.data.releases) || [];
+            if (!list.length) return '<div class="muted small">No releases recorded.</div>';
+            const rows = list.map(r => {
+                const st = String(r.status || '');
+                const superseded = st === 'failed' && String(r.error || '').indexOf('superseded:') === 0;
+                const badge = superseded ? '<span class="job-status-badge pending">superseded</span>' : runBadge(st === 'loaded' ? 'success' : st);
+                return `<tr>
+                    <td class="mono">${esc(r.release_key)}</td>
+                    <td>${badge}${st === 'loaded' || superseded ? '' : ` <span class="muted small">${esc(st)}</span>`}</td>
+                    <td class="num">${r.rows_loaded == null ? '&mdash;' : fmtNum(r.rows_loaded)}</td>
+                    <td class="num">${fmtBytes(r.bytes)}</td>
+                    <td>${timeCell(r.loaded_at || r.fetched_at || r.updated_at, ago)}</td>
+                    <td>${r.error && !superseded ? `<span class="err-text">${esc(String(r.error).slice(0, 240))}</span>` : ''}</td>
+                </tr>`;
+            }).join('');
+            return `<div class="scroll-x"><table class="mini-table"><thead><tr><th>Release</th><th>Status</th><th>Rows</th><th>Size</th><th>When</th><th>Error</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+        }
+
+        function buildsHtml(slot) {
+            const p = pendingHtml(slot);
+            if (p) return p;
+            const list = (slot.data && slot.data.builds) || [];
+            if (!list.length) return `<div class="muted small">${esc((slot.data && slot.data.note) || 'No builds recorded.')}</div>`;
+            // The server withholds error text from non-admins; the public view
+            // hides it from admins too.
+            const showErrors = isAdmin && state.view === 'operator';
+            return list.map(b => {
+                const gates = b.gate_results && typeof b.gate_results === 'object'
+                    ? Object.entries(b.gate_results).map(([name, g]) => {
+                        g = g || {};
+                        const cls = g.skipped ? 'skip' : g.passed ? 'pass' : 'fail';
+                        const tip = [g.detail, g.value != null ? 'value ' + g.value : '', g.threshold != null ? 'threshold ' + g.threshold : ''].filter(Boolean).join('; ');
+                        return `<span class="gate ${cls}" title="${esc(tip)}">${esc(name)}: ${cls}</span>`;
+                    }).join('') : '';
+                const inputs = Array.isArray(b.inputs)
+                    ? b.inputs.filter(i => i && i.ok === false).map(i => `<li>${esc(i.source || i.kind || '?')}: ${esc(i.problem || 'not ok')}</li>`).join('')
+                    : '';
+                return `<div class="build">
+                    ${runBadge(b.status)} ${b.dry_run ? '<span class="muted small">dry run</span>' : ''}
+                    ${b.started_at ? relSpan(b.started_at, 'ago') : ''}
+                    ${b.finished_at && b.started_at ? `<span class="muted small">&middot; ${esc(fmtDuration((parseTs(b.finished_at) - parseTs(b.started_at)) / 1000))}</span>` : ''}
+                    ${b.code_version ? `<span class="muted small mono">&middot; ${esc(b.code_version)}</span>` : ''}
+                    ${b.refusal_reason ? `<div class="err-text" style="margin-top:0.25rem">Refused: ${esc(b.refusal_reason)}</div>` : ''}
+                    ${b.error && showErrors ? `<div class="err-text" style="margin-top:0.25rem">${esc(String(b.error).slice(0, 400))}</div>` : ''}
+                    ${(b.error || b.error_hidden) && !showErrors ? '<div class="muted small" style="margin-top:0.25rem">Error text is shown to admins in the operator view.</div>' : ''}
+                    ${inputs ? `<ul class="reason-list blockers" style="margin-top:0.3rem">${inputs}</ul>` : ''}
+                    ${gates ? `<div style="margin-top:0.35rem">${gates}</div>` : ''}
+                </div>`;
+            }).join('');
+        }
+
+        function runsHtml(slot) {
+            const p = pendingHtml(slot);
+            if (p) return p;
+            const list = slot.data || [];
+            const more = slot.truncated
+                ? '<div class="info-note">Only the most recent jobs of this source were searched; older runs of this producer may exist.</div>' : '';
+            if (!list.length) return slot.truncated
+                ? '<div class="muted small">None among the most recent jobs of this source (search limit reached).</div>'
+                : '<div class="muted small">No ingestion jobs recorded for this producer.</div>';
+            const rows = list.map(j => {
+                const dur = j.started_at && j.completed_at ? fmtDuration((parseTs(j.completed_at) - parseTs(j.started_at)) / 1000) : '';
+                return `<tr>
+                    <td class="num">#${esc(j.id)}</td>
+                    <td>${runBadge(j.status)}</td>
+                    <td>${timeCell(j.created_at, ago)}</td>
+                    <td class="num">${esc(dur)}</td>
+                    <td class="num">${j.rows_inserted == null ? '&mdash;' : fmtNum(j.rows_inserted)}</td>
+                    <td>${esc(j.trigger || '')}</td>
+                    <td>${j.error_message ? `<span class="err-text">${esc(String(j.error_message).slice(0, 240))}</span>` : ''}</td>
+                </tr>`;
+            }).join('');
+            return `<div class="scroll-x"><table class="mini-table"><thead><tr><th>Job</th><th>Status</th><th>Created</th><th>Took</th><th>Rows</th><th>Trigger</th><th>Error</th></tr></thead><tbody>${rows}</tbody></table></div>${more}`;
+        }
+
+        async function loadExtras(d) {
+            const key = d.key;
+            if (state.extras.has(key)) return;
+            const slot = {};
+            state.extras.set(key, slot);
+            const jobs = [];
+            const q = C.jobsQueryFor(d.producer);
+            if (q) {
+                jobs.push((isAdmin
+                    ? getJson(`${ENDPOINTS.jobs}?producer=${encodeURIComponent(q.producer)}&limit=10`)
+                    : Promise.resolve({ forbidden: true })
+                ).then(res => { slot.runs = res; }));
+            }
+            const bulk = C.bulkSourceFor(d.producer);
+            if (bulk) {
+                jobs.push((isAdmin
+                    ? getJson(`${ENDPOINTS.releases}?source=${encodeURIComponent(bulk)}&limit=12`)
+                    : Promise.resolve({ forbidden: true })
+                ).then(res => { slot.releases = res; }));
+            }
+            const mart = C.martFor(d.producer);
+            if (mart) {
+                jobs.push(getJson(`${ENDPOINTS.martBuilds}?mart=${encodeURIComponent(mart)}&limit=5`)
+                    .then(res => { slot.builds = res; }));
+            }
+            await Promise.all(jobs);
+            if (state.extras.get(key) !== slot) return;  // invalidated meanwhile
+            const det = detailEl(key);
+            const cur = state.byKey.get(key);
+            if (det && cur) det.outerHTML = detailRowHtml(cur);
+        }
+
+        // ---- loading -------------------------------------------------------
+        let refreshing = null;
+        async function loadStatus() {
+            const res = await getJson(ENDPOINTS.status);
+            if (!res.data) {
+                notices.load = { cls: 'error', html: res.forbidden
+                    ? 'You do not have access to dataset status.'
+                    : `Could not load dataset status (${esc(res.error)}). Retrying within ${Math.round(TICK_MS / 1000)} seconds.` };
+                renderNotices();
+                return null;
+            }
+            notices.load = null;
+            const deg = res.data.degraded || [];
+            notices.degraded = deg.length ? { cls: 'warn', html:
+                `Some stores could not be read in time (${deg.map(esc).join(', ')}): statuses that rest on missing evidence show as unknown.` } : null;
+            renderNotices();
+            return res.data;
+        }
+
+        function applyStatus(data, affectedPrefixes) {
+            const old = state.data;
+            state.data = data;
+            state.byKey = new Map(data.datasets.map(d => [d.key, d]));
+            state.fetchedAt = Date.now();
+            document.getElementById('generated-at').innerHTML =
+                `as of ${relSpan(data.generated_at, 'ago')}<span class="stale-flag"> &middot; stale</span>`;
+            retick();
+            renderBanner();
+            renderLagStrip();
+
+            // Expansions whose producer a job touched: their runs/releases/builds may have moved.
+            const stale = new Set();
+            if (affectedPrefixes && affectedPrefixes.size) {
+                state.expanded.forEach(key => {
+                    const d = state.byKey.get(key);
+                    if (d && Array.from(affectedPrefixes).some(p => C.matchesPrefix(d.producer, p))) stale.add(key);
+                });
+            }
+            applyLivePlan(data);
+            scheduleCoverageCatchup(data);
+            if (!old) { fillKindFilter(); renderTable(); return; }
+
+            const changed = C.changedKeys(old.datasets, data.datasets);
+            changed.forEach(k => state.extras.delete(k));
+            stale.forEach(k => state.extras.delete(k));
+            // A changed row may move group / order or leave the filter: re-render the table then.
+            const oldOrder = visibleKeys(old.datasets);
+            const newOrder = visibleKeys(data.datasets);
+            if (oldOrder !== newOrder) {
+                renderTable();
+            } else {
+                changed.forEach(k => { const d = state.byKey.get(k); if (d) replaceRow(d); });
+            }
+            new Set([...changed, ...stale]).forEach(k => {
+                const d = state.byKey.get(k);
+                if (d && state.expanded.has(k)) loadExtras(d);
+            });
+        }
+
+        function visibleKeys(datasets) {
+            const saved = state.data;
+            state.data = { datasets: datasets };
+            const keys = C.groupByKind(visibleDatasets()).map(g => g[0] + ':' + g[1].map(d => d.key).join(',')).join('|');
+            state.data = saved;
+            return keys;
+        }
+
+        async function refresh(affectedPrefixes) {
+            if (refreshing) { refreshing.again = true; return; }
+            refreshing = { again: false };
+            try {
+                const data = await loadStatus();
+                if (data) applyStatus(data, affectedPrefixes);
+            } finally {
+                const again = refreshing.again;
+                refreshing = null;
+                if (again) refresh();
+            }
+        }
+
+        async function loadCatalog() {
+            const res = await getJson(ENDPOINTS.catalog);
+            if (res.data && Array.isArray(res.data.datasets)) {
+                state.catalog = new Map(res.data.datasets.map(d => [d.key, d]));
+            }
+        }
+
+        function fillKindFilter() {
+            const sel = document.getElementById('f-kind');
+            const kinds = Array.from(new Set(state.data.datasets.map(d => d.kind))).sort();
+            sel.innerHTML = '<option value="">All kinds</option>' +
+                kinds.map(k => `<option value="${esc(k)}">${esc(k.replace(/_/g, ' '))}</option>`).join('');
+            sel.value = state.kind;
+        }
+
+        // ---- live updates (SSE with a stream token; slow poll fallback) ----
+        const live = { es: null, fails: 0, poll: null, retry: null, debounce: null, prefixes: new Set(),
+                       plan: C.livePlan(null, isAdmin), tick: null, catchups: 0, catchup: null };
+
+        function setLive(mode, text) {
+            document.getElementById('live-dot').className = 'live-dot ' + mode;
+            const running = state.activeJobs.size;
+            document.getElementById('live-text').textContent =
+                text + (mode === 'live' && running ? ` · ${running} job${running === 1 ? '' : 's'} running` : '');
+        }
+
+        function onJobEvent(name, e) {
+            let d = {};
+            try { d = JSON.parse(e.data); } catch (err) { return; }
+            if (name === 'job_started') state.activeJobs.set(d.job_id, d.job_type);
+            else state.activeJobs.delete(d.job_id);
+            setLive('live', 'live');
+            live.prefixes.add(C.producerPrefixForJobType(d.job_type));
+            clearTimeout(live.debounce);
+            live.debounce = setTimeout(() => {
+                const prefixes = live.prefixes;
+                live.prefixes = new Set();
+                refresh(prefixes);
+            }, REFRESH_DEBOUNCE_MS);
+        }
+
+        function pollTick() { refresh(); }
+        function retryStream() {
+            if (!live.es) { live.fails = 0; connectStream(); }
+        }
+
+        function startFallback(reason) {
+            setLive('polling', `updates every ${Math.round(FALLBACK_POLL_MS / 1000)}s`);
+            notices.live = { cls: 'info', html: `Live job stream unavailable (${esc(reason)}); reloading every ${Math.round(FALLBACK_POLL_MS / 1000)} seconds.` };
+            renderNotices();
+            if (!live.poll) live.poll = setInterval(pollTick, FALLBACK_POLL_MS);
+            if (live.plan.retry && !live.retry) live.retry = setInterval(retryStream, SSE_RETRY_MS);
+        }
+
+        /** Always-on slow clock (TICK_MS): keeps relative times and the stale
+         *  flag current, retries a failed load, and re-fetches when nothing
+         *  has for SAFETY_REFRESH_MS (quiet queue, api/scheduler work, time-
+         *  driven statuses such as stalled or an overdue next run). */
+        function tick() {
+            retick();
+            const since = Date.now() - (state.fetchedAt || 0);
+            if (notices.load || since >= SAFETY_REFRESH_MS) refresh();
+        }
+
+        /** A cold coverage cache answers 'deadline' and computes in the
+         *  background: fetch again shortly so the page picks up the result. */
+        function scheduleCoverageCatchup(data) {
+            if (live.catchup || live.catchups >= COVERAGE_CATCHUP_MAX) return;
+            if (!C.pendingCoverage(data.datasets)) return;
+            live.catchups += 1;
+            live.catchup = setTimeout(() => { live.catchup = null; refresh(); }, COVERAGE_CATCHUP_MS);
+        }
+
+        /** Re-plan live updates when a status body says how jobs run. */
+        function applyLivePlan(data) {
+            const plan = C.livePlan(data, isAdmin);
+            const was = live.plan;
+            live.plan = plan;
+            if (!plan.sse) {
+                if (live.es) { live.es.close(); live.es = null; }
+                if (live.retry) { clearInterval(live.retry); live.retry = null; }
+                if (!live.poll || was.sse) startFallback(plan.reason);
+            } else if (!was.sse && !live.es) {
+                stopFallback();
+                live.fails = 0;
+                connectStream();
+            }
+        }
+        function stopFallback() {
+            if (live.poll) { clearInterval(live.poll); live.poll = null; }
+            if (live.retry) { clearInterval(live.retry); live.retry = null; }
+            notices.live = null;
+            renderNotices();
+        }
+
+        function onStreamFail() {
+            live.fails += 1;
+            if (live.fails >= SSE_MAX_FAILS) { startFallback('could not connect'); return; }
+            if (!live.poll) setLive('reconnecting', 'reconnecting');
+            setTimeout(connectStream, Math.min(30000, 1000 * Math.pow(2, live.fails)));
+        }
+
+        async function connectStream() {
+            if (live.es) return;
+            if (!live.plan.sse) { startFallback(live.plan.reason); return; }
+            // EventSource cannot send headers: a fresh short-lived stream token
+            // per (re)connect (SPEC_127).
+            let url;
+            try { url = await NexdataAuth.streamUrl(ENDPOINTS.stream); } catch (e) { url = null; }
+            if (!url) { onStreamFail(); return; }
+            const es = new EventSource(url);
+            live.es = es;
+            es.onopen = () => {
+                if (!live.plan.sse) { es.close(); if (live.es === es) live.es = null; return; }
+                const wasPolling = !!live.poll;
+                live.fails = 0;
+                stopFallback();
+                setLive('live', 'live');
+                if (wasPolling) refresh();  // catch up on what the poll gap missed
+            };
+            ['job_started', 'job_completed', 'job_failed'].forEach(n =>
+                es.addEventListener(n, e => onJobEvent(n, e)));
+            es.onerror = () => {
+                es.close();
+                if (live.es === es) live.es = null;
+                onStreamFail();
+            };
+        }
+
+        // ---- wiring --------------------------------------------------------
+        function wire() {
+            document.getElementById('reload-btn').addEventListener('click', () => refresh());
+            document.getElementById('f-search').addEventListener('input', e => { state.search = e.target.value; renderTable(); });
+            document.getElementById('f-kind').addEventListener('change', e => { state.kind = e.target.value; renderTable(); });
+            document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => {
+                state.view = b.getAttribute('data-view');
+                document.querySelectorAll('.seg button').forEach(x => x.classList.toggle('active', x === b));
+                renderBanner();
+                renderLagStrip();
+                renderTable();
+            }));
+            const body = document.getElementById('ds-body');
+            body.addEventListener('click', e => {
+                const tr = e.target.closest('tr.ds-row');
+                if (tr) toggleRow(tr.getAttribute('data-key'));
+            });
+            body.addEventListener('keydown', e => {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                const tr = e.target.closest('tr.ds-row');
+                if (tr) { e.preventDefault(); toggleRow(tr.getAttribute('data-key')); }
+            });
+        }
+
+        async function init() {
+            wire();
+            live.tick = setInterval(tick, TICK_MS);
+            const [data] = await Promise.all([loadStatus(), loadCatalog()]);
+            if (!data) {
+                document.getElementById('banner').innerHTML = '<div class="empty">Dataset status is unavailable.</div>';
+                document.getElementById('lag-strip').innerHTML = '';
+                document.getElementById('ds-body').innerHTML = '<tr><td colspan="9" class="empty">No data.</td></tr>';
+                startFallback('status failed to load');
+                return;
+            }
+            live.plan = C.livePlan(data, isAdmin);
+            applyStatus(data);
+            connectStream();
+        }
+
+        init();
+    })();
+    </script>
+</body>
+</html>

@@ -54,6 +54,7 @@ from app.api.v1 import (
     prediction_markets,
     bulk,
     catalog,
+    dataset_status,
     entity_master,
     pe_marts,
     mart_builds,
@@ -269,6 +270,9 @@ async def lifespan(app: FastAPI):
         engine = get_engine()
         create_tables(engine)
         logger.info("Database tables verified via create_all()")
+        # A failed migration must not leave ORM-mapped columns missing (SPEC_124)
+        from app.core.migrate import verify_mapped_columns
+        verify_mapped_columns(engine)
     except Exception as e:
         logger.error(f"create_tables failed: {e}")
         raise
@@ -1362,6 +1366,7 @@ Browse the endpoint sections below to see what's available:
         # ── Source Directory ──────────────────────────────────────────────
         {"name": "sources", "description": "📚 **Source Directory** — Overview and status for all data sources"},
         {"name": "catalog", "description": "🗂️ **Dataset Catalog** — Declared datasets: producer, tables, cadence, rights, live row counts and coverage"},
+        {"name": "dataset-status", "description": "🚦 **Dataset Status** — Per-dataset run, publish and coverage clocks, one status, and the admin run verdict"},
         # ── Government / Economic Data ─────────────────────────────────
         {"name": "census-batch", "description": "📊 **U.S. Census Bureau - Batch** - Bulk census data ingestion"},
         {"name": "census-geography", "description": "📊 **U.S. Census Bureau - Geography** - Geographic hierarchy and FIPS codes"},
@@ -1625,6 +1630,7 @@ app.include_router(dunl.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(prediction_markets.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(bulk.router, prefix="/api/v1", dependencies=_admin)
 app.include_router(catalog.router, prefix="/api/v1", dependencies=_auth)  # SPEC_123
+app.include_router(dataset_status.router, prefix="/api/v1", dependencies=_auth)  # SPEC_124 (run: admin)
 app.include_router(entity_master.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(pe_marts.router, prefix="/api/v1", dependencies=_admin)
 app.include_router(mart_builds.router, prefix="/api/v1", dependencies=_auth)  # SPEC_126a ledger reads

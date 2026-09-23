@@ -25,6 +25,7 @@ def log_collection(
     job_type: Optional[str] = None,
     trigger_source: Optional[str] = None,
     config_snapshot: Optional[Dict[str, Any]] = None,
+    actor: Optional[str] = None,
 ) -> CollectionAuditLog:
     """
     Create an audit trail entry for a collection trigger.
@@ -38,6 +39,7 @@ def log_collection(
         job_type: "ingestion" or "site_intel"
         trigger_source: Endpoint path or schedule_id
         config_snapshot: Collection config at time of trigger
+        actor: Who triggered it (principal email or name), when known
 
     Returns:
         Created audit log entry
@@ -50,6 +52,7 @@ def log_collection(
         job_id=job_id,
         job_type=job_type,
         config_snapshot=config_snapshot,
+        actor=actor,
     )
     db.add(entry)
     db.commit()

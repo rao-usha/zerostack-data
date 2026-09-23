@@ -5,8 +5,9 @@ Job management endpoints.
 import importlib
 import logging
 from datetime import datetime
-from typing import List, Dict, Tuple
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from typing import List, Dict, Optional, Tuple
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Response
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -24,23 +25,14 @@ logger = logging.getLogger(__name__)
 
 
 def _check_api_key_preflight(source: str):
-    """Return error message if required API key is missing, else None."""
-    from app.core.api_registry import API_REGISTRY, APIKeyRequirement
-    from app.core.config import get_settings
+    """Return error message if required API key is missing, else None.
 
-    # Strip dataset suffix (e.g. "job_postings:all" → "job_postings")
-    base_source = source.split(":")[0]
+    Delegates to ``app.core.preflight.api_key_preflight`` (SPEC_124), which the
+    dataset status API also uses to explain ``blocked`` datasets.
+    """
+    from app.core.preflight import api_key_preflight
 
-    api_config = API_REGISTRY.get(base_source)
-    if not api_config or api_config.api_key_requirement != APIKeyRequirement.REQUIRED:
-        return None
-
-    settings = get_settings()
-    try:
-        settings.get_api_key(base_source, required=True)
-        return None
-    except Exception:
-        return f"API key required for '{base_source}' but not configured"
+    return api_key_preflight(source)
 
 
 # =============================================================================
@@ -1623,12 +1615,76 @@ def get_job(job_id: int, db: Session = Depends(get_db)) -> JobResponse:
     return JobResponse.model_validate(job)
 
 
+# GET /jobs?producer=: rows scanned per round trip, and in total, before giving up.
+PRODUCER_SCAN_BATCH = 500
+PRODUCER_SCAN_MAX = 5000
+
+
+def _like_literal(value: str) -> str:
+    return value.replace("\\", r"\\").replace("%", r"\%").replace("_", r"\_")
+
+
+def producer_source_candidates(producer: str) -> List[str]:
+    """``ingestion_jobs.source`` values a catalog producer's jobs can carry
+    (before the ``:split_<n>`` suffix). ``dispatch:treasury:auctions`` runs
+    as source ``treasury`` with ``config.dataset='auctions'``; collector and
+    api producers do not write ingestion_jobs rows at all."""
+    base = (producer or "").split("#", 1)[0]
+    if base.startswith(("bulk:", "job:")):
+        return [base]
+    if base.startswith("dispatch:"):
+        parts = base[len("dispatch:"):].split(":")
+        return [":".join(parts[:i]) for i in range(1, len(parts) + 1) if parts[0]]
+    return []
+
+
+def jobs_for_producer(query, producer: str, limit: int, offset: int = 0):
+    """The newest jobs ``query`` holds that ran ``producer`` (SPEC_125).
+
+    Resolved at read time with the same ``producer_for_job`` mapping
+    ``GET /datasets/status`` uses, so it covers history written before
+    ``dataset_key`` existed, split jobs (``<source>:split_<n>``), and keeps a
+    bare dispatch key (``dispatch:treasury``) apart from its dataset-qualified
+    siblings (``dispatch:treasury:auctions``). Returns ``(jobs, truncated)``;
+    ``truncated`` is True when the scan cap ran out before ``limit`` matches.
+    """
+    from app.catalog.job_keys import producer_for_job
+
+    base = (producer or "").split("#", 1)[0]
+    cands = producer_source_candidates(base)
+    if not cands or limit <= 0:
+        return [], False
+    conds = [IngestionJob.source.in_(cands)]
+    conds += [IngestionJob.source.like(_like_literal(c) + r":split\_%", escape="\\")
+              for c in cands]
+    query = query.filter(or_(*conds)).order_by(
+        IngestionJob.created_at.desc(), IngestionJob.id.desc())
+    matched, skipped, scanned = [], 0, 0
+    while scanned < PRODUCER_SCAN_MAX:
+        batch = query.offset(scanned).limit(PRODUCER_SCAN_BATCH).all()
+        scanned += len(batch)
+        for job in batch:
+            if producer_for_job(job.source, job.config) != base:
+                continue
+            if skipped < offset:
+                skipped += 1
+                continue
+            matched.append(job)
+            if len(matched) >= limit:
+                return matched, False
+        if len(batch) < PRODUCER_SCAN_BATCH:
+            return matched, False
+    return matched, True
+
+
 @router.get("", response_model=List[JobResponse])
 def list_jobs(
+    response: Response,
     source: str = None,
     status: JobStatus = None,
     batch_run_id: str = None,
     trigger: str = None,
+    producer: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
     db: Session = Depends(get_db),
@@ -1639,6 +1695,10 @@ def list_jobs(
     Args:
         batch_run_id: Filter to jobs in a specific batch run
         trigger: Filter by trigger type ("batch", "manual", "scheduled")
+        producer: A catalog producer (``dispatch:treasury:auctions``,
+            ``bulk:sec_adv``, ``job:pe_mart_build``): only the jobs that ran
+            it, split jobs included. When the scan cap is reached first the
+            response carries ``X-Producer-Scan-Truncated: true``.
     """
     query = db.query(IngestionJob)
 
@@ -1650,6 +1710,12 @@ def list_jobs(
         query = query.filter(IngestionJob.batch_run_id == batch_run_id)
     if trigger:
         query = query.filter(IngestionJob.trigger == trigger)
+
+    if producer:
+        jobs, truncated = jobs_for_producer(query, producer, limit, offset)
+        if truncated and response is not None:
+            response.headers["X-Producer-Scan-Truncated"] = "true"
+        return [JobResponse.model_validate(job) for job in jobs]
 
     query = query.order_by(IngestionJob.created_at.desc()).offset(offset).limit(limit)
 
