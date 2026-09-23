@@ -4,13 +4,16 @@ Payload:
     skip_feeds: bool      reuse core.source_record as-is
     skip_bridge: bool     keep the existing bridge
     include_name_tier: bool (default True) name+state bridge tier
-    dry_run: bool         plan and ledger only, no entity writes
+    dry_run: bool         build, gate and ledger; keep nothing (one rolled-back tx)
+    input_override / input_max_age_days / gate_override
+                          admin overrides of the SPEC_126a input and ship gates
 
 The blocking work runs in a thread so the worker heartbeat keeps ticking.
 """
 
 import asyncio
 import logging
+import threading
 
 from sqlalchemy.orm import Session
 
@@ -19,6 +22,17 @@ from app.core.models_queue import JobQueue
 
 logger = logging.getLogger(__name__)
 
+MART = "entity_resolve"
+
+
+def _stages(skip_feeds: bool, skip_bridge: bool) -> list:
+    out = []
+    if not skip_feeds:
+        out.append("feeds")
+    if not skip_bridge:
+        out.append("bridge")
+    return out + ["resolve"]
+
 
 def run_entity_master(
     skip_feeds: bool = False,
@@ -26,29 +40,74 @@ def run_entity_master(
     include_name_tier: bool = True,
     dry_run: bool = False,
     progress=None,
+    *,
+    guard: bool = False,
+    input_override=None,
+    input_max_age_days=None,
+    gate_override=None,
+    ingestion_job_id=None,
+    job_queue_id=None,
+    cancel_event=None,
 ) -> dict:
-    """Refresh the entity master. Each stage commits on its own."""
+    """Refresh the entity master on ONE connection inside ONE transaction.
+
+    The stages used to commit one by one, so a failed `resolve` left the feeds
+    and bridge rewritten, and `dry_run` (honoured only by `resolve`) still
+    wrote them. Now a failure or a dry run keeps nothing (SPEC_126a).
+    `guard=True` (the worker) adds input assertions, ship gates and the
+    `core.mart_build` ledger row.
+    """
     from app.entities import cik_crd_bridge, feeds, resolve
 
     engine = get_engine()
-    summary = {}
 
-    if not skip_feeds:
-        if progress:
-            progress("feeding core.source_record", 5.0)
-        with engine.begin() as conn:
+    def build(conn, checkpoint=lambda: None) -> dict:
+        summary = {}
+        if not skip_feeds:
+            checkpoint()
+            if progress:
+                progress("feeding core.source_record", 5.0)
             summary["feeds"] = feeds.run_feeds(conn, progress=progress)
-
-    if not skip_bridge:
-        if progress:
-            progress("building CIK/CRD bridge", 40.0)
-        with engine.begin() as conn:
+        if not skip_bridge:
+            checkpoint()
+            if progress:
+                progress("building CIK/CRD bridge", 40.0)
             summary["bridge"] = cik_crd_bridge.build(conn, include_name_tier=include_name_tier)
-
-    if progress:
-        progress("resolving entities", 60.0)
-    with engine.begin() as conn:
+        checkpoint()
+        if progress:
+            progress("resolving entities", 60.0)
         summary["resolve"] = resolve.resolve(conn, dry_run=dry_run)
+        return summary
+
+    if guard:
+        from app.marts import build_ledger, inputs
+
+        return build_ledger.run_guarded(
+            engine,
+            mart=MART,
+            sources=inputs.sources_for(inputs.ENTITY_STAGE_INPUTS,
+                                       _stages(skip_feeds, skip_bridge)),
+            build=build,
+            dry_run=dry_run,
+            input_override=input_override,
+            input_max_age_days=input_max_age_days,
+            gate_override=gate_override,
+            ingestion_job_id=ingestion_job_id,
+            job_queue_id=job_queue_id,
+            cancel_event=cancel_event,
+        )
+
+    with engine.connect() as conn:
+        tx = conn.begin()
+        try:
+            summary = build(conn)
+        except BaseException:
+            tx.rollback()
+            raise
+        if dry_run:
+            tx.rollback()
+        else:
+            tx.commit()
     return summary
 
 
@@ -74,17 +133,32 @@ async def execute(job: JobQueue, db: Session):
         finally:
             session.close()
 
-    summary = await asyncio.to_thread(
-        run_entity_master,
-        skip_feeds=bool(payload.get("skip_feeds")),
-        skip_bridge=bool(payload.get("skip_bridge")),
-        include_name_tier=payload.get("include_name_tier", True),
-        dry_run=bool(payload.get("dry_run")),
-        progress=progress,
-    )
+    # cancel/timeout cancels this coroutine, not the thread: tell the build
+    cancel = threading.Event()
+    try:
+        summary = await asyncio.to_thread(
+            run_entity_master,
+            skip_feeds=bool(payload.get("skip_feeds")),
+            skip_bridge=bool(payload.get("skip_bridge")),
+            include_name_tier=payload.get("include_name_tier", True),
+            dry_run=bool(payload.get("dry_run")),
+            progress=progress,
+            guard=True,
+            input_override=payload.get("input_override"),
+            input_max_age_days=payload.get("input_max_age_days"),
+            gate_override=payload.get("gate_override"),
+            ingestion_job_id=payload.get("ingestion_job_id"),
+            job_queue_id=getattr(job, "id", None),
+            cancel_event=cancel,
+        )
+    except asyncio.CancelledError:
+        cancel.set()
+        raise
 
     resolved = summary.get("resolve", {})
+    build = summary.get("mart_build") or {}
     job.progress_message = (
+        f"{'build #' + str(build['id']) + ': ' if build.get('id') else ''}"
         f"entities: {resolved.get('components_materialized', 0)} components, "
         f"{resolved.get('entities_new', 0)} new, {resolved.get('entities_written', 0)} written, "
         f"bridge {summary.get('bridge', {}).get('accepted', 0)}"

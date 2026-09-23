@@ -55,6 +55,7 @@ from app.api.v1 import (
     bulk,
     entity_master,
     pe_marts,
+    mart_builds,
     schedules,
     webhooks,
     chains,
@@ -1615,6 +1616,7 @@ app.include_router(prediction_markets.router, prefix="/api/v1", dependencies=_au
 app.include_router(bulk.router, prefix="/api/v1", dependencies=_admin)
 app.include_router(entity_master.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(pe_marts.router, prefix="/api/v1", dependencies=_admin)
+app.include_router(mart_builds.router, prefix="/api/v1", dependencies=_auth)  # SPEC_126a ledger reads
 app.include_router(schedules.router, prefix="/api/v1", dependencies=_admin)
 app.include_router(webhooks.router, prefix="/api/v1", dependencies=_admin)
 app.include_router(chains.router, prefix="/api/v1", dependencies=_admin)

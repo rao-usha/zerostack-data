@@ -8,7 +8,7 @@ and hand-entered rows are never touched.
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -25,11 +25,30 @@ def queue_build(
     publish_guard_override: Optional[List[str]] = Query(
         None, description="Tables whose publish guard this one build may bypass (SPEC_129)"
     ),
+    input_override: Optional[List[str]] = Query(
+        None, description="Inputs (or 'all') this build may use although their latest "
+                          "release failed or is stale, incl. 'entity_resolve' (SPEC_126a)"
+    ),
+    input_max_age_days: Optional[List[str]] = Query(
+        None, description="Per-input max age, as source=days (SPEC_126a)"
+    ),
+    dry_run: bool = Query(False, description="Build, gate and ledger; keep nothing"),
+    gate_override: Optional[List[str]] = Query(
+        None, description="Ship gates (or 'all') this build may fail and still commit (SPEC_126a)"
+    ),
     db: Session = Depends(get_db),
 ):
+    from app.marts.inputs import override_payload
+
     payload = {"skip_firms": skip_firms, "skip_funds": skip_funds}
+    if dry_run is True:  # not a bare Query()
+        payload["dry_run"] = True
     if isinstance(publish_guard_override, list) and publish_guard_override:  # not a bare Query()
         payload["publish_guard_override"] = publish_guard_override
+    try:
+        payload.update(override_payload(input_override, gate_override, input_max_age_days))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return submit_job(db=db, job_type="pe_mart_build", payload=payload)
 
 
