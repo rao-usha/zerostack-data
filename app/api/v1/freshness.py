@@ -8,14 +8,12 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.models import (
     IngestionJob,
     IngestionSchedule,
-    JobStatus,
     ScheduleFrequency,
     SourceFreshnessSLA,
 )
@@ -43,31 +41,34 @@ def get_freshness_dashboard(db: Session = Depends(get_db)):
     """
     Return per-source freshness status.
 
-    For every source that has at least one successful job, reports:
-    - last_success_at
+    Covers every source that has a successful job, an active schedule, an SLA,
+    or any job at all, and reports:
+    - last_success_at (successful jobs only; None if it never succeeded)
     - age_hours
     - expected_cadence_hours (from DB SLA first, then schedule cadence)
-    - is_stale / freshness label
+    - is_stale / freshness label: ``fresh``, ``stale``, ``never_succeeded``,
+      or ``unknown`` when there is no SLA and no schedule to judge against
+      (SPEC_128: that used to be reported as ``fresh``).
     """
+    from app.services.data_watchdog import (
+        STALL_FACTOR,
+        cron_cadence_hours,
+        last_success_by_source,
+    )
+
     now = datetime.utcnow()
 
-    # 1. Last successful job per source (case-insensitive status match
-    #    because some jobs were written with uppercase status values)
-    last_success_subq = (
-        db.query(
-            IngestionJob.source,
-            func.max(IngestionJob.completed_at).label("last_success"),
-        )
-        .filter(func.lower(IngestionJob.status) == "success")
-        .group_by(IngestionJob.source)
-        .all()
-    )
+    # 1. Last successful run per source: successful ingestion_jobs (any status
+    #    case) plus linked job_queue successes for workers that do not write
+    #    the IngestionJob back -- the same evidence the watchdog uses.
+    last_success_map: dict[str, Optional[datetime]] = last_success_by_source(db)
 
     # 2. Expected cadence from active schedules (take the tightest per source)
     schedule_rows = (
         db.query(
             IngestionSchedule.source,
             IngestionSchedule.frequency,
+            IngestionSchedule.cron_expression,
         )
         .filter(IngestionSchedule.is_active == 1)
         .all()
@@ -75,7 +76,14 @@ def get_freshness_dashboard(db: Session = Depends(get_db)):
 
     cadence_map: dict[str, float] = {}
     for row in schedule_rows:
-        grace = CADENCE_GRACE_HOURS.get(row.frequency, DEFAULT_GRACE_HOURS)
+        grace = None
+        if row.frequency == ScheduleFrequency.CUSTOM and row.cron_expression:
+            # A monthly cron is not stale after the 48h CUSTOM fallback
+            cron_hours = cron_cadence_hours(row.cron_expression)
+            if cron_hours:
+                grace = cron_hours * STALL_FACTOR
+        if grace is None:
+            grace = CADENCE_GRACE_HOURS.get(row.frequency, DEFAULT_GRACE_HOURS)
         # Keep the tightest (smallest) grace if multiple schedules exist
         if row.source not in cadence_map or grace < cadence_map[row.source]:
             cadence_map[row.source] = grace
@@ -83,46 +91,63 @@ def get_freshness_dashboard(db: Session = Depends(get_db)):
     # 3. Load DB SLAs — these override schedule-derived cadence
     sla_map = {r.source: r for r in db.query(SourceFreshnessSLA).all()}
 
-    # 4. Build per-source entries
-    sources = []
-    stale_count = 0
-    for row in last_success_subq:
-        source = row.source
-        last_at: Optional[datetime] = row.last_success
-        if last_at is None:
-            continue
+    # 4. Every source that ever had a job, so never-succeeded ones are listed
+    attempted = {r.source for r in db.query(IngestionJob.source).distinct().all()}
 
-        age_hours = (now - last_at).total_seconds() / 3600
+    all_sources = set(last_success_map) | set(cadence_map) | set(sla_map) | attempted
+
+    # 5. Build per-source entries
+    sources = []
+    counts = {"fresh": 0, "stale": 0, "never_succeeded": 0, "unknown": 0}
+    for source in all_sources:
+        last_at: Optional[datetime] = last_success_map.get(source)
 
         # DB SLA overrides schedule-derived cadence
         sla = sla_map.get(source)
         expected = sla.max_age_hours if sla else cadence_map.get(source)
         sla_source = "db" if sla else ("schedule" if source in cadence_map else None)
 
-        is_stale = (age_hours > expected) if expected else False
+        if last_at is None:
+            age_hours = None
+            is_stale = True
+            freshness = "never_succeeded"
+        else:
+            age_hours = round((now - last_at).total_seconds() / 3600, 1)
+            if expected:
+                is_stale = age_hours > expected
+                freshness = "stale" if is_stale else "fresh"
+            else:
+                # Nothing to judge against: say so instead of calling it fresh
+                is_stale = False
+                freshness = "unknown"
 
+        counts[freshness] += 1
         sources.append(
             {
                 "source": source,
-                "last_success_at": last_at.isoformat(),
-                "age_hours": round(age_hours, 1),
+                "last_success_at": last_at.isoformat() if last_at else None,
+                "age_hours": age_hours,
                 "expected_cadence_hours": expected,
                 "sla_source": sla_source,
                 "is_stale": is_stale,
-                "freshness": "stale" if is_stale else "fresh",
+                "freshness": freshness,
             }
         )
 
-        if is_stale:
-            stale_count += 1
-
-    # Sort stale-first, then by age descending
-    sources.sort(key=lambda s: (not s["is_stale"], -s["age_hours"]))
+    # Sort stale-first (never-succeeded first of all), then by age descending
+    sources.sort(key=lambda s: (
+        not s["is_stale"],
+        s["age_hours"] is not None,
+        -(s["age_hours"] or 0),
+        s["source"],
+    ))
 
     return {
         "total_sources": len(sources),
-        "stale_count": stale_count,
-        "fresh_count": len(sources) - stale_count,
+        "stale_count": counts["stale"] + counts["never_succeeded"],
+        "never_succeeded_count": counts["never_succeeded"],
+        "fresh_count": counts["fresh"],
+        "unknown_count": counts["unknown"],
         "sources": sources,
     }
 
@@ -209,71 +234,6 @@ def delete_freshness_sla(source: str, db: Session = Depends(get_db)):
     return {"deleted": source}
 
 
-# =============================================================================
-# Freshness violation checker (for periodic / webhook use)
-# =============================================================================
-
-
-async def check_freshness_violations(db: Session):
-    """
-    Check all sources with DB SLAs for freshness violations.
-
-    Sends ALERT_DATA_STALENESS webhook for each violating source
-    that has alert_on_violation enabled.
-    """
-    from app.core.webhook_service import trigger_webhooks
-    from app.core.models import WebhookEventType
-
-    now = datetime.utcnow()
-
-    slas = db.query(SourceFreshnessSLA).filter(
-        SourceFreshnessSLA.alert_on_violation == 1
-    ).all()
-
-    if not slas:
-        return {"violations": 0}
-
-    # Get last success per source
-    last_success_rows = (
-        db.query(
-            IngestionJob.source,
-            func.max(IngestionJob.completed_at).label("last_success"),
-        )
-        .filter(func.lower(IngestionJob.status) == "success")
-        .group_by(IngestionJob.source)
-        .all()
-    )
-    last_success_map = {r.source: r.last_success for r in last_success_rows}
-
-    violations = []
-    for sla in slas:
-        last_at = last_success_map.get(sla.source)
-        if last_at is None:
-            continue
-
-        age_hours = (now - last_at).total_seconds() / 3600
-        if age_hours > sla.max_age_hours:
-            violations.append({
-                "source": sla.source,
-                "age_hours": round(age_hours, 1),
-                "max_age_hours": sla.max_age_hours,
-            })
-
-            try:
-                await trigger_webhooks(
-                    event_type=WebhookEventType.ALERT_DATA_STALENESS,
-                    event_data={
-                        "source": sla.source,
-                        "age_hours": round(age_hours, 1),
-                        "sla_max_age_hours": sla.max_age_hours,
-                        "message": (
-                            f"Source '{sla.source}' is {round(age_hours, 1)}h old "
-                            f"(SLA: {sla.max_age_hours}h)"
-                        ),
-                    },
-                    source=sla.source,
-                )
-            except Exception as e:
-                logger.error(f"Freshness violation webhook error for {sla.source}: {e}")
-
-    return {"violations": len(violations), "details": violations}
+# SLA violations are checked every 15 minutes by the data watchdog
+# (app/services/data_watchdog.py, rule_sla), with dedupe and resolve notices.
+# The old check_freshness_violations here had no caller and was removed.

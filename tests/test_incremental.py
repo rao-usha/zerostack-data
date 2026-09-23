@@ -160,7 +160,9 @@ class TestFreshnessDashboard:
         # No schedules
         db.query.return_value.filter.return_value.all.return_value = []
 
-        result = get_freshness_dashboard(db=db)
+        # Last success comes from the shared watchdog helper (SPEC_128)
+        with patch("app.services.data_watchdog.last_success_by_source", return_value={}):
+            result = get_freshness_dashboard(db=db)
         assert result["total_sources"] == 0
         assert result["stale_count"] == 0
         assert result["fresh_count"] == 0

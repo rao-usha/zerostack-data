@@ -32,6 +32,9 @@ import app.core.probability_models  # noqa: F401 — registers txn_prob_* tables
 # Import Economic Data Quality models
 from app.core.models import EconDataRevision  # noqa: F401 — registers econ_data_revisions with Base.metadata
 
+# Import data watchdog alert state (SPEC_128)
+import app.core.models_watchdog  # noqa: F401 — registers watchdog_alerts with Base.metadata
+
 # Import Job Queue model for distributed workers
 import logging
 
