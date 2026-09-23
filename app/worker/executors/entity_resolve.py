@@ -13,6 +13,7 @@ The blocking work runs in a thread so the worker heartbeat keeps ticking.
 
 import asyncio
 import logging
+import threading
 
 from sqlalchemy.orm import Session
 
@@ -46,6 +47,7 @@ def run_entity_master(
     gate_override=None,
     ingestion_job_id=None,
     job_queue_id=None,
+    cancel_event=None,
 ) -> dict:
     """Refresh the entity master on ONE connection inside ONE transaction.
 
@@ -59,16 +61,19 @@ def run_entity_master(
 
     engine = get_engine()
 
-    def build(conn) -> dict:
+    def build(conn, checkpoint=lambda: None) -> dict:
         summary = {}
         if not skip_feeds:
+            checkpoint()
             if progress:
                 progress("feeding core.source_record", 5.0)
             summary["feeds"] = feeds.run_feeds(conn, progress=progress)
         if not skip_bridge:
+            checkpoint()
             if progress:
                 progress("building CIK/CRD bridge", 40.0)
             summary["bridge"] = cik_crd_bridge.build(conn, include_name_tier=include_name_tier)
+        checkpoint()
         if progress:
             progress("resolving entities", 60.0)
         summary["resolve"] = resolve.resolve(conn, dry_run=dry_run)
@@ -89,6 +94,7 @@ def run_entity_master(
             gate_override=gate_override,
             ingestion_job_id=ingestion_job_id,
             job_queue_id=job_queue_id,
+            cancel_event=cancel_event,
         )
 
     with engine.connect() as conn:
@@ -127,20 +133,27 @@ async def execute(job: JobQueue, db: Session):
         finally:
             session.close()
 
-    summary = await asyncio.to_thread(
-        run_entity_master,
-        skip_feeds=bool(payload.get("skip_feeds")),
-        skip_bridge=bool(payload.get("skip_bridge")),
-        include_name_tier=payload.get("include_name_tier", True),
-        dry_run=bool(payload.get("dry_run")),
-        progress=progress,
-        guard=True,
-        input_override=payload.get("input_override"),
-        input_max_age_days=payload.get("input_max_age_days"),
-        gate_override=payload.get("gate_override"),
-        ingestion_job_id=payload.get("ingestion_job_id"),
-        job_queue_id=getattr(job, "id", None),
-    )
+    # cancel/timeout cancels this coroutine, not the thread: tell the build
+    cancel = threading.Event()
+    try:
+        summary = await asyncio.to_thread(
+            run_entity_master,
+            skip_feeds=bool(payload.get("skip_feeds")),
+            skip_bridge=bool(payload.get("skip_bridge")),
+            include_name_tier=payload.get("include_name_tier", True),
+            dry_run=bool(payload.get("dry_run")),
+            progress=progress,
+            guard=True,
+            input_override=payload.get("input_override"),
+            input_max_age_days=payload.get("input_max_age_days"),
+            gate_override=payload.get("gate_override"),
+            ingestion_job_id=payload.get("ingestion_job_id"),
+            job_queue_id=getattr(job, "id", None),
+            cancel_event=cancel,
+        )
+    except asyncio.CancelledError:
+        cancel.set()
+        raise
 
     resolved = summary.get("resolve", {})
     build = summary.get("mart_build") or {}

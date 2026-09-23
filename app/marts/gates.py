@@ -7,7 +7,19 @@ it commits (see ``build_ledger.run_guarded``).
 
 Absolute one-time ranges (SPEC_119's "pairs 9,700-10,200") became ratios and
 tolerances against the previous successful build, so they hold as the data
-grows. Each gate returns::
+grows. Before the first ledgered build there is no previous build, so the
+volume floors (``floor:*``) compare each stage's candidates with the rows the
+mart has already published, read at the start of the build transaction.
+
+Published-data probes (``probe_published``) check what the build wrote, on
+the open transaction: SPEC_119's title gate (never empty, only the 7 unions
+of Director / Executive Officer / Promoter).
+
+Not ported, on purpose: SPEC_119's idempotency run (a second full build in the
+same transaction would double the lock window; it is a property of the code,
+covered by tests/test_spec_119 ``test_build_is_idempotent`` on every change,
+and the ledger records the code version) and the quarantine walk (same: a code
+property, tested). Each gate returns::
 
     {"passed": bool, "skipped": bool, "value": ..., "threshold": ..., "detail": str}
 
@@ -116,19 +128,58 @@ def _people_pairs(p):
     return _num(p, "candidate_pairs")
 
 
+# SPEC_119 gate 3, as run by hand: form_d_signer 94-98% of pairs (measured
+# 96.3%), fund_admin <= 400 and platform_fund <= 100 of ~10k pairs.
 def _people_signer(s, counts, base) -> Result:
     return _ratio_gate(s, "people", lambda p: _num(p, "tier_form_d_signer"), _people_pairs,
-                       lo=0.90, hi=0.99, what="pairs in the form_d_signer tier")
+                       lo=0.94, hi=0.98, what="pairs in the form_d_signer tier")
 
 
 def _people_admin(s, counts, base) -> Result:
     return _ratio_gate(s, "people", lambda p: _num(p, "tier_fund_admin"), _people_pairs,
-                       hi=0.05, what="pairs in the fund_admin tier")
+                       hi=0.04, what="pairs in the fund_admin tier")
 
 
 def _people_platform(s, counts, base) -> Result:
     return _ratio_gate(s, "people", lambda p: _num(p, "tier_platform_fund"), _people_pairs,
-                       hi=0.02, what="pairs in the platform_fund tier")
+                       hi=0.01, what="pairs in the platform_fund tier")
+
+
+ADMIN_BAND_MAX = 150
+ADMIN_BAND_SHARE = 0.002
+
+
+def _admin_cliff(s, counts, base) -> Result:
+    """SPEC_119 gate 4: the fund_admin 50% threshold must stay a cliff -- at most
+    150 filings (0.2% of kept filings as the data grows) by names whose admin
+    share sits in the 0.25-0.90 band."""
+    p = s.get("people")
+    if not isinstance(p, Mapping) or "admin_band_filings" not in p:
+        return _skip("stage people did not run")
+    limit = max(ADMIN_BAND_MAX, int(_num(p, "kept") * ADMIN_BAND_SHARE))
+    n = _num(p, "admin_band_filings")
+    return _res(n <= limit, n, f"<= {limit}",
+                f"{n} filings by names with a 25-90% admin share (the 50% cut is a cliff)")
+
+
+TITLE_PARTS = ("Director", "Executive Officer", "Promoter")
+TITLE_VALUES_MAX = 7  # the non-empty unions of TITLE_PARTS
+
+
+def _title_shape(s, counts, base, probes=None) -> Result:
+    """SPEC_119 gate 5, on the rows this mart published."""
+    t = (probes or {}).get("people_titles")
+    if not isinstance(t, Mapping):
+        return _skip("stage people did not run")
+    if not t.get("rows"):
+        return _skip("no SEC Form D person links published")
+    values = t.get("values") or []
+    odd = [v for v in values
+           if not v or any(part.strip() not in TITLE_PARTS for part in v.split(","))]
+    ok = t.get("empty", 0) == 0 and not odd and len(values) <= TITLE_VALUES_MAX
+    return _res(ok, len(values), f"0 empty, <= {TITLE_VALUES_MAX} values of {TITLE_PARTS}",
+                f"{t.get('empty', 0)} empty titles of {t['rows']}; {len(values)} distinct"
+                + (f"; unexpected: {odd[:5]}" if odd else ""))
 
 
 def _zero(stage: str, key: str, what: str):
@@ -217,6 +268,8 @@ GATES: Dict[str, List[Tuple[str, GateFn]]] = {
         ("people_signer_share", _people_signer),
         ("people_fund_admin_share", _people_admin),
         ("people_platform_fund_share", _people_platform),
+        ("people_admin_cliff", _admin_cliff),
+        ("people_title_shape", _title_shape),
         ("people_no_silent_merge", _zero("people", "collides_same_firm",
                                          "incoming people collide with a same-firm person")),
         ("people_links_resolved", _zero("people", "link_person_missing",
@@ -269,17 +322,69 @@ def count_published(conn, mart: str) -> Dict[str, int]:
     return out
 
 
+# First-build volume floors: (stage, key, published table count) -- a stage's
+# candidates may not fall more than the drop tolerance below the rows the mart
+# already published. Only while there is no previous ledgered build (after
+# that the drop:* gates compare like with like).
+FIRST_BUILD_FLOORS: Dict[str, List[Tuple[str, str, str]]] = {
+    "pe_marts": [("firms", "candidates", "pe_firms_sec"),
+                 ("adv_private_funds", "candidates", "sec_adv_private_funds"),
+                 ("funds", "candidates", "pe_funds_sec"),
+                 ("people", "candidate_pairs", "pe_firm_people_sec")],
+    "entity_resolve": [("feeds", "total", "source_record")],
+}
+
+
+def probe_published(conn, mart: str, summary: Mapping[str, Any]) -> Dict[str, Any]:
+    """Facts about what the build wrote, read on its open transaction."""
+    out: Dict[str, Any] = {}
+    if mart != "pe_marts" or not isinstance(summary.get("people"), Mapping):
+        return out
+    if conn.execute(text("SELECT to_regclass('public.pe_firm_people')")).scalar() is None:
+        return out
+    have = {r[0] for r in conn.execute(text(
+        "SELECT column_name FROM information_schema.columns "
+        "WHERE table_schema = 'public' AND table_name = 'pe_firm_people'"))}
+    if not {"title", "data_source"} <= have:
+        return out
+    row = conn.execute(text(
+        "SELECT COUNT(*) AS n, COUNT(*) FILTER (WHERE COALESCE(title, '') = '') AS empty "
+        "FROM pe_firm_people WHERE data_source = 'SEC Form D'")).mappings().one()
+    values = [r[0] for r in conn.execute(text(
+        "SELECT DISTINCT title FROM pe_firm_people "
+        "WHERE data_source = 'SEC Form D' AND COALESCE(title, '') <> '' "
+        "ORDER BY 1 LIMIT 50"))]
+    out["people_titles"] = {"rows": int(row["n"]), "empty": int(row["empty"]),
+                            "values": values}
+    return out
+
+
 def evaluate(
     mart: str,
     summary: Mapping[str, Any],
     counts: Mapping[str, int],
     baseline: Optional[Mapping[str, Any]],
+    probes: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Result]:
     """Every gate of ``mart``. ``baseline`` is the previous successful build's
-    ``stage_counts`` ({"stages": ..., "tables": ...}) or None."""
+    ``stage_counts`` ({"stages": ..., "tables": ...}), the pre-build published
+    counts ({"build_id": None, "stages": {}, "tables": ...}) before the first
+    ledgered build, or None."""
     results: Dict[str, Result] = {}
     for name, fn in GATES.get(mart, []):
-        results[name] = fn(summary, counts, baseline)
+        results[name] = (fn(summary, counts, baseline, probes)
+                         if fn is _title_shape else fn(summary, counts, baseline))
+
+    if baseline is None or baseline.get("build_id") is None:
+        before = (baseline or {}).get("tables") or {}
+        for stage, key, table in FIRST_BUILD_FLOORS.get(mart, []):
+            name = f"floor:{stage}.{key}"
+            value = _stage_value(summary, stage, key)
+            if value is None:
+                results[name] = _skip(f"stage {stage} did not run")
+                continue
+            results[name] = _drop(value, before.get(table),
+                                  f"{stage}.{key} vs {table} rows already published")
 
     prev_stages = (baseline or {}).get("stages") or {}
     for stage, key in STAGE_DROPS.get(mart, []):

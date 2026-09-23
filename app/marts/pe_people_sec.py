@@ -55,6 +55,7 @@ ADMIN_PROSE = re.compile(r"\b(agent|administrat|authorized signator|signatory)",
 # person-shaped names, 9,162 sit at exactly 0% and 30 at 90-100%; only 8 names
 # fall anywhere between 0.25 and 0.90, so this is a cliff, not a knob.
 ADMIN_SHARE_MIN = 0.5
+ADMIN_BAND_LO, ADMIN_BAND_HI = 0.25, 0.90  # the band that must stay nearly empty
 # Distinct firm BRANDS before a name is cross-brand. First token, not two:
 # Blackstone's four registrations are four distinct two-token stems, so a
 # two-token collapse convicts its real GPs of promiscuity.
@@ -329,6 +330,13 @@ def build(conn, today: Optional[date] = None, dry_run: bool = False) -> Dict[str
         raise RuntimeError(
             f"refusal ledger does not close: counted {counted} of {base_rows} rows"
         )
+
+    # SPEC_119 gate 4 (SPEC_126a runs it on every build): the admin threshold
+    # must stay a cliff -- few filings by names in the 0.25-0.90 share band.
+    band = [k for k, n in name_filings.items()
+            if n and ADMIN_BAND_LO <= name_admin[k] / n <= ADMIN_BAND_HI]
+    stats["admin_band_names"] = len(band)
+    stats["admin_band_filings"] = sum(name_filings[k] for k in band)
 
     people_rows, link_rows = [], []
     tiers: Counter = Counter()

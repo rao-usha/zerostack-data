@@ -14,8 +14,10 @@ Every 15 minutes (APScheduler, registered from the app lifespan) it checks:
 - **failure spike** many failed ``job_queue`` rows in the last hour
 - **SLA**           ``source_freshness_sla`` rows that are violated
 - **mart_build**    a mart's latest build was refused on its inputs or failed
-                    its ship gates (SPEC_126a). Partial bulk runs surface
-                    through **releases** (their failed release rows).
+                    its ship gates, or a build row is stuck ``running``
+                    (SPEC_126a)
+- **partial_job**   a queue job succeeded only in part (``PARTIAL:``, e.g. a
+                    bulk run with some releases failed) in the last 24h
 
 Each finding has a stable key. ``watchdog_alerts`` holds its state so an alert
 is sent once, reminded at most every 24h, and followed by a ``resolved``
@@ -398,16 +400,45 @@ def rule_sla(db: Session, now: datetime) -> List[Finding]:
 def rule_mart_builds(db: Session, now: datetime) -> List[Finding]:
     """SPEC_126a: a mart whose latest real (non-dry-run) build was refused on
     its inputs or failed its ship gates. Open until the next successful build:
-    the previous mart is still being served, but it is going stale."""
+    the previous mart is still being served, but it is going stale.
+
+    A ``running`` row older than ``ABANDONED_AFTER`` whose build lock nobody
+    holds is from a dead worker: it is closed as ``failed`` here (so it alerts
+    now, not when the next monthly build starts). One whose lock is held is a
+    live but long build: a warning. ``busy:`` refusals (a second build of a
+    mart already building) are not a mart problem and are skipped.
+    """
     if db.execute(text("SELECT to_regclass('core.mart_build')")).scalar() is None:
         return []
+    from app.marts.build_ledger import ABANDONED_AFTER, BUSY_PREFIX, build_lock_held, close_abandoned
+
+    cutoff = now - ABANDONED_AFTER
+    findings = []
+    stuck = db.execute(text(
+        "SELECT mart, MIN(id) AS id, MIN(started_at) AS started_at FROM core.mart_build "
+        "WHERE status = 'running' AND started_at < :cutoff GROUP BY mart ORDER BY mart"
+    ), {"cutoff": cutoff}).mappings().all()
+    for r in stuck:
+        if close_abandoned(db, r["mart"], cutoff):
+            logger.warning(f"[watchdog] closed abandoned {r['mart']} build(s) from #{r['id']}")
+        elif build_lock_held(db, r["mart"]):
+            hours = (now - r["started_at"]).total_seconds() / 3600
+            findings.append(Finding(
+                key=f"mart_build:running:{r['mart']}",
+                rule="mart_build",
+                severity="warning",
+                message=f"Mart '{r['mart']}' build #{r['id']} has been running {hours:.0f}h",
+                details={"mart": r["mart"], "build_id": r["id"],
+                         "started_at": r["started_at"].isoformat() if r["started_at"] else None},
+            ))
+
     rows = db.execute(text(
         "SELECT DISTINCT ON (mart) id, mart, status, started_at, "
         "LEFT(COALESCE(refusal_reason, error, ''), 300) AS reason "
         "FROM core.mart_build WHERE NOT dry_run AND status <> 'running' "
+        "AND NOT (status = 'refused' AND COALESCE(refusal_reason, '') LIKE :busy) "
         "ORDER BY mart, id DESC"
-    )).mappings().all()
-    findings = []
+    ), {"busy": BUSY_PREFIX + "%"}).mappings().all()
     for r in rows:
         if r["status"] not in ("failed", "refused"):
             continue
@@ -419,6 +450,39 @@ def rule_mart_builds(db: Session, now: datetime) -> List[Finding]:
                      if r["reason"] else f"Mart '{r['mart']}' build #{r['id']} {r['status']}"),
             details={"mart": r["mart"], "build_id": r["id"], "status": r["status"],
                      "started_at": r["started_at"].isoformat() if r["started_at"] else None},
+        ))
+    return findings
+
+
+def rule_partial_jobs(db: Session, now: datetime) -> List[Finding]:
+    """SPEC_126a: queue jobs that succeeded only in part (``PARTIAL:``
+    error_message, e.g. bulk_ingest with some releases failed) in the last
+    24h, one alert per job type and bulk source."""
+    from app.core.ingestion_job_sync import PARTIAL_PREFIX
+
+    if db.execute(text("SELECT to_regclass('public.job_queue')")).scalar() is None:
+        return []
+    rows = db.execute(text(
+        "SELECT id, job_type, CAST(payload AS JSONB) ->> 'bulk_source' AS source, "
+        "LEFT(error_message, 300) AS error, completed_at FROM job_queue "
+        "WHERE LOWER(CAST(status AS TEXT)) = 'success' AND error_message LIKE :p "
+        "AND completed_at >= :since ORDER BY completed_at DESC"
+    ), {"p": PARTIAL_PREFIX + "%", "since": now - timedelta(hours=24)}).mappings().all()
+    by_key: Dict[str, List[Dict[str, Any]]] = {}
+    for r in rows:
+        by_key.setdefault(f"{r['job_type']}:{r['source'] or '-'}", []).append(dict(r))
+    findings = []
+    for key, items in by_key.items():
+        latest = items[0]
+        what = latest["source"] or latest["job_type"]
+        findings.append(Finding(
+            key=f"partial:{key}",
+            rule="partial_job",
+            severity="warning",
+            message=(f"{len(items)} {what} job(s) finished with partial failures in the "
+                     f"last 24h (latest #{latest['id']})"),
+            details={"job_type": latest["job_type"], "source": latest["source"],
+                     "job_ids": [i["id"] for i in items], "last_error": latest["error"]},
         ))
     return findings
 
@@ -440,6 +504,7 @@ RULES: List[Tuple[str, Callable[[Session, datetime], List[Finding]]]] = [
     ("failure_spike", rule_failure_spike),
     ("sla", rule_sla),
     ("mart_build", rule_mart_builds),
+    ("partial_job", rule_partial_jobs),
 ]
 
 

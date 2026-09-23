@@ -1,6 +1,6 @@
 # SPEC 126a — Mart input assertions, build ledger, ship gates as code
 
-**Status:** Implemented (branch spec-126a; live verification pending)
+**Status:** Implemented + review fixes (branches spec-126a, spec-126a-fix; live verification pending)
 **Task type:** service
 **Date:** 2026-09-23
 **Plan:** PLAN_087 wave 1; PLAN_085 §D5; review `docs/reviews/2026-09-23_daas_platform_review.md` rows 17, 18
@@ -39,9 +39,11 @@ Today:
       gate_results, overrides (jsonb), refusal_reason, error,
       ingestion_job_id, job_queue_id.
 - [x] Before building, every input bulk source of the stages that will run is
-      asserted: the latest discovery batch of `raw.source_release` rows must
-      all be `loaded`, and the newest `loaded_at` must be within the input's
-      max age. A failed/fetched/discovered latest release, a source with no
+      asserted: the latest release — by the *period its key names*, per
+      series — must be `loaded`, and the newest period must have been first
+      seen within the input's max age (see Inputs). Upstream marts too: the
+      pe_marts firms stage needs the latest real `entity_resolve` build to be
+      a recent success. A failed/fetched/discovered latest release, a source with no
       loaded release, or a stale one => the build is **refused**: ledger row
       `refused` with the reason, job fails with that reason, no stage runs,
       previous mart untouched.
@@ -66,8 +68,14 @@ Today:
       IngestionJob is `success` with `error_message` `PARTIAL: ...`. All
       failed => failed (unchanged).
 - [x] Watchdog: a new `mart_build` rule alerts (critical) while a mart's
-      latest non-dry-run build is failed or refused. Partial bulk runs alert
-      through the existing `failed_release` rule (the failed release rows).
+      latest non-dry-run build is failed or refused (not `busy:` refusals),
+      closes `running` rows older than 6 h whose build lock nobody holds
+      (dead worker), and warns on a live build running > 6 h. A new
+      `partial_job` rule (warning) alerts on `PARTIAL:` queue jobs of the last
+      24 h; the `failed_release` rule still alerts on the failed rows.
+- [x] One build per mart at a time (advisory lock); a second is refused
+      `busy:`. Cancel / timeout of the job rolls the build back and finishes
+      the ledger row `failed` "cancelled".
 - [x] `GET /api/v1/pe/marts/builds` (user-level: any signed-in user reads)
       lists recent ledger rows, filterable by mart/status.
 
@@ -79,14 +87,18 @@ Today:
   value breaks every reader that compares statuses, including SPEC_121's
   sweep (`TERMINAL_QUEUE_STATUSES`) and the claim query.
 - `IngestionJob` FAILED for a partial run would stop the schedule watermark
-  (SPEC_121 advances `last_run_at` only on success) and, after 1.5x cadence,
+  (`last_run_at` advances only on success) and, after 1.5x cadence,
   raise a *stalled* alert although data did land — and the next run retries
   the failed releases anyway (`run_source` skips only `loaded`).
 - So: status success (rows landed, watermark advances), `error_message`
   starting `PARTIAL:` on both rows (`ingestion_job_sync.PARTIAL_PREFIX`,
   `is_partial()`), `summary["status"] = "partial"`. The SPEC_121 write-back
-  is a no-op on the already-terminal IngestionJob. The watchdog's
-  `failed_release` rule already alerts on the failed release rows of that run.
+  is a no-op on the already-terminal IngestionJob — which is also why it
+  never advanced the watermark for bulk runs (pre-existing). The fix round
+  makes `bulk_ingest._finish_ingestion_job` advance `last_run_at` itself on
+  success (clean or partial), like `mirror_queue_outcome`. Alerts: the new
+  `partial_job` watchdog rule reads `PARTIAL:`; `failed_release` still fires
+  on the failed release rows.
 
 ### Inputs (`app/marts/inputs.py`)
 
@@ -99,29 +111,62 @@ Today:
 | entity_resolve: feeds | sec_adv_roster, sec_iapd_feed, sec_13f, sec_form_d, sec_edgar_submissions, sec_insider |
 | entity_resolve: bridge | sec_13f, sec_adv_roster |
 
-Max age of the newest `loaded_at`: daily sources 7 days, monthly 75, quarterly
-150 (a quarter's zip lands weeks after quarter end and the loaders skip loaded
-releases, so the newest load of a quarterly source is legitimately ~4 months
-old right before the next quarter lands).
+| pe_marts: firms (upstream mart) | entity_resolve (latest real build must be `success`, ≤ 45 days) |
 
-"Latest release" = the latest *discovery batch*: rows discovered within 6 h of
-the newest `discovered_at`. `discovered_at` is written once
-(`_upsert_discovered` only bumps `updated_at`), so it orders releases by when
-the publisher produced them. A batch catches e.g. `ria:2026-06` loaded with
-`era:2026-06` failed. Older unloaded releases are recorded
-(`older_unloaded`) but do not refuse.
+**Latest release = newest period, not newest discovery.** Every release key
+names a period: `2026q3` (quarter end), `01jun2026-31aug2026_form13f` (range
+end), `ria:2026-06-01` / `edition:…` / `snapshot:…` (date),
+`adv1:2026-06:<upload>` (month). `inputs.release_period` returns (period,
+series) where series is the key text before the period (`ria:` / `era:` /
+`adv1:` / ``). For the newest period, each series' most recently discovered
+release must be `loaded`. Keys with no period fall back to the newest
+discovery batch (6 h window). Ordering by `discovered_at` (the first version)
+was wrong for backfills: `?since=2019-01-01` discovers old quarters *now*, so
+they hid a failed newest quarter (and `MAX(loaded_at)` made it look fresh),
+and one bad 2019 zip refused the mart until a new release appeared.
+
+**Staleness = age of the newest period's first sighting** (`discovered_at`,
+written once), not `MAX(loaded_at)` over all rows: retrying an old failed
+release or reloading any release no longer resets the clock. Max age: daily
+sources 7 days, monthly 75, quarterly 150 (a quarter's zip lands weeks after
+quarter end, so right before the next one lands the newest was first seen
+~4 months ago). A newest period that was discovered long ago and loaded only
+recently is (correctly) stale: the publisher has had nothing newer.
+
+The input record keeps `release_keys` (the latest release), `latest_by`,
+`first_seen`, `loaded_at`, `older_unloaded`, and every loaded release the mart
+reads (`loaded_release_count`, `loaded_release_keys`, newest period first,
+capped at 100).
+
+Upstream marts (`check_upstream_mart`): no ledger history → ok with a note
+(the tables predate the ledger); latest finished real build not `success`, or
+older than the max age → refused. Overridable with
+`input_override=["entity_resolve"]`.
 
 ### Ledger (`app/marts/build_ledger.py`)
 
-`run_guarded(engine, mart, stage_inputs, build, gates, dry_run, ...)`:
+`run_guarded(engine, mart, sources, build, dry_run, ..., upstream, cancel_event)`:
 
-1. insert `running` row (own transaction). Older `running` rows of the same
-   mart (> 6 h) are marked `failed` "abandoned" (a worker died mid-build).
-2. assert inputs; refused => finish `refused`, raise `MartInputRefused`.
-3. `engine.connect()` + `conn.begin()`; `build(conn)`; count published rows;
-   evaluate gates against the previous successful build; commit / rollback.
-4. finish `success` or `failed` (+ gate results, stage counts, error).
+1. open the build connection + transaction, `pg_try_advisory_xact_lock(1260,
+   hashtext('mart_build:'||mart))`. Not acquired → row `refused`
+   "busy: another <mart> build is running" (`MartBuildBusy`); the watchdog
+   ignores busy refusals. Only the lock holder closes older `running` rows
+   as abandoned, so a live long build is never marked dead.
+2. insert `running` row (own transaction).
+3. assert inputs + upstream marts; refused => finish `refused`, raise
+   `MartInputRefused`.
+4. read the published counts (`tables_before`), `build(conn, checkpoint)`,
+   count again, probe published data, evaluate gates against the previous
+   successful build — or, before the first one, against `tables_before` —
+   then commit / rollback.
+5. finish `success` or `failed` (+ gate results, stage counts, error).
    Failure raises `MartGateFailed` / re-raises the build error.
+
+Cancellation: the worker cancels the executor coroutine on cancel/timeout but
+cannot stop the build thread. The executor sets a `threading.Event`;
+`checkpoint()` (called before every stage and right before commit) also
+re-reads the `job_queue` row. Either one → rollback, row `failed`
+"cancelled: …", `MartBuildCancelled`.
 
 The ledger writes use their own transactions so a rolled-back build still
 leaves its row. `code_version`: env `NEXDATA_GIT_SHA` / `GIT_SHA`, else the
@@ -147,23 +192,33 @@ hold as the data grows):
 | funds_link_rate | linked / candidates ≥ 0.40 | measured 52% (20,490 / 39,148) |
 | platform_link_share | adv_platform / linked ≤ 0.40 | measured 32%; AngelList took 31% pre-fix |
 | platform_adviser_count | platform advisers ≤ 10 | measured 4, the 21→64 cliff |
-| people_signer_share | form_d_signer / pairs in [0.90, 0.99] | SPEC_119 gate 3 (94–98%) |
-| people_fund_admin_share | fund_admin / pairs ≤ 0.05 | SPEC_119 gate 3 (≤400 of ~10k) |
-| people_platform_fund_share | platform_fund / pairs ≤ 0.02 | SPEC_119 gate 3 (≤100) |
+| people_signer_share | form_d_signer / pairs in [0.94, 0.98] | SPEC_119 gate 3 (94–98%, measured 96.3%) |
+| people_fund_admin_share | fund_admin / pairs ≤ 0.04 | SPEC_119 gate 3 (≤400 of ~10k) |
+| people_platform_fund_share | platform_fund / pairs ≤ 0.01 | SPEC_119 gate 3 (≤100 of ~10k) |
+| people_admin_cliff | filings by names with admin share in [0.25, 0.90] ≤ max(150, 0.2% of kept) | SPEC_119 gate 4 (new stat `admin_band_filings`) |
+| people_title_shape | published SEC Form D links: 0 empty titles, ≤ 7 values, all unions of Director / Executive Officer / Promoter | SPEC_119 gate 5 (probe on the open tx) |
 | people_no_silent_merge | collides_same_firm == 0 | SPEC_119 gate 6 |
 | people_links_resolved | link_person_missing == 0 | SPEC_119 two-phase merge |
 | drop:&lt;stage&gt;.&lt;count&gt; | ≤ 20% drop vs previous success | review row 17 |
-| rows:&lt;table&gt; | published rows ≤ 20% drop vs previous success | review row 17 |
+| rows:&lt;table&gt; | published rows ≤ 20% drop vs previous success (first build: vs the rows published before it) | review row 17 |
+| floor:&lt;stage&gt;.&lt;count&gt; | first ledgered build only: candidates ≥ 80% of the rows the mart already published | SPEC_119 gate 2 volume, data-relative |
 
 entity_resolve: `feeds_nonempty`, drop gates on feeds total, bridge accepted,
 `rows:source_record`, `rows:entities_live`, `rows:bridge`, and
 `entity_mass_merge` (merges ≤ max(500, 2% of the previous live entity count)).
 
-Not ported: SPEC_119's absolute volume bands (9,700–10,200 pairs) — they were
-a one-time sanity range and would fail as the data grows; the drop gates
-replace them. The admin-threshold cliff (≤150 filings in the 0.25–0.90 band)
-needs a stat `pe_people_sec` does not emit; refusal closure is already
-asserted inside `pe_people_sec.build`.
+Not ported, on purpose:
+- SPEC_119's absolute volume bands (9,700–10,200 pairs; firms ≥ 3,100): a
+  one-time sanity range that fails as the data grows. The `drop:*` gates
+  replace them from the second ledgered build, and the `floor:*` gates plus
+  pre-build `rows:*` baseline cover the first one.
+- Idempotency (second run inserts/updates 0) and the quarantine walk: code
+  properties, not data properties — a second full build inside the build
+  transaction would double the lock window. Covered by the SPEC_119 tests on
+  every change; the ledger records `code_version`.
+- `people_no_silent_merge` stays although `collides_same_firm` is structurally
+  0 (the key carries firm_id): it guards a future key change.
+- Refusal closure is asserted inside `pe_people_sec.build` (raises).
 
 ## Test Cases
 
@@ -189,6 +244,13 @@ asserted inside `pe_people_sec.build`.
 | T18 | (pg) `test_watchdog_mart_build_rule` | alerts on latest failed/refused, clears on success |
 | T19 | (pg) `test_builds_endpoint_lists_rows` | GET returns ledger rows |
 | T20 | (pg) `test_real_pe_stages_guarded` | real firms/ADV/funds stages inside the guarded tx; counts + tolerance on a rerun |
+| T22 | `TestReleasePeriod`, (pg) `test_backfill_after_failed_newest_release_still_refuses`, `test_backfill_with_one_bad_old_quarter_does_not_refuse`, `test_old_retry_or_reload_does_not_make_stale_input_fresh`, `test_schedule_d_reupload_of_newest_period` | review R1/R4: period order, first-seen age, loaded keys |
+| T23 | (pg) `test_pe_marts_refused_after_refused_entity_resolve`, `test_pe_marts_refused_on_stale_entity_master` | R3 upstream mart |
+| T24 | `test_entity_resolve_endpoint_takes_admin_overrides` | R2 |
+| T25 | (pg) `test_second_concurrent_build_is_refused_busy` | R5 lock, busy refusal, no false abandon |
+| T26 | (pg) `test_cancel_event_rolls_back_instead_of_committing`, `test_queue_row_no_longer_running_aborts_commit`, `test_executor_sets_cancel_event_when_cancelled` | R6 |
+| T27 | (pg) `test_watchdog_closes_dead_running_build`, `test_watchdog_partial_job_rule` | R7, partial alert |
+| T28 | `TestRestoredGates`, (pg) `test_bulk_partial_advances_schedule_watermark` | SPEC_119 gates, watermark |
 | T21 | (pg) `test_refused_on_partial_discovery_batch`, `test_older_failure_does_not_refuse`, `test_abandoned_running_rows_are_closed`, `test_unguarded_run_keeps_direct_behaviour`, `test_entity_dry_run_keeps_nothing` | batch rule, old failures, dead-worker rows, direct calls, entity dry-run leak |
 
 ## Files to Create/Modify
@@ -206,7 +268,9 @@ asserted inside `pe_people_sec.build`.
 | app/worker/main.py | Modify (success message keeps partial) |
 | app/services/data_watchdog.py | Modify (mart_build rule) |
 | app/api/v1/mart_builds.py | Create (GET /pe/marts/builds) |
-| app/api/v1/pe_marts.py | Modify (POST /build takes `input_override`, `gate_override`) |
+| app/api/v1/pe_marts.py | Modify (POST /build takes `input_override`, `input_max_age_days`, `gate_override`, `dry_run`) |
+| app/api/v1/entity_master.py | Modify (POST /resolve, admin on write, takes the same overrides) |
+| app/marts/pe_people_sec.py | Modify (`admin_band_filings` stat) |
 | app/main.py | Modify (register router, `_auth`) |
 | tests/test_spec_126a_mart_gates_build_ledger.py | Create |
 
@@ -219,4 +283,9 @@ asserted inside `pe_people_sec.build`.
 
 ## Feedback History
 
-_No corrections yet._
+- 2026-09-23 review (fix round, branch spec-126a-fix): latest release by
+  period not discovery; staleness from first sighting; entity_resolve admin
+  overrides; upstream entity-master assertion; per-mart advisory lock;
+  cancel/timeout rollback; watchdog closes dead `running` rows; SPEC_119
+  bands restored and admin-cliff / title gates ported; first-build floors;
+  partial alert rule; bulk watermark.

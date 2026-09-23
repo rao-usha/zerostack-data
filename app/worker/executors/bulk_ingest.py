@@ -97,6 +97,16 @@ def _finish_ingestion_job(ingestion_job_id, summary, error: str = None,
         ing.rows_inserted = summary.get("rows", 0)
         ing.error_message = error or partial
         ing.completed_at = datetime.utcnow()
+        if not error and ing.schedule_id:
+            # This executor finishes its own IngestionJob, so SPEC_121's
+            # write-back (mirror_queue_outcome) no-ops on the terminal row and
+            # never advanced the watermark: do it here, the same way.
+            from sqlalchemy import text
+
+            db.execute(text(
+                "UPDATE ingestion_schedules SET last_run_at = :c "
+                "WHERE id = :sid AND (last_run_at IS NULL OR last_run_at < :c)"
+            ), {"c": ing.completed_at, "sid": ing.schedule_id})
         db.commit()
     except Exception as e:
         db.rollback()

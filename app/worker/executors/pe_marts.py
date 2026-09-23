@@ -9,6 +9,8 @@ Payload:
     input_override: true | [src]  (SPEC_126a, admin) build on failed/stale inputs
     input_max_age_days: {src: n}  (SPEC_126a, admin) per-input max age
     gate_override: true | [gate]  (SPEC_126a, admin) commit despite failed gates
+                                  input_override may name "entity_resolve": the
+                                  firms stage reads the entity master
 
 The worker runs the build guarded (SPEC_126a): inputs asserted first, every
 stage in ONE transaction, ship gates before commit, a `core.mart_build` row
@@ -17,6 +19,7 @@ for every run. See app/marts/build_ledger.py.
 
 import asyncio
 import logging
+import threading
 from contextlib import nullcontext
 
 from sqlalchemy.orm import Session
@@ -68,7 +71,8 @@ def _stages(skip_firms: bool, skip_funds: bool, skip_people: bool) -> list:
 def run_pe_marts(skip_firms: bool = False, skip_funds: bool = False,
                  skip_people: bool = False, dry_run: bool = False, *,
                  guard: bool = False, input_override=None, input_max_age_days=None,
-                 gate_override=None, ingestion_job_id=None, job_queue_id=None) -> dict:
+                 gate_override=None, ingestion_job_id=None, job_queue_id=None,
+                 cancel_event=None) -> dict:
     """Build the PE marts on ONE connection inside ONE transaction.
 
     Every stage shares the transaction (SPEC_126a): a failure in `people` no
@@ -78,22 +82,29 @@ def run_pe_marts(skip_firms: bool = False, skip_funds: bool = False,
     see the would-be firm ids and ADV index).
 
     `guard=True` (the worker) adds the input assertions, ship gates and ledger
-    row; direct calls (tests, scripts) build without them.
+    row; direct calls (tests, scripts) build without them. `cancel_event` (a
+    threading.Event) set by the executor on cancel/timeout stops the build at
+    the next stage boundary or before commit, and rolls it back.
     """
     engine = get_engine()
 
-    def build(conn) -> dict:
-        return _run_stages(lambda: nullcontext(conn), skip_firms, skip_funds,
-                           skip_people, dry_run=dry_run)
+    def build(conn, checkpoint=lambda: None) -> dict:
+        def conn_for():
+            checkpoint()  # every stage asks for the connection first
+            return nullcontext(conn)
+
+        return _run_stages(conn_for, skip_firms, skip_funds, skip_people, dry_run=dry_run)
 
     if guard:
         from app.marts import build_ledger, inputs
 
+        stages = _stages(skip_firms, skip_funds, skip_people)
         summary = build_ledger.run_guarded(
             engine,
             mart=MART,
-            sources=inputs.sources_for(inputs.PE_MART_STAGE_INPUTS,
-                                       _stages(skip_firms, skip_funds, skip_people)),
+            sources=inputs.sources_for(inputs.PE_MART_STAGE_INPUTS, stages),
+            upstream=inputs.sources_for(inputs.PE_MART_STAGE_UPSTREAM, stages),
+            cancel_event=cancel_event,
             build=build,
             dry_run=dry_run,
             input_override=input_override,
@@ -125,21 +136,29 @@ async def execute(job: JobQueue, db: Session):
     job.progress_message = "Building PE marts from SEC data"
     db.commit()
 
+    # The worker cancels this coroutine on cancel/timeout, but cannot stop the
+    # thread; the event tells the build to roll back instead of committing.
+    cancel = threading.Event()
     # publish_guard_override (SPEC_129): accept a guard trip for this job only
     with publish_guard_override(payload.get("publish_guard_override")):
-        summary = await asyncio.to_thread(
-            run_pe_marts,
-            skip_firms=bool(payload.get("skip_firms")),
-            skip_funds=bool(payload.get("skip_funds")),
-            skip_people=bool(payload.get("skip_people")),
-            dry_run=bool(payload.get("dry_run")),
-            guard=True,
-            input_override=payload.get("input_override"),
-            input_max_age_days=payload.get("input_max_age_days"),
-            gate_override=payload.get("gate_override"),
-            ingestion_job_id=payload.get("ingestion_job_id"),
-            job_queue_id=getattr(job, "id", None),
-        )
+        try:
+            summary = await asyncio.to_thread(
+                run_pe_marts,
+                skip_firms=bool(payload.get("skip_firms")),
+                skip_funds=bool(payload.get("skip_funds")),
+                skip_people=bool(payload.get("skip_people")),
+                dry_run=bool(payload.get("dry_run")),
+                guard=True,
+                input_override=payload.get("input_override"),
+                input_max_age_days=payload.get("input_max_age_days"),
+                gate_override=payload.get("gate_override"),
+                ingestion_job_id=payload.get("ingestion_job_id"),
+                job_queue_id=getattr(job, "id", None),
+                cancel_event=cancel,
+            )
+        except asyncio.CancelledError:
+            cancel.set()
+            raise
 
     firms = summary.get("firms", {})
     funds = summary.get("funds", {})

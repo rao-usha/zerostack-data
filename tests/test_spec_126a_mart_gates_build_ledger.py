@@ -267,6 +267,10 @@ def pgl():
         for stmt in _migration("0013_mart_build").UPGRADE_SQL:
             conn.execute(text(stmt))
     yield engine
+    # later suites (SPEC_128's watchdog runs) share the database: leave no
+    # failed/stuck ledger rows behind for rule_mart_builds to report
+    with engine.begin() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS core.mart_build"))
     engine.dispose()
 
 
@@ -491,7 +495,10 @@ def test_within_tolerance_commits(pgl, monkeypatch):
     assert r["gate_results"]["drop:funds.candidates"]["passed"] is True
     keys = {i["source"]: i["release_keys"] for i in r["inputs"]}
     assert keys["sec_form_d"] == ["2026q2"] and keys["sec_adv_schedule_d"] == ["2026-08@x"]
-    assert all(i["loaded_at"] for i in r["inputs"])
+    assert all(i["loaded_at"] for i in r["inputs"] if i["kind"] == "bulk")
+    # the firms stage's upstream mart: no entity_resolve history yet -> noted, not refused
+    ent = next(i for i in r["inputs"] if i["source"] == "entity_resolve")
+    assert ent["kind"] == "mart" and ent["ok"] is True and "no recorded build" in ent["note"]
     assert "tables" in r["stage_counts"]
     assert out["mart_build"]["id"] == r["id"]
     assert _markers(pgl) == ["built", "built"]
@@ -804,6 +811,8 @@ def pgq(monkeypatch):
     for mod in (wm, bi):
         monkeypatch.setattr(mod, "get_session_factory", lambda: factory)
     yield engine, factory
+    with engine.begin() as conn:  # no PARTIAL: rows for later watchdog suites
+        conn.execute(text("DELETE FROM job_queue"))
     engine.dispose()
 
 
@@ -928,3 +937,491 @@ def test_real_pe_stages_guarded(pgmart, monkeypatch):  # noqa: F811
     assert rows[1]["gate_results"]["rows:pe_funds_sec"]["passed"] is True
     assert rows[1]["gate_results"]["rows:pe_funds_sec"]["skipped"] is False
     assert rows[1]["overrides"]["input_override"] is True
+
+
+# ===========================================================================
+# Review fixes (spec-126a-fix)
+# ===========================================================================
+
+
+@pytest.mark.unit
+class TestReleasePeriod:
+    """R1: the latest release is chosen by the period the key names."""
+
+    @pytest.mark.parametrize("key,period,series", [
+        ("2026q3", "2026-09-30", ""),
+        ("2026q4", "2026-12-31", ""),
+        ("2023q4_form13f", "2023-12-31", ""),
+        ("01jun2026-31aug2026_form13f", "2026-08-31", ""),
+        ("ria:2026-06-01", "2026-06-01", "ria:"),
+        ("era:2026-06-01", "2026-06-01", "era:"),
+        ("edition:2026-09-22", "2026-09-22", "edition:"),
+        ("snapshot:2026-09-22", "2026-09-22", "snapshot:"),
+        ("adv1:2026-06:20260704", "2026-06-01", "adv1:"),
+        ("2026-08@x", "2026-08-01", ""),
+    ])
+    def test_periods(self, key, period, series):
+        from app.marts.inputs import release_period
+
+        d, s = release_period(key)
+        assert d.isoformat() == period and s == series
+
+    def test_unrecognised(self):
+        from app.marts.inputs import release_period
+
+        assert release_period("weird-key") == (None, "weird-key")
+
+
+@pytest.mark.unit
+class TestRestoredGates:
+    """R8: SPEC_119 gates ported as run by hand."""
+
+    def _eval(self, summary, probes=None, baseline=None):
+        from app.marts import gates
+
+        return gates.evaluate("pe_marts", summary, {}, baseline, probes=probes)
+
+    def test_signer_band_is_94_to_98(self):
+        from app.marts import gates
+
+        s = _copy(GOOD_PE)
+        s["people"]["tier_form_d_signer"], s["people"]["tier_cross_brand"] = 92, 4
+        assert "people_signer_share" in gates.failures(self._eval(s))
+        s["people"]["tier_form_d_signer"], s["people"]["tier_cross_brand"] = 99, 0
+        assert "people_signer_share" in gates.failures(self._eval(s))
+
+    def test_admin_cliff(self):
+        from app.marts import gates
+
+        s = _copy(GOOD_PE)
+        s["people"].update(kept=87_000, admin_band_filings=120)
+        assert "people_admin_cliff" not in gates.failures(self._eval(s))
+        s["people"]["admin_band_filings"] = 400  # > max(150, 0.2% of 87k = 174)
+        res = self._eval(s)
+        assert "people_admin_cliff" in gates.failures(res)
+        assert res["people_admin_cliff"]["threshold"] == "<= 174"
+
+    def test_title_shape(self):
+        from app.marts import gates
+
+        good = {"people_titles": {"rows": 10, "empty": 0,
+                                  "values": ["Director", "Director, Executive Officer"]}}
+        assert "people_title_shape" not in gates.failures(self._eval(GOOD_PE, good))
+        empty = {"people_titles": {"rows": 10, "empty": 1, "values": ["Director"]}}
+        assert "people_title_shape" in gates.failures(self._eval(GOOD_PE, empty))
+        odd = {"people_titles": {"rows": 10, "empty": 0, "values": ["Director, Chairman"]}}
+        res = self._eval(GOOD_PE, odd)
+        assert "people_title_shape" in gates.failures(res)
+        assert "Chairman" in res["people_title_shape"]["detail"]
+        assert self._eval(GOOD_PE)["people_title_shape"]["skipped"] is True
+
+    def test_first_build_floor_vs_published(self):
+        """No ledgered baseline: candidates are compared with the rows the mart
+        already published (read before the build)."""
+        from app.marts import gates
+
+        pre = {"build_id": None, "stages": {}, "tables": {"pe_funds_sec": 2000}}
+        res = self._eval(GOOD_PE, baseline=pre)  # funds.candidates 1000 vs 2000 published
+        assert "floor:funds.candidates" in gates.failures(res)
+        assert res["drop:funds.candidates"]["skipped"] is True
+        ledgered = {"build_id": 4, "stages": _copy(GOOD_PE), "tables": {"pe_funds_sec": 2000}}
+        assert "floor:funds.candidates" not in self._eval(GOOD_PE, baseline=ledgered)
+
+
+@pytest.mark.unit
+def test_entity_resolve_endpoint_takes_admin_overrides():
+    """R2: POST /entities/master/resolve (admin: _auth on a write) carries the
+    SPEC_126a overrides into the queue payload."""
+    from unittest.mock import MagicMock, patch
+
+    from fastapi import HTTPException
+
+    from app.api.v1 import entity_master
+
+    with patch.object(entity_master, "submit_job", return_value={"job_queue_id": 9}) as sj:
+        entity_master.queue_resolve(
+            skip_feeds=False, skip_bridge=False, include_name_tier=True, dry_run=True,
+            input_override=["sec_edgar_submissions"], input_max_age_days=["sec_13f=400"],
+            gate_override=["feeds_nonempty"], db=MagicMock())
+    payload = sj.call_args.kwargs["payload"]
+    assert payload["input_override"] == ["sec_edgar_submissions"]
+    assert payload["input_max_age_days"] == {"sec_13f": 400.0}
+    assert payload["gate_override"] == ["feeds_nonempty"] and payload["dry_run"] is True
+    with pytest.raises(HTTPException) as e:
+        entity_master.queue_resolve(skip_feeds=False, skip_bridge=False,
+                                    include_name_tier=True, dry_run=False,
+                                    input_override=None, input_max_age_days=["sec_13f"],
+                                    gate_override=None, db=MagicMock())
+    assert e.value.status_code == 400
+
+
+@pg
+def test_backfill_after_failed_newest_release_still_refuses(pgl, monkeypatch):
+    """R1: 2026q3 fails, then an admin backfills 2019 quarters that load now.
+    Discovery order made the backfill the 'latest batch'; the period order
+    keeps 2026q3 the latest release -> refused."""
+    from app.marts.build_ledger import MartInputRefused
+    from app.worker.executors import pe_marts
+
+    _fresh_pe_inputs(pgl)
+    _release(pgl, "sec_form_d", "2026q3", status="failed", discovered_days_ago=1,
+             error="BadZipFile: truncated")
+    for q in (1, 2, 3, 4):
+        _release(pgl, "sec_form_d", f"2019q{q}", loaded_days_ago=0.01, discovered_days_ago=0.02)
+    _fake_pe_stages(monkeypatch)
+    monkeypatch.setattr(pe_marts, "get_engine", lambda: pgl)
+    with pytest.raises(MartInputRefused, match="sec_form_d.*2026q3 is failed"):
+        pe_marts.run_pe_marts(guard=True)
+    form_d = next(i for i in _builds(pgl)[0]["inputs"] if i["source"] == "sec_form_d")
+    assert form_d["release_keys"] == ["2026q3"] and form_d["latest_by"] == "period 2026-09-30"
+    assert _markers(pgl) == []
+
+
+@pg
+def test_backfill_with_one_bad_old_quarter_does_not_refuse(pgl, monkeypatch):
+    """R1, the reverse: a backfilled 2019 zip that fails to parse is old news."""
+    from app.worker.executors import pe_marts
+
+    _fresh_pe_inputs(pgl)
+    _release(pgl, "sec_form_d", "2019q1", status="failed", discovered_days_ago=0.02)
+    _release(pgl, "sec_form_d", "2019q2", loaded_days_ago=0.01, discovered_days_ago=0.02)
+    _fake_pe_stages(monkeypatch)
+    monkeypatch.setattr(pe_marts, "get_engine", lambda: pgl)
+    pe_marts.run_pe_marts(guard=True)
+    row = _builds(pgl)[-1]
+    assert row["status"] == "success"
+    form_d = next(i for i in row["inputs"] if i["source"] == "sec_form_d")
+    assert form_d["release_keys"] == ["2026q2"] and form_d["older_unloaded"] == 1
+    # every loaded release the mart reads is recorded, newest period first
+    assert form_d["loaded_release_keys"] == ["2026q2", "2019q2"]
+    assert form_d["loaded_release_count"] == 2
+
+
+@pg
+def test_old_retry_or_reload_does_not_make_stale_input_fresh(pgl):
+    """R4: the newest 13F quarter was first seen 200 days ago. An old failed
+    release retried today, or the newest one reloaded today, must not reset
+    the staleness clock."""
+    from sqlalchemy import text
+
+    from app.marts import inputs
+
+    _release(pgl, "sec_13f", "2025q4", loaded_days_ago=199, discovered_days_ago=200)
+    _release(pgl, "sec_13f", "2019q1", loaded_days_ago=0.01, discovered_days_ago=900)
+    with pgl.connect() as conn:
+        rec = inputs.check_source(conn, "sec_13f", datetime.utcnow(), 150)
+    assert rec["ok"] is False and "first seen 200 days ago" in rec["problem"]
+    assert rec["release_keys"] == ["2025q4"]
+
+    with pgl.begin() as conn:  # an operator reloads the newest quarter today
+        conn.execute(text("UPDATE raw.source_release SET loaded_at = NOW() "
+                          "WHERE source = 'sec_13f' AND release_key = '2025q4'"))
+    with pgl.connect() as conn:
+        rec = inputs.check_source(conn, "sec_13f", datetime.utcnow(), 150)
+    assert rec["ok"] is False and rec["age_days"] >= 199
+
+
+@pg
+def test_schedule_d_reupload_of_newest_period(pgl):
+    """Within one period the most recently discovered upload is the release."""
+    from app.marts import inputs
+
+    _release(pgl, "sec_adv_schedule_d", "adv1:2026-06:20260704", loaded_days_ago=20,
+             discovered_days_ago=21)
+    _release(pgl, "sec_adv_schedule_d", "adv1:2026-06:20260801", status="failed",
+             discovered_days_ago=2)
+    with pgl.connect() as conn:
+        rec = inputs.check_source(conn, "sec_adv_schedule_d", datetime.utcnow(), 75)
+    assert rec["ok"] is False and "adv1:2026-06:20260801 is failed" in rec["problem"]
+
+
+def _ledger_row(engine, mart, status, days_ago=1, dry_run=False, reason=None):
+    from sqlalchemy import text
+
+    with engine.begin() as conn:
+        return conn.execute(text(
+            "INSERT INTO core.mart_build (mart, status, dry_run, started_at, finished_at, "
+            "refusal_reason) VALUES (:m, :s, :d, NOW() - make_interval(days => :n), "
+            "NOW() - make_interval(days => :n), :r) RETURNING id"
+        ), {"m": mart, "s": status, "d": dry_run, "n": days_ago, "r": reason}).scalar()
+
+
+@pg
+def test_pe_marts_refused_after_refused_entity_resolve(pgl, monkeypatch):
+    """R3: the firms stage reads core.identifier; a refused entity_resolve on
+    the 10th refuses the 06:00 pe_mart_build instead of a silent stale join."""
+    from app.marts.build_ledger import MartInputRefused
+    from app.worker.executors import pe_marts
+
+    _fresh_pe_inputs(pgl)
+    _ledger_row(pgl, "entity_resolve", "success", days_ago=30)
+    bad = _ledger_row(pgl, "entity_resolve", "refused", days_ago=0,
+                      reason="refused: sec_edgar_submissions: latest release is fetched")
+    _ledger_row(pgl, "entity_resolve", "failed", days_ago=0, dry_run=True)  # dry runs ignored
+    _fake_pe_stages(monkeypatch)
+    monkeypatch.setattr(pe_marts, "get_engine", lambda: pgl)
+
+    with pytest.raises(MartInputRefused, match=f"entity_resolve: latest build #{bad} refused"):
+        pe_marts.run_pe_marts(guard=True)
+    # funds/people alone do not read the entity master
+    pe_marts.run_pe_marts(guard=True, skip_firms=True)
+    # the admin override names the upstream mart like any input
+    pe_marts.run_pe_marts(guard=True, input_override=["entity_resolve"])
+    rows = _builds(pgl, "pe_marts")
+    assert [r["status"] for r in rows] == ["refused", "success", "success"]
+    assert any("entity_resolve" in w for w in rows[2]["overrides"]["inputs_accepted"])
+
+
+@pg
+def test_pe_marts_refused_on_stale_entity_master(pgl, monkeypatch):
+    from app.marts.build_ledger import MartInputRefused
+    from app.worker.executors import pe_marts
+
+    _fresh_pe_inputs(pgl)
+    _ledger_row(pgl, "entity_resolve", "success", days_ago=60)
+    _fake_pe_stages(monkeypatch)
+    monkeypatch.setattr(pe_marts, "get_engine", lambda: pgl)
+    with pytest.raises(MartInputRefused, match="entity_resolve: latest successful build .* 60 days"):
+        pe_marts.run_pe_marts(guard=True)
+    _ledger_row(pgl, "entity_resolve", "success", days_ago=0)
+    pe_marts.run_pe_marts(guard=True)
+    assert _builds(pgl, "pe_marts")[-1]["status"] == "success"
+
+
+@pg
+def test_second_concurrent_build_is_refused_busy(pgl, monkeypatch):
+    """R5: one build per mart. While another session holds the build lock a
+    second build is refused ('busy:'), does not close the live build's
+    'running' row, and the watchdog does not alert on the busy refusal."""
+    from sqlalchemy import text
+    from sqlalchemy.orm import sessionmaker
+
+    from app.marts import build_ledger
+    from app.services import data_watchdog as wd
+    from app.worker.executors import pe_marts
+
+    _fresh_pe_inputs(pgl)
+    calls = []
+    _fake_pe_stages(monkeypatch, calls=calls)
+    monkeypatch.setattr(pe_marts, "get_engine", lambda: pgl)
+    live = _ledger_row(pgl, "pe_marts", "running", days_ago=1)  # long but alive
+    with pgl.begin() as conn:
+        conn.execute(text("UPDATE core.mart_build SET finished_at = NULL WHERE id = :i"),
+                     {"i": live})
+
+    holder = pgl.connect()
+    tx = holder.begin()
+    try:
+        assert build_ledger.try_build_lock(holder, "pe_marts") is True
+        with pytest.raises(build_ledger.MartBuildBusy, match="another pe_marts build"):
+            pe_marts.run_pe_marts(guard=True)
+        rows = _builds(pgl, "pe_marts")
+        assert rows[0]["status"] == "running"  # not marked abandoned
+        assert rows[1]["status"] == "refused" and rows[1]["refusal_reason"].startswith("busy:")
+        assert calls == [] and _markers(pgl) == []
+        with pgl.connect() as c:
+            assert build_ledger.build_lock_held(c, "pe_marts") is True
+            assert build_ledger.build_lock_held(c, "entity_resolve") is False
+        db = sessionmaker(bind=pgl)()
+        try:
+            findings = wd.rule_mart_builds(db, datetime.utcnow())
+            db.commit()
+        finally:
+            db.close()
+        # the live long build is a warning; the busy refusal raises nothing
+        assert [(f.key, f.severity) for f in findings] == [
+            ("mart_build:running:pe_marts", "warning")]
+    finally:
+        tx.rollback()
+        holder.close()
+
+    # lock released: the next build closes the (now dead) running row and builds
+    pe_marts.run_pe_marts(guard=True)
+    rows = _builds(pgl, "pe_marts")
+    assert rows[0]["status"] == "failed" and "abandoned" in rows[0]["error"]
+    assert rows[-1]["status"] == "success"
+
+
+@pg
+def test_cancel_event_rolls_back_instead_of_committing(pgl, monkeypatch):
+    """R6: the job was cancelled / timed out while the thread built. The build
+    must roll back and the ledger must say failed, not success."""
+    import threading
+
+    from sqlalchemy import text
+
+    from app.marts.build_ledger import MartBuildCancelled
+    from app.worker.executors import pe_marts
+
+    _fresh_pe_inputs(pgl)
+    monkeypatch.setattr(pe_marts, "get_engine", lambda: pgl)
+    cancel = threading.Event()
+
+    def fake(conn_for, skip_firms, skip_funds, skip_people, dry_run):
+        with conn_for() as conn:
+            conn.execute(text("INSERT INTO public.t126a_marker VALUES ('built')"))
+        cancel.set()  # the worker cancels mid-build, after the last stage began
+        return _copy(GOOD_PE)
+
+    monkeypatch.setattr(pe_marts, "_run_stages", fake)
+    with pytest.raises(MartBuildCancelled, match="cancelled"):
+        pe_marts.run_pe_marts(guard=True, cancel_event=cancel)
+    assert _markers(pgl) == []
+    [row] = _builds(pgl)
+    assert row["status"] == "failed" and row["error"].startswith("cancelled")
+
+    # a stage boundary after the cancel stops the build before the next stage
+    stages = []
+
+    def two_stage(conn_for, skip_firms, skip_funds, skip_people, dry_run):
+        with conn_for():
+            stages.append("firms")
+        cancel.set()
+        with conn_for():
+            stages.append("funds")
+        return _copy(GOOD_PE)
+
+    cancel.clear()
+    monkeypatch.setattr(pe_marts, "_run_stages", two_stage)
+    with pytest.raises(MartBuildCancelled):
+        pe_marts.run_pe_marts(guard=True, cancel_event=cancel)
+    assert stages == ["firms"]
+
+
+@pytest.mark.unit
+def test_executor_sets_cancel_event_when_cancelled(monkeypatch):
+    """R6: cancelling the executor coroutine signals the build thread."""
+    import threading
+    from unittest.mock import MagicMock
+
+    from app.worker.executors import pe_marts
+
+    seen = {}
+    started = threading.Event()
+
+    def slow(**kw):
+        seen["event"] = kw["cancel_event"]
+        started.set()
+        kw["cancel_event"].wait(5)
+        return {}
+
+    monkeypatch.setattr(pe_marts, "run_pe_marts", slow)
+
+    async def go():
+        task = asyncio.create_task(pe_marts.execute(MagicMock(payload={}, id=1), MagicMock()))
+        while not started.is_set():
+            await asyncio.sleep(0.01)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    asyncio.run(go())
+    assert seen["event"].is_set()
+
+
+@pg
+def test_queue_row_no_longer_running_aborts_commit(pgl, pgq, monkeypatch):
+    """R6: belt and braces -- the queue row was marked failed (timeout/cancel)."""
+    from sqlalchemy import text
+
+    from app.marts.build_ledger import MartBuildCancelled
+    from app.worker.executors import pe_marts
+
+    engine, _ = pgq
+    with engine.begin() as conn:
+        qid = conn.execute(text(
+            "INSERT INTO job_queue (job_type, status, priority, payload, created_at) "
+            "VALUES ('pe_mart_build', 'running', 0, '{}', NOW()) RETURNING id")).scalar()
+    _fresh_pe_inputs(pgl)
+    monkeypatch.setattr(pe_marts, "get_engine", lambda: pgl)
+
+    def fake(conn_for, skip_firms, skip_funds, skip_people, dry_run):
+        with conn_for() as conn:
+            conn.execute(text("INSERT INTO public.t126a_marker VALUES ('built')"))
+        with engine.begin() as c:  # the worker times the job out meanwhile
+            c.execute(text("UPDATE job_queue SET status = 'failed' WHERE id = :i"), {"i": qid})
+        return _copy(GOOD_PE)
+
+    monkeypatch.setattr(pe_marts, "_run_stages", fake)
+    with pytest.raises(MartBuildCancelled, match=f"job_queue #{qid} is failed"):
+        pe_marts.run_pe_marts(guard=True, job_queue_id=qid)
+    assert _markers(pgl) == [] and _builds(pgl)[0]["status"] == "failed"
+
+
+@pg
+def test_watchdog_closes_dead_running_build(pgl):
+    """R7: a worker died mid-build; nobody holds the lock. The watchdog closes
+    the row now (not at next month's build) and the mart alert opens."""
+    from sqlalchemy import text
+    from sqlalchemy.orm import sessionmaker
+
+    from app.services import data_watchdog as wd
+
+    _ledger_row(pgl, "entity_resolve", "success", days_ago=30)
+    dead = _ledger_row(pgl, "entity_resolve", "running", days_ago=1)
+    with pgl.begin() as conn:
+        conn.execute(text("UPDATE core.mart_build SET finished_at = NULL WHERE id = :i"),
+                     {"i": dead})
+    db = sessionmaker(bind=pgl)()
+    try:
+        [f] = wd.rule_mart_builds(db, datetime.utcnow())
+        db.commit()
+    finally:
+        db.close()
+    assert f.key == "mart_build:entity_resolve" and f.severity == "critical"
+    assert "abandoned" in f.message
+    assert _builds(pgl, "entity_resolve")[-1]["status"] == "failed"
+
+
+@pg
+def test_watchdog_partial_job_rule(pgq):
+    """Scope gap: the PARTIAL: marker itself raises an alert."""
+    from sqlalchemy import text
+    from sqlalchemy.orm import sessionmaker
+
+    from app.services import data_watchdog as wd
+
+    engine, _ = pgq
+    with engine.begin() as conn:
+        conn.execute(text("""
+            INSERT INTO job_queue (job_type, status, priority, payload, created_at,
+                                   completed_at, error_message)
+            VALUES ('bulk_ingest', 'success', 0, '{"bulk_source": "sec_13f"}', NOW(), NOW(),
+                    'PARTIAL: 1 of 3 sec_13f release(s) failed'),
+                   ('bulk_ingest', 'success', 0, '{"bulk_source": "sec_form_d"}', NOW(), NOW(),
+                    NULL),
+                   ('bulk_ingest', 'success', 0, '{"bulk_source": "sec_insider"}', NOW(),
+                    NOW() - INTERVAL '3 days', 'PARTIAL: old')
+        """))
+    db = sessionmaker(bind=engine)()
+    try:
+        [f] = wd.rule_partial_jobs(db, datetime.utcnow())
+    finally:
+        db.close()
+    assert f.key == "partial:bulk_ingest:sec_13f" and f.severity == "warning"
+    assert "partial_job" in dict(wd.RULES)
+
+
+@pg
+def test_bulk_partial_advances_schedule_watermark(pgq, monkeypatch):
+    """Scope gap: the bulk executor finishes its own IngestionJob, so the
+    SPEC_121 write-back no-ops; the watermark must still advance on success
+    (clean or partial) and not on failure."""
+    from sqlalchemy import text
+
+    engine, factory = pgq
+    for summary, advances in ((_summary(2, 1), True), (_summary(0, 2, rows=0), False)):
+        ing, qid = _bulk_job(engine)
+        with engine.begin() as conn:
+            sid = conn.execute(text("""
+                INSERT INTO ingestion_schedules (name, source, config, frequency,
+                    cron_expression, hour, is_active, created_at, updated_at, priority)
+                VALUES (:n, 'bulk:sec_13f', '{}', 'custom', '0 6 * * *', 6, 1, NOW(), NOW(), 5)
+                RETURNING id"""), {"n": f"s-{ing}"}).scalar()
+            conn.execute(text("UPDATE ingestion_jobs SET schedule_id = :s WHERE id = :i"),
+                         {"s": sid, "i": ing})
+        _run_bulk_via_worker(engine, factory, qid, monkeypatch, summary)
+        with engine.connect() as conn:
+            last = conn.execute(text("SELECT last_run_at FROM ingestion_schedules WHERE id = :s"),
+                                {"s": sid}).scalar()
+        assert (last is not None) is advances

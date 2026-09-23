@@ -6,7 +6,7 @@ The master links organizations across SEC sources by strong identifier
 name-similarity resolver over `canonical_entities`.
 """
 
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text
@@ -20,20 +20,38 @@ router = APIRouter(prefix="/entities/master", tags=["Entity Master"])
 ID_TYPES = ("cik", "crd", "ein", "lei", "uei", "sei")
 
 
-@router.post("/resolve", summary="Queue an entity master refresh")
+@router.post("/resolve", summary="Queue an entity master refresh (admin)")
 def queue_resolve(
     skip_feeds: bool = Query(False, description="Reuse core.source_record as-is"),
     skip_bridge: bool = Query(False, description="Keep the existing CIK/CRD bridge"),
     include_name_tier: bool = Query(True, description="Allow the name+state bridge tier"),
-    dry_run: bool = Query(False, description="Plan and ledger only, no entity writes"),
+    dry_run: bool = Query(False, description="Build, gate and ledger; keep nothing"),
+    input_override: Optional[List[str]] = Query(
+        None, description="Input sources (or 'all') this build may use although their "
+                          "latest release failed or is stale (SPEC_126a)"
+    ),
+    input_max_age_days: Optional[List[str]] = Query(
+        None, description="Per-input max age, as source=days (SPEC_126a)"
+    ),
+    gate_override: Optional[List[str]] = Query(
+        None, description="Ship gates (or 'all') this build may fail and still commit (SPEC_126a)"
+    ),
     db: Session = Depends(get_db),
 ):
+    # POST on this router needs admin (_auth = require_admin_for_writes, main.py),
+    # so the SPEC_126a overrides are admin-only like /pe/marts/build's.
+    from app.marts.inputs import override_payload
+
     payload = {
         "skip_feeds": skip_feeds,
         "skip_bridge": skip_bridge,
         "include_name_tier": include_name_tier,
         "dry_run": dry_run,
     }
+    try:
+        payload.update(override_payload(input_override, gate_override, input_max_age_days))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return submit_job(db=db, job_type="entity_resolve", payload=payload)
 
 
