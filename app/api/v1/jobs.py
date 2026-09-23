@@ -24,23 +24,14 @@ logger = logging.getLogger(__name__)
 
 
 def _check_api_key_preflight(source: str):
-    """Return error message if required API key is missing, else None."""
-    from app.core.api_registry import API_REGISTRY, APIKeyRequirement
-    from app.core.config import get_settings
+    """Return error message if required API key is missing, else None.
 
-    # Strip dataset suffix (e.g. "job_postings:all" → "job_postings")
-    base_source = source.split(":")[0]
+    Delegates to ``app.core.preflight.api_key_preflight`` (SPEC_124), which the
+    dataset status API also uses to explain ``blocked`` datasets.
+    """
+    from app.core.preflight import api_key_preflight
 
-    api_config = API_REGISTRY.get(base_source)
-    if not api_config or api_config.api_key_requirement != APIKeyRequirement.REQUIRED:
-        return None
-
-    settings = get_settings()
-    try:
-        settings.get_api_key(base_source, required=True)
-        return None
-    except Exception:
-        return f"API key required for '{base_source}' but not configured"
+    return api_key_preflight(source)
 
 
 # =============================================================================

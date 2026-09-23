@@ -111,6 +111,12 @@ class IngestionJob(Base):
     # Data provenance — tracks whether ingested data is real or synthetic
     data_origin = Column(String(16), nullable=False, default="real", server_default="real")  # "real" or "synthetic"
 
+    # Catalog dataset this job produced (SPEC_124, Alembic 0014). Projected by
+    # the before_insert listener below when the producer maps to exactly one
+    # dataset; NULL for older rows and for job types with several stage
+    # datasets (resolved at read time).
+    dataset_key = Column(String(64), nullable=True, index=True)
+
     def __repr__(self) -> str:
         return (
             f"<IngestionJob(id={self.id}, source={self.source}, "
@@ -121,6 +127,25 @@ class IngestionJob(Base):
     def can_retry(self) -> bool:
         """Check if job can be retried."""
         return self.status == JobStatus.FAILED and self.retry_count < self.max_retries
+
+
+@event.listens_for(IngestionJob, "before_insert")
+def _project_dataset_key(mapper, connection, target) -> None:
+    """Fill ``dataset_key`` from the catalog for every new job (SPEC_124).
+
+    Every enqueue path (POST /jobs, schedules, the nightly batch, retries,
+    splits) creates its IngestionJob through the ORM, so one listener keeps
+    them all projected. Never raises: a job must not fail to be created
+    because the catalog could not resolve it.
+    """
+    if target.dataset_key:
+        return
+    try:
+        from app.catalog.job_keys import dataset_key_for_job
+
+        target.dataset_key = dataset_key_for_job(target.source, target.config)
+    except Exception:
+        pass
 
 
 class IngestionSchedule(Base):
@@ -318,6 +343,8 @@ class CollectionAuditLog(Base):
     job_id = Column(Integer, nullable=True, index=True)
     job_type = Column(String(20), nullable=True)  # ingestion, site_intel
     config_snapshot = Column(JSON, nullable=True)
+    # Who triggered it (SPEC_124, Alembic 0014): principal email or name.
+    actor = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
     __table_args__ = (Index("idx_audit_source_created", "source", "created_at"),)
