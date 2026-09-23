@@ -96,29 +96,43 @@ async def execute(job: JobQueue, db: Session):
     if not name:
         raise ValueError("bulk_ingest payload requires 'bulk_source'")
     source = get_source(name)
-    _start_ingestion_job(payload.get("ingestion_job_id"))
-
-    job.progress_pct = 1.0
-    job.progress_message = f"Discovering {name} releases"
-    db.commit()
-
-    summary = await asyncio.to_thread(
-        run_source,
-        source,
-        since=payload.get("since"),
-        max_releases=payload.get("max_releases"),
-        release_keys=payload.get("release_keys"),
-        progress=_progress_writer(job.id),
-    )
-    logger.info(f"bulk_ingest {name} summary: { {k: v for k, v in summary.items() if k != 'releases'} }")
-
-    attempted = summary["loaded"] + summary["failed"]
     ingestion_job_id = payload.get("ingestion_job_id")
-    if attempted and summary["loaded"] == 0:
-        message = f"All {summary['failed']} {name} release(s) failed: {summary['errors'][:3]}"
-        _finish_ingestion_job(ingestion_job_id, summary, error=message)
-        raise RuntimeError(message)
-    _finish_ingestion_job(ingestion_job_id, summary)
+    _start_ingestion_job(ingestion_job_id)
+
+    # The IngestionJob is finished in `finally` (SPEC_121): if discovery or a
+    # load raises, or the task is cancelled, a RUNNING row would otherwise
+    # block its schedule until the stuck-job timeout.
+    summary: dict = {}
+    error = None
+    finished = False
+    try:
+        job.progress_pct = 1.0
+        job.progress_message = f"Discovering {name} releases"
+        db.commit()
+
+        summary = await asyncio.to_thread(
+            run_source,
+            source,
+            since=payload.get("since"),
+            max_releases=payload.get("max_releases"),
+            release_keys=payload.get("release_keys"),
+            progress=_progress_writer(job.id),
+        )
+        logger.info(f"bulk_ingest {name} summary: { {k: v for k, v in summary.items() if k != 'releases'} }")
+
+        attempted = summary["loaded"] + summary["failed"]
+        if attempted and summary["loaded"] == 0:
+            error = f"All {summary['failed']} {name} release(s) failed: {summary['errors'][:3]}"
+            raise RuntimeError(error)
+        finished = True
+    except Exception as e:
+        if error is None:
+            error = f"{type(e).__name__}: {e}"
+        raise
+    finally:
+        if not finished and error is None:
+            error = f"bulk_ingest {name} interrupted before completion"
+        _finish_ingestion_job(ingestion_job_id, summary, error=error)
 
     if summary["rows"] == 0:
         job.progress_message = (

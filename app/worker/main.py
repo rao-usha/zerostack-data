@@ -190,6 +190,43 @@ async def _heartbeat_loop(db_factory, job_id: int):
                 pass
 
 
+def _write_back_ingestion_job(job: JobQueue, succeeded: bool, error: Optional[str] = None) -> None:
+    """Mirror a finished queue job onto its linked ingestion_jobs row (SPEC_121).
+
+    Most executors never touch ingestion_jobs, so without this a scheduled
+    ``job:`` run left its IngestionJob PENDING forever and the schedule skipped
+    every later run. Runs in its own session after the queue row is committed:
+    a write-back error must not turn a successful job into a failed one, and
+    the executor may have left ``db`` dirty. Idempotent — rows an executor
+    already finished are left alone.
+    """
+    from app.core.ingestion_job_sync import linked_ingestion_job_id, mirror_queue_outcome
+
+    try:
+        ing_id = linked_ingestion_job_id(job.job_table_id, job.payload)
+        started_at, completed_at = job.started_at, job.completed_at
+    except Exception as e:
+        logger.error(f"Job {getattr(job, 'id', '?')}: could not read queue row for write-back: {e}")
+        return
+    if not ing_id:
+        return
+
+    session = get_session_factory()()
+    try:
+        if mirror_queue_outcome(session, ing_id, succeeded, error, started_at, completed_at):
+            session.commit()
+            logger.info(
+                f"Job {job.id}: ingestion job {ing_id} -> {'success' if succeeded else 'failed'}"
+            )
+        else:
+            session.rollback()
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Job {job.id}: ingestion job {ing_id} write-back failed: {e}")
+    finally:
+        session.close()
+
+
 async def execute_job(job: JobQueue, db: Session):
     """Execute a claimed job using the appropriate executor."""
     job_type_enum = (
@@ -204,6 +241,7 @@ async def execute_job(job: JobQueue, db: Session):
         job.error_message = error
         job.completed_at = datetime.utcnow()
         db.commit()
+        _write_back_ingestion_job(job, succeeded=False, error=error)
         return
 
     # Mark as running
@@ -308,6 +346,7 @@ async def execute_job(job: JobQueue, db: Session):
         job.progress_pct = 100.0
         job.progress_message = "Completed"
         db.commit()
+        _write_back_ingestion_job(job, succeeded=True)
 
         send_job_event(
             db,
@@ -338,6 +377,7 @@ async def execute_job(job: JobQueue, db: Session):
             job.error_message = "Cancelled by user"
             job.completed_at = datetime.utcnow()
         db.commit()
+        _write_back_ingestion_job(job, succeeded=False, error=job.error_message or "Cancelled by user")
 
         send_job_event(
             db,
@@ -366,6 +406,7 @@ async def execute_job(job: JobQueue, db: Session):
         job.error_message = str(e)[:2000]
         job.completed_at = datetime.utcnow()
         db.commit()
+        _write_back_ingestion_job(job, succeeded=False, error=job.error_message)
 
         send_job_event(
             db,
@@ -502,18 +543,37 @@ async def poll_loop():
                     task.cancel()
             await asyncio.gather(*active_tasks, return_exceptions=True)
 
-            # Mark interrupted jobs as failed in DB
+            # Mark interrupted jobs as failed in DB. Statuses are stored
+            # lower-case; the old upper-case literals matched nothing.
             try:
+                from app.core.ingestion_job_sync import (
+                    linked_ingestion_job_id,
+                    mirror_queue_outcome,
+                )
+
+                reason = "Worker drain timeout — forced shutdown"
                 cleanup_db = get_session_factory()()
-                cleanup_db.execute(text("""
-                    UPDATE job_queue
-                    SET status = 'FAILED',
-                        error_message = 'Worker drain timeout — forced shutdown',
-                        completed_at = NOW()
-                    WHERE worker_id = :wid AND status IN ('RUNNING', 'CLAIMED')
-                """), {"wid": WORKER_ID})
-                cleanup_db.commit()
-                cleanup_db.close()
+                try:
+                    interrupted = cleanup_db.execute(text("""
+                        UPDATE job_queue
+                        SET status = :failed,
+                            error_message = :reason,
+                            completed_at = :now
+                        WHERE worker_id = :wid AND lower(status) IN ('running', 'claimed')
+                        RETURNING id, job_table_id, payload
+                    """), {
+                        "failed": QueueJobStatus.FAILED.value,
+                        "reason": reason,
+                        "now": datetime.utcnow(),
+                        "wid": WORKER_ID,
+                    }).fetchall()
+                    for _qid, job_table_id, payload in interrupted:
+                        ing_id = linked_ingestion_job_id(job_table_id, payload)
+                        if ing_id:
+                            mirror_queue_outcome(cleanup_db, ing_id, succeeded=False, error=reason)
+                    cleanup_db.commit()
+                finally:
+                    cleanup_db.close()
             except Exception as e:
                 logger.error(f"Drain cleanup failed: {e}")
 
