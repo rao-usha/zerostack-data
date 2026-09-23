@@ -69,6 +69,7 @@ def _snapshot_date(release: Release) -> date:
 class EdgarSubmissionsBulk(BulkSource):
     name = "sec_edgar_submissions"
     parser_version = "1"
+    snapshot = True  # conditional GET on the last loaded ETag + raw retention (SPEC_122)
 
     def discover(self, http, since: Optional[date] = None) -> List[Release]:
         """The file is a rolling snapshot: one release per UTC day, no index page to read."""

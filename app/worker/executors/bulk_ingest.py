@@ -145,6 +145,7 @@ async def execute(job: JobQueue, db: Session):
                 max_releases=payload.get("max_releases"),
                 release_keys=payload.get("release_keys"),
                 progress=_progress_writer(job.id),
+                force=bool(payload.get("force")),
             )
         logger.info(f"bulk_ingest {name} summary: { {k: v for k, v in summary.items() if k != 'releases'} }")
 
@@ -175,7 +176,14 @@ async def execute(job: JobQueue, db: Session):
         # the queue row stays 'success' (status enum unchanged); the worker keeps
         # this visible as "Completed with partial failures"
         job.error_message = partial
-    if summary["rows"] == 0:
+    if summary.get("locked"):
+        job.progress_message = f"skipped: another {name} run is in progress"
+    elif summary["rows"] == 0 and summary.get("unchanged"):
+        job.progress_message = (
+            f"unchanged upstream: {summary['unchanged']} snapshot(s) not modified "
+            f"({summary['failed']} failed, {summary['skipped']} already loaded)"
+        )
+    elif summary["rows"] == 0:
         job.progress_message = (
             f"warning: 0 rows loaded ({summary['skipped']} already loaded, {summary['failed']} failed)"
         )
@@ -183,5 +191,11 @@ async def execute(job: JobQueue, db: Session):
         job.progress_message = (
             f"{summary['rows']} rows from {summary['loaded']} release(s); "
             f"{summary['failed']} failed, {summary['skipped']} skipped"
+        )
+    # SPEC_122: bytes downloaded vs download avoided (conditional GET)
+    if summary.get("bytes_downloaded") or summary.get("bytes_saved"):
+        job.progress_message += (
+            f"; {summary.get('bytes_downloaded', 0) / 1e6:.0f} MB downloaded, "
+            f"{summary.get('bytes_saved', 0) / 1e6:.0f} MB saved"
         )
     db.commit()

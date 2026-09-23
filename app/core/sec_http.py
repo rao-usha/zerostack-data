@@ -57,6 +57,9 @@ class FetchedFile:
     etag: Optional[str]
     last_modified: Optional[str]
     fetched_at: datetime
+    # True when the server answered 304 to a conditional request: nothing was
+    # written and ``path`` does not exist (SPEC_122)
+    not_modified: bool = False
 
 
 def validate_payload(name: str, head: bytes, content_type: Optional[str], size: Optional[int] = None) -> None:
@@ -187,12 +190,12 @@ class SecHttp:
             self._sleep(0.25)
 
     # -- requests ---------------------------------------------------------
-    def _send(self, url: str, stream: bool):
+    def _send(self, url: str, stream: bool, headers: Optional[dict] = None):
         attempt = 0
         while True:
             self._throttle(url)
             try:
-                request = self._client.build_request("GET", url)
+                request = self._client.build_request("GET", url, headers=headers)
                 response = self._client.send(request, stream=stream)
             except (httpx.TransportError,) as e:
                 if attempt < len(BACKOFF_SECONDS):
@@ -227,11 +230,41 @@ class SecHttp:
         self.bytes_downloaded += len(response.content)
         return response.content
 
-    def stream_to_file(self, url: str, dest: Path | str) -> FetchedFile:
+    def stream_to_file(
+        self,
+        url: str,
+        dest: Path | str,
+        etag: Optional[str] = None,
+        last_modified: Optional[str] = None,
+    ) -> FetchedFile:
+        """Stream ``url`` to ``dest``.
+
+        With ``etag`` / ``last_modified`` (validators from an earlier download of
+        the same URL) the request is conditional (SPEC_122); a 304 writes nothing
+        and returns ``FetchedFile(not_modified=True, bytes=0)``.
+        """
         dest = Path(dest)
         dest.parent.mkdir(parents=True, exist_ok=True)
         part = dest.with_name(dest.name + ".part")
-        response = self._send(url, stream=True)
+        conditional = {}
+        if etag:
+            conditional["If-None-Match"] = etag
+        if last_modified:
+            conditional["If-Modified-Since"] = last_modified
+        response = self._send(url, stream=True, headers=conditional or None)
+        if response.status_code == 304:
+            response.close()
+            logger.info(f"SEC 304 not modified: {url}")
+            return FetchedFile(
+                path=dest,
+                url=str(response.url),
+                bytes=0,
+                sha256="",
+                etag=response.headers.get("ETag") or etag,
+                last_modified=response.headers.get("Last-Modified") or last_modified,
+                fetched_at=datetime.utcnow(),
+                not_modified=True,
+            )
         digest = hashlib.sha256()
         size = 0
         head = b""
