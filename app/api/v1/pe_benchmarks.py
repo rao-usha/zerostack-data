@@ -158,7 +158,7 @@ def _build_firm_summary(
         "name": firm.name,
         "firm_type": firm.firm_type,
         "primary_strategy": firm.primary_strategy,
-        "aum_usd_millions": float(firm.aum_usd_millions) if firm.aum_usd_millions else None,
+        "aum_usd_millions": float(firm.aum_usd_millions) if firm.aum_usd_millions is not None else None,
         "headquarters_city": firm.headquarters_city,
         "headquarters_state": firm.headquarters_state,
         "sector_focus": firm.sector_focus,
@@ -884,11 +884,11 @@ async def get_data_room_package(
     for f in financials_raw:
         financials.append(DataRoomFinancials(
             fiscal_year=f.fiscal_year,
-            revenue_usd=float(f.revenue_usd) if f.revenue_usd else None,
-            ebitda_usd=float(f.ebitda_usd) if f.ebitda_usd else None,
-            ebitda_margin_pct=float(f.ebitda_margin_pct) if f.ebitda_margin_pct else None,
-            gross_margin_pct=float(f.gross_margin_pct) if f.gross_margin_pct else None,
-            revenue_growth_pct=float(f.revenue_growth_pct) if f.revenue_growth_pct else None,
+            revenue_usd=float(f.revenue_usd) if f.revenue_usd is not None else None,
+            ebitda_usd=float(f.ebitda_usd) if f.ebitda_usd is not None else None,
+            ebitda_margin_pct=float(f.ebitda_margin_pct) if f.ebitda_margin_pct is not None else None,
+            gross_margin_pct=float(f.gross_margin_pct) if f.gross_margin_pct is not None else None,
+            revenue_growth_pct=float(f.revenue_growth_pct) if f.revenue_growth_pct is not None else None,
             employees=None,
         ))
     if financials:
@@ -2376,7 +2376,7 @@ async def get_firm_funds(
             fund_name=fund.name,
             vintage_year=fund.vintage_year,
             strategy=fund.strategy,
-            target_size_usd_millions=float(fund.target_size_usd_millions) if fund.target_size_usd_millions else None,
+            target_size_usd_millions=float(fund.target_size_usd_millions) if fund.target_size_usd_millions is not None else None,
             status=fund.status,
             metrics=FundMetricsResponse(**metrics),
         ))
@@ -2807,10 +2807,10 @@ async def get_portfolio_health(
         statuses.append(CompanyHealthStatus(
             company_id=company.id,
             company_name=company.name,
-            exit_score=float(snapshot.exit_score) if snapshot and snapshot.exit_score else None,
+            exit_score=float(snapshot.exit_score) if snapshot and snapshot.exit_score is not None else None,
             exit_grade=snapshot.exit_grade if snapshot else None,
-            revenue=float(snapshot.revenue) if snapshot and snapshot.revenue else None,
-            ebitda_margin=float(snapshot.ebitda_margin) if snapshot and snapshot.ebitda_margin else None,
+            revenue=float(snapshot.revenue) if snapshot and snapshot.revenue is not None else None,
+            ebitda_margin=float(snapshot.ebitda_margin) if snapshot and snapshot.ebitda_margin is not None else None,
             leadership_count=snapshot.leadership_count if snapshot else 0,
             alert_count=alert_count,
             trend="stable",
@@ -2978,7 +2978,7 @@ async def get_pe_network_graph(
             "id": f"pf_{f[0]}",
             "label": f[1],
             "type": "pe",
-            "aum": float(f[2]) if f[2] else None,
+            "aum": float(f[2]) if f[2] is not None else None,
             "strategy": f[3],
         })
         firm_id_set.add(f[0])

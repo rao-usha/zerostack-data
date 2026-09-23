@@ -25,7 +25,14 @@ from typing import Dict, Iterable, List, Optional, Sequence
 
 from sqlalchemy import text
 
-from app.core.copy_loader import copy_rows, create_staging, drop_staging, merge_staging
+from app.core.copy_loader import (
+    check_publish,
+    copy_rows,
+    create_staging,
+    drop_staging,
+    merge_staging,
+    table_count,
+)
 from app.ingest.bulk.base import BulkSource, Release
 from app.ingest.bulk.registry import register_bulk_source
 from app.ingest.bulk.sec_13f.parse import (
@@ -202,6 +209,8 @@ class Sec13FDataSets(BulkSource):
 
             if meta.get("load_holdings"):
                 dates = filing_dates(zf)
+                # what is published now, before this release merges (SPEC_129)
+                published_before = table_count(conn, HOLDINGS_TABLE)
                 out["sec_13f_holdings"] = self._stage_and_merge(
                     conn, "sec_13f_holdings", HOLDINGS_TABLE, HOLDING_COLUMNS, HOLDING_TYPES,
                     ["accession_number", "infotable_sk"], iter_holdings(zf, dates, fallback), key, loaded_at)
@@ -209,6 +218,16 @@ class Sec13FDataSets(BulkSource):
                 if key not in keep:
                     keep.append(key)
                 if os.environ.get("BULK_13F_PRUNE_HOLDINGS", "1") != "0":
+                    # The prune deletes every other release in this same
+                    # transaction, so a release with no (or few) holdings
+                    # would empty the table while being marked `loaded`.
+                    # Compare what survives the prune with what was published.
+                    survivors = table_count(
+                        conn, HOLDINGS_TABLE,
+                        "source_release_key IS NOT NULL AND source_release_key = ANY(:keep)",
+                        {"keep": keep},
+                    )
+                    check_publish(HOLDINGS_TABLE, survivors, published_before)
                     pruned = conn.execute(
                         text("DELETE FROM public.sec_13f_holdings "
                              "WHERE source_release_key IS NULL OR NOT (source_release_key = ANY(:keep))"),

@@ -442,6 +442,14 @@ def apply(conn: Connection, rules: List[QuarantineRule] = RULES,
     captured = []
     roots = []
     for rule in rules:
+        # A table that was never created holds no bad rows. Without this a
+        # blank database (CI, a new deployment) cannot migrate past 0003,
+        # because several rule tables are created by their ingestors, not
+        # by create_all() (SPEC_129).
+        if not conn.execute(text("SELECT to_regclass(:t)"), {"t": f"public.{rule.table}"}).scalar():
+            roots.append({"rule": rule.name, "table": rule.table, "expected": rule.expected,
+                          "live": 0, "absent": True})
+            continue
         tmp = mover._temp_ids(rule.table, f"({rule.predicate})")
         live = mover._count(tmp)
         check_guard(rule, live)

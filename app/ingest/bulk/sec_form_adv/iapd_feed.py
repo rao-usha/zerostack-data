@@ -19,7 +19,14 @@ from typing import Dict, List, Optional
 
 from sqlalchemy import text
 
-from app.core.copy_loader import copy_rows, create_staging, drop_staging, merge_staging
+from app.core.copy_loader import (
+    check_publish,
+    copy_rows,
+    create_staging,
+    drop_staging,
+    merge_staging,
+    table_count,
+)
 from app.core.safe_sql import qi
 from app.ingest.bulk.base import BulkSource, Release
 from app.ingest.bulk.registry import register_bulk_source
@@ -73,8 +80,13 @@ class SecIapdFeed(BulkSource):
         copied = copy_rows(conn, STAGING, names, iter_feed_rows(path, edition, release.release_key))
         if copied == 0:
             raise RuntimeError(f"{release.release_key}: feed parsed 0 firms from {Path(path).name}")
+        published_before = table_count(conn, TARGET)
         inserted, updated = merge_staging(conn, STAGING, TARGET, names, KEY_COLUMNS)
         drop_staging(conn, STAGING)
+        # The prune below keeps only this edition: a truncated feed must not
+        # replace a full one (SPEC_129).
+        check_publish(TARGET, table_count(conn, TARGET, "edition_date >= :edition", {"edition": edition}),
+                      published_before)
         # Keep only the latest edition (~40 MB each; daily editions ~14 GB/yr)
         pruned = conn.execute(
             text(f"DELETE FROM {TARGET} WHERE edition_date < :edition"), {"edition": edition}

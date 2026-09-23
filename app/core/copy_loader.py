@@ -15,12 +15,16 @@ merge keeps the LAST row per key within a batch.
 from __future__ import annotations
 
 import io
+import logging
+import os
 from typing import Iterable, Iterator, List, Optional, Sequence, Tuple
 
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 from app.core.safe_sql import qi
+
+logger = logging.getLogger(__name__)
 
 STAGING_SCHEMA = "stg"
 _ALLOWED_TYPE_CHARS = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 (),_[]")
@@ -188,7 +192,88 @@ def staging_count(conn: Connection, name: str) -> int:
     return conn.execute(text(f"SELECT COUNT(*) FROM {_stg(name)}")).scalar() or 0
 
 
+# ---------------------------------------------------------------------------
+# Publish guard (SPEC_129)
+# ---------------------------------------------------------------------------
+
+PUBLISH_GUARD_OVERRIDE_ENV = "BULK_PUBLISH_GUARD_OVERRIDE"
+DEFAULT_MAX_DROP = 0.5
+
+
+class PublishGuardError(RuntimeError):
+    """A destructive replace would publish an empty or much smaller table."""
+
+
+def _guard_overridden(target: str) -> bool:
+    raw = os.environ.get(PUBLISH_GUARD_OVERRIDE_ENV, "").strip().lower()
+    if not raw:
+        return False
+    if raw in ("1", "true", "yes", "all", "*"):
+        return True
+    wanted = {t.strip() for t in raw.split(",") if t.strip()}
+    short = target.lower().split(".")[-1]
+    return short in wanted or target.lower() in wanted
+
+
+def check_publish(
+    target: str,
+    new_rows: int,
+    current_rows: int,
+    max_drop: float = DEFAULT_MAX_DROP,
+    override: Optional[bool] = None,
+) -> None:
+    """Refuse to publish a replacement that is empty or shrinks ``target`` too far.
+
+    Call this BEFORE deleting published rows (a prune, or a delete of rows the
+    new batch no longer carries), inside the same transaction, so raising rolls
+    the whole load back and the bulk runner marks the release ``failed``.
+
+    - ``new_rows``: rows that will be published once the replace completes.
+    - ``current_rows``: rows published right now (before this load).
+    - Raises when ``new_rows == 0``, or when ``current_rows > 0`` and
+      ``new_rows < current_rows * (1 - max_drop)``.
+
+    ``override`` defaults to env ``BULK_PUBLISH_GUARD_OVERRIDE``: ``1``/``all``
+    for every target, or a comma list of table names (``sec_13f_holdings``).
+    It is an operator decision for one run, never a code default.
+    """
+    if override is None:
+        override = _guard_overridden(target)
+    new_rows, current_rows = int(new_rows or 0), int(current_rows or 0)
+    problem = None
+    if new_rows == 0:
+        problem = f"replacement for {target} has 0 rows (currently {current_rows})"
+    elif current_rows > 0 and new_rows < current_rows * (1 - max_drop):
+        drop = 1 - new_rows / current_rows
+        problem = (
+            f"replacement for {target} would drop from {current_rows} to {new_rows} rows "
+            f"({drop:.0%} > {max_drop:.0%} tolerance)"
+        )
+    if problem is None:
+        return
+    if override:
+        logger.warning(f"[publish-guard] OVERRIDDEN: {problem}")
+        return
+    raise PublishGuardError(
+        f"{problem}. Refusing to publish; set {PUBLISH_GUARD_OVERRIDE_ENV}="
+        f"{target.split('.')[-1]} to accept it for one run."
+    )
+
+
+def table_count(conn: Connection, table: str, where: str = "", params: Optional[dict] = None) -> int:
+    """COUNT(*) of a (possibly schema-qualified) table; 0 when it does not exist."""
+    if not conn.execute(text("SELECT to_regclass(:t)"), {"t": table}).scalar():
+        return 0
+    sql = f"SELECT COUNT(*) FROM {_qualified(table)}"
+    if where:
+        sql += f" WHERE {where}"
+    return int(conn.execute(text(sql), params or {}).scalar() or 0)
+
+
 __all__: List[str] = [
+    "PublishGuardError",
+    "check_publish",
+    "table_count",
     "create_staging",
     "copy_rows",
     "merge_staging",

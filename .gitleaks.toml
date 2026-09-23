@@ -1,0 +1,42 @@
+# gitleaks configuration (SPEC_129).
+#
+# CI runs `gitleaks git` over ONLY the commits a push or PR adds (see
+# .github/workflows/ci.yml, job `secrets`). The job is blocking: any new
+# secret fails the build.
+#
+# This file extends the default rule set. It allowlists two things, and
+# nothing else:
+#
+# 1. Commits already in published history that are KNOWN leaks. Scanning a
+#    range never reaches them today, but a rebase/force-push that re-scans
+#    history would, and failing forever on a secret that is already public
+#    helps no one. Listing a commit here is NOT remediation: every credential
+#    below must be rotated (PLAN_086 Ops). Allowlisting a commit only stops it
+#    being re-reported; the same secret in a new commit still fails.
+#
+#      a1483fc  .env.cloud / .env.test / docker-compose.yml: Cloud SQL
+#               `nexdata` password            -> rotate (PLAN_086 Ops)
+#      0360e3c  .kaggle/kaggle.json: Kaggle API key
+#                                             -> rotate in the Kaggle web UI (user)
+#      cda25ea  docs/LAUNCH_READINESS.md: credential-bearing DATABASE_URL
+#                                             -> same Cloud SQL password
+#
+# 2. Local-development placeholder credentials that are not secrets (the
+#    docker-compose Postgres default and doc/test examples).
+
+title = "nexdata gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known, rotated historical leaks and local-dev placeholders"
+commits = [
+  "a1483fc9913c6a051cd6de1e717f94e181d8a6f7",
+  "0360e3c7344930803f9556a9d1daef1c236a7fff",
+  "cda25ea14b7a4852027753e48d4521d305ba656a",
+]
+regexes = [
+  '''nexdata_dev_password''',
+  '''://(user|test|postgres|nexdata_user):(password|pass|test|postgres|nexdata_password)@''',
+]

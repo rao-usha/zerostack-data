@@ -136,8 +136,8 @@ async def list_deals(
                         "closed": row[8].isoformat() if row[8] else None,
                     },
                     "valuation": {
-                        "enterprise_value_usd": float(row[9]) if row[9] else None,
-                        "ev_ebitda_multiple": float(row[10]) if row[10] else None,
+                        "enterprise_value_usd": float(row[9]) if row[9] is not None else None,
+                        "ev_ebitda_multiple": float(row[10]) if row[10] is not None else None,
                     },
                     "parties": {
                         "buyer": row[11],
@@ -186,7 +186,7 @@ async def search_deals(
                     "deal_name": row[1],
                     "deal_type": row[2],
                     "company_name": row[3],
-                    "enterprise_value_usd": float(row[4]) if row[4] else None,
+                    "enterprise_value_usd": float(row[4]) if row[4] is not None else None,
                     "closed_date": row[5].isoformat() if row[5] else None,
                     "buyer": row[6],
                 }
@@ -364,8 +364,8 @@ async def get_deal(deal_id: int, db: Session = Depends(get_db)):
                 "type": p[2],
                 "role": p[3],
                 "is_lead": p[4],
-                "equity_contribution_usd": float(p[5]) if p[5] else None,
-                "ownership_pct": float(p[6]) if p[6] else None,
+                "equity_contribution_usd": float(p[5]) if p[5] is not None else None,
+                "ownership_pct": float(p[6]) if p[6] is not None else None,
                 "firm_id": p[7],
                 "fund_id": p[8],
             }
@@ -419,23 +419,23 @@ async def get_deal(deal_id: int, db: Session = Depends(get_db)):
                 "expected_close": row[9].isoformat() if row[9] else None,
             },
             "valuation": {
-                "enterprise_value_usd": float(row[10]) if row[10] else None,
-                "equity_value_usd": float(row[11]) if row[11] else None,
-                "debt_amount_usd": float(row[12]) if row[12] else None,
+                "enterprise_value_usd": float(row[10]) if row[10] is not None else None,
+                "equity_value_usd": float(row[11]) if row[11] is not None else None,
+                "debt_amount_usd": float(row[12]) if row[12] is not None else None,
             },
             "multiples": {
-                "ev_revenue": float(row[13]) if row[13] else None,
-                "ev_ebitda": float(row[14]) if row[14] else None,
-                "ev_ebit": float(row[15]) if row[15] else None,
+                "ev_revenue": float(row[13]) if row[13] is not None else None,
+                "ev_ebitda": float(row[14]) if row[14] is not None else None,
+                "ev_ebit": float(row[15]) if row[15] is not None else None,
             },
             "financials_at_deal": {
-                "ltm_revenue_usd": float(row[16]) if row[16] else None,
-                "ltm_ebitda_usd": float(row[17]) if row[17] else None,
+                "ltm_revenue_usd": float(row[16]) if row[16] is not None else None,
+                "ltm_ebitda_usd": float(row[17]) if row[17] is not None else None,
             },
             "structure": {
-                "equity_pct": float(row[18]) if row[18] else None,
-                "debt_pct": float(row[19]) if row[19] else None,
-                "management_rollover_pct": float(row[20]) if row[20] else None,
+                "equity_pct": float(row[18]) if row[18] is not None else None,
+                "debt_pct": float(row[19]) if row[19] is not None else None,
+                "management_rollover_pct": float(row[20]) if row[20] is not None else None,
             },
             "parties": {"buyer": row[21], "seller": row[22], "seller_type": row[23]},
             "status": {
@@ -508,8 +508,8 @@ async def get_deal_stats(year: Optional[int] = None, db: Session = Depends(get_d
                 "average_ev_usd": float(row[6]) if row[6] else 0,
             },
             "multiples": {
-                "avg_ev_ebitda": float(row[7]) if row[7] else None,
-                "avg_ev_revenue": float(row[8]) if row[8] else None,
+                "avg_ev_ebitda": float(row[7]) if row[7] is not None else None,
+                "avg_ev_revenue": float(row[8]) if row[8] is not None else None,
             },
         }
 
@@ -552,7 +552,7 @@ async def get_recent_deals(
                     "deal_name": row[1],
                     "deal_type": row[2],
                     "company_name": row[3],
-                    "enterprise_value_usd": float(row[4]) if row[4] else None,
+                    "enterprise_value_usd": float(row[4]) if row[4] is not None else None,
                     "closed_date": row[5].isoformat() if row[5] else None,
                     "announced_date": row[6].isoformat() if row[6] else None,
                     "buyer": row[7],

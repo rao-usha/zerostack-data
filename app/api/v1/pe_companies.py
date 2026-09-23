@@ -306,14 +306,14 @@ async def get_portfolio_company(company_id: int, db: Session = Depends(get_db)):
                 "date": i[3].isoformat() if i[3] else None,
                 "type": i[4],
                 "round": i[5],
-                "amount_usd": float(i[6]) if i[6] else None,
-                "ownership_pct": float(i[7]) if i[7] else None,
-                "entry_ev_usd": float(i[8]) if i[8] else None,
-                "entry_multiple": float(i[9]) if i[9] else None,
+                "amount_usd": float(i[6]) if i[6] is not None else None,
+                "ownership_pct": float(i[7]) if i[7] is not None else None,
+                "entry_ev_usd": float(i[8]) if i[8] is not None else None,
+                "entry_multiple": float(i[9]) if i[9] is not None else None,
                 "status": i[10],
                 "exit_date": i[11].isoformat() if i[11] else None,
                 "exit_type": i[12],
-                "exit_multiple": float(i[13]) if i[13] else None,
+                "exit_multiple": float(i[13]) if i[13] is not None else None,
             }
             for i in inv_result.fetchall()
         ]
@@ -480,29 +480,29 @@ async def get_company_financials(
                         "end_date": row[3].isoformat() if row[3] else None,
                     },
                     "income_statement": {
-                        "revenue_usd": float(row[4]) if row[4] else None,
-                        "revenue_growth_pct": float(row[5]) if row[5] else None,
-                        "gross_profit_usd": float(row[6]) if row[6] else None,
-                        "gross_margin_pct": float(row[7]) if row[7] else None,
-                        "ebitda_usd": float(row[8]) if row[8] else None,
-                        "ebitda_margin_pct": float(row[9]) if row[9] else None,
-                        "ebit_usd": float(row[10]) if row[10] else None,
-                        "net_income_usd": float(row[11]) if row[11] else None,
+                        "revenue_usd": float(row[4]) if row[4] is not None else None,
+                        "revenue_growth_pct": float(row[5]) if row[5] is not None else None,
+                        "gross_profit_usd": float(row[6]) if row[6] is not None else None,
+                        "gross_margin_pct": float(row[7]) if row[7] is not None else None,
+                        "ebitda_usd": float(row[8]) if row[8] is not None else None,
+                        "ebitda_margin_pct": float(row[9]) if row[9] is not None else None,
+                        "ebit_usd": float(row[10]) if row[10] is not None else None,
+                        "net_income_usd": float(row[11]) if row[11] is not None else None,
                     },
                     "balance_sheet": {
-                        "total_assets_usd": float(row[12]) if row[12] else None,
-                        "total_debt_usd": float(row[13]) if row[13] else None,
-                        "cash_usd": float(row[14]) if row[14] else None,
-                        "net_debt_usd": float(row[15]) if row[15] else None,
+                        "total_assets_usd": float(row[12]) if row[12] is not None else None,
+                        "total_debt_usd": float(row[13]) if row[13] is not None else None,
+                        "cash_usd": float(row[14]) if row[14] is not None else None,
+                        "net_debt_usd": float(row[15]) if row[15] is not None else None,
                     },
                     "cash_flow": {
-                        "operating_cash_flow_usd": float(row[16]) if row[16] else None,
-                        "capex_usd": float(row[17]) if row[17] else None,
-                        "free_cash_flow_usd": float(row[18]) if row[18] else None,
+                        "operating_cash_flow_usd": float(row[16]) if row[16] is not None else None,
+                        "capex_usd": float(row[17]) if row[17] is not None else None,
+                        "free_cash_flow_usd": float(row[18]) if row[18] is not None else None,
                     },
                     "ratios": {
-                        "debt_to_ebitda": float(row[19]) if row[19] else None,
-                        "interest_coverage": float(row[20]) if row[20] else None,
+                        "debt_to_ebitda": float(row[19]) if row[19] is not None else None,
+                        "interest_coverage": float(row[20]) if row[20] is not None else None,
                     },
                     "data_quality": {
                         "is_audited": row[21],
@@ -556,15 +556,15 @@ async def get_company_valuations(
                     "id": row[0],
                     "date": row[1].isoformat() if row[1] else None,
                     "values": {
-                        "enterprise_value_usd": float(row[2]) if row[2] else None,
-                        "equity_value_usd": float(row[3]) if row[3] else None,
-                        "net_debt_usd": float(row[4]) if row[4] else None,
+                        "enterprise_value_usd": float(row[2]) if row[2] is not None else None,
+                        "equity_value_usd": float(row[3]) if row[3] is not None else None,
+                        "net_debt_usd": float(row[4]) if row[4] is not None else None,
                     },
                     "multiples": {
-                        "ev_revenue": float(row[5]) if row[5] else None,
-                        "ev_ebitda": float(row[6]) if row[6] else None,
-                        "ev_ebit": float(row[7]) if row[7] else None,
-                        "pe": float(row[8]) if row[8] else None,
+                        "ev_revenue": float(row[5]) if row[5] is not None else None,
+                        "ev_ebitda": float(row[6]) if row[6] is not None else None,
+                        "ev_ebit": float(row[7]) if row[7] is not None else None,
+                        "pe": float(row[8]) if row[8] is not None else None,
                     },
                     "context": {
                         "type": row[9],
@@ -683,10 +683,10 @@ async def get_company_news(
                     "classification": {
                         "type": row[7],
                         "sentiment": row[8],
-                        "sentiment_score": float(row[9]) if row[9] else None,
+                        "sentiment_score": float(row[9]) if row[9] is not None else None,
                     },
                     "relevance": {
-                        "score": float(row[10]) if row[10] else None,
+                        "score": float(row[10]) if row[10] is not None else None,
                         "is_primary": row[11],
                     },
                 }
@@ -775,15 +775,15 @@ async def get_company_benchmark(
             }
 
         company_metrics = {
-            "revenue_usd": float(fin_row[0]) if fin_row[0] else None,
-            "revenue_growth_pct": float(fin_row[1]) if fin_row[1] else None,
-            "gross_margin_pct": float(fin_row[2]) if fin_row[2] else None,
-            "ebitda_usd": float(fin_row[3]) if fin_row[3] else None,
-            "ebitda_margin_pct": float(fin_row[4]) if fin_row[4] else None,
-            "net_income_usd": float(fin_row[5]) if fin_row[5] else None,
-            "debt_to_ebitda": float(fin_row[6]) if fin_row[6] else None,
-            "interest_coverage": float(fin_row[7]) if fin_row[7] else None,
-            "free_cash_flow_usd": float(fin_row[8]) if fin_row[8] else None,
+            "revenue_usd": float(fin_row[0]) if fin_row[0] is not None else None,
+            "revenue_growth_pct": float(fin_row[1]) if fin_row[1] is not None else None,
+            "gross_margin_pct": float(fin_row[2]) if fin_row[2] is not None else None,
+            "ebitda_usd": float(fin_row[3]) if fin_row[3] is not None else None,
+            "ebitda_margin_pct": float(fin_row[4]) if fin_row[4] is not None else None,
+            "net_income_usd": float(fin_row[5]) if fin_row[5] is not None else None,
+            "debt_to_ebitda": float(fin_row[6]) if fin_row[6] is not None else None,
+            "interest_coverage": float(fin_row[7]) if fin_row[7] is not None else None,
+            "free_cash_flow_usd": float(fin_row[8]) if fin_row[8] is not None else None,
         }
 
         # 4. Get competitor company IDs
@@ -843,13 +843,13 @@ async def get_company_benchmark(
             for pr in peer_fin_rows:
                 peer_metrics.append({
                     "name": pr[0],
-                    "revenue_usd": float(pr[1]) if pr[1] else None,
-                    "revenue_growth_pct": float(pr[2]) if pr[2] else None,
-                    "gross_margin_pct": float(pr[3]) if pr[3] else None,
-                    "ebitda_margin_pct": float(pr[4]) if pr[4] else None,
-                    "debt_to_ebitda": float(pr[5]) if pr[5] else None,
-                    "interest_coverage": float(pr[6]) if pr[6] else None,
-                    "free_cash_flow_usd": float(pr[7]) if pr[7] else None,
+                    "revenue_usd": float(pr[1]) if pr[1] is not None else None,
+                    "revenue_growth_pct": float(pr[2]) if pr[2] is not None else None,
+                    "gross_margin_pct": float(pr[3]) if pr[3] is not None else None,
+                    "ebitda_margin_pct": float(pr[4]) if pr[4] is not None else None,
+                    "debt_to_ebitda": float(pr[5]) if pr[5] is not None else None,
+                    "interest_coverage": float(pr[6]) if pr[6] is not None else None,
+                    "free_cash_flow_usd": float(pr[7]) if pr[7] is not None else None,
                 })
 
         # 7. Compute percentile stats
@@ -898,8 +898,8 @@ async def get_company_benchmark(
         ).fetchone()
 
         company_multiples = {
-            "ev_revenue": float(val_row[0]) if val_row and val_row[0] else None,
-            "ev_ebitda": float(val_row[1]) if val_row and val_row[1] else None,
+            "ev_revenue": float(val_row[0]) if val_row and val_row[0] is not None else None,
+            "ev_ebitda": float(val_row[1]) if val_row and val_row[1] is not None else None,
         }
 
         peer_val_multiples = []
@@ -915,8 +915,8 @@ async def get_company_benchmark(
                 {"ids": peer_ids},
             ).fetchall()
             peer_val_multiples = [
-                {"ev_revenue": float(r[1]) if r[1] else None,
-                 "ev_ebitda": float(r[2]) if r[2] else None}
+                {"ev_revenue": float(r[1]) if r[1] is not None else None,
+                 "ev_ebitda": float(r[2]) if r[2] is not None else None}
                 for r in peer_val_rows
             ]
 
@@ -1054,7 +1054,7 @@ async def get_exit_readiness(
             growth = float(latest[2]) if latest[2] else 0
             ebitda_margin = float(latest[4]) if latest[4] else 0
             fcf = float(latest[6]) if latest[6] else 0
-            dte = float(latest[7]) if latest[7] else None
+            dte = float(latest[7]) if latest[7] is not None else None
 
             # Revenue scale score (0-25)
             scale_score = min(25, revenue / 40_000_000)  # Full marks at $1B+
@@ -1224,8 +1224,8 @@ async def get_exit_readiness(
                     risks.append(f"Enterprise value declined {abs(ev_growth):.0f}%")
 
             # Multiple expansion
-            latest_mult = float(val_rows[0][2]) if val_rows[0][2] else None
-            earliest_mult = float(val_rows[-1][2]) if val_rows[-1][2] else None
+            latest_mult = float(val_rows[0][2]) if val_rows[0][2] is not None else None
+            earliest_mult = float(val_rows[-1][2]) if val_rows[-1][2] is not None else None
             if latest_mult and earliest_mult and earliest_mult > 0:
                 mult_change = (latest_mult / earliest_mult - 1) * 100
                 if mult_change > 0:
@@ -1236,13 +1236,13 @@ async def get_exit_readiness(
                 "latest_ev_usd": latest_ev,
                 "entry_ev_usd": earliest_ev,
                 "ev_growth_pct": round((latest_ev / earliest_ev - 1) * 100, 1) if earliest_ev > 0 else None,
-                "latest_ev_revenue": float(val_rows[0][2]) if val_rows[0][2] else None,
+                "latest_ev_revenue": float(val_rows[0][2]) if val_rows[0][2] is not None else None,
                 "valuations_count": len(val_rows),
             }
         elif len(val_rows) == 1:
             scores["valuation_momentum"] = 50
             details["valuation_momentum"] = {
-                "latest_ev_usd": float(val_rows[0][1]) if val_rows[0][1] else None,
+                "latest_ev_usd": float(val_rows[0][1]) if val_rows[0][1] is not None else None,
                 "message": "Only one valuation point - trend unknown",
             }
         else:
@@ -1462,7 +1462,7 @@ async def get_potential_buyers(
             """),
             {"id": company_id},
         ).fetchone()
-        company_revenue = float(fin_row[0]) if fin_row and fin_row[0] else None
+        company_revenue = float(fin_row[0]) if fin_row and fin_row[0] is not None else None
 
         # Get latest EV separately (more reliable)
         ev_row = db.execute(
@@ -1472,7 +1472,7 @@ async def get_potential_buyers(
             """),
             {"id": company_id},
         ).fetchone()
-        company_ev = float(ev_row[0]) if ev_row and ev_row[0] else None
+        company_ev = float(ev_row[0]) if ev_row and ev_row[0] is not None else None
 
         # =====================================================================
         # Strategic Buyers (from competitor mappings)
@@ -1595,9 +1595,9 @@ async def get_potential_buyers(
             rationale = []
             strategy = row[2] or ""
             sector_focus = row[3]
-            aum = float(row[4]) if row[4] else None
-            check_min = float(row[5]) if row[5] else None
-            check_max = float(row[6]) if row[6] else None
+            aum = float(row[4]) if row[4] is not None else None
+            check_min = float(row[5]) if row[5] is not None else None
+            check_max = float(row[6]) if row[6] is not None else None
 
             # Strategy match
             if company_industry and company_industry.lower() in strategy.lower():
@@ -1804,16 +1804,16 @@ async def generate_data_room_package(
         for r in fin_rows:
             financials.append({
                 "fiscal_year": r[0],
-                "revenue_usd": float(r[2]) if r[2] else None,
-                "revenue_growth_pct": float(r[3]) if r[3] else None,
-                "gross_margin_pct": float(r[5]) if r[5] else None,
-                "ebitda_usd": float(r[6]) if r[6] else None,
-                "ebitda_margin_pct": float(r[7]) if r[7] else None,
-                "net_income_usd": float(r[8]) if r[8] else None,
-                "total_debt_usd": float(r[10]) if r[10] else None,
-                "cash_usd": float(r[11]) if r[11] else None,
-                "free_cash_flow_usd": float(r[15]) if r[15] else None,
-                "debt_to_ebitda": float(r[16]) if r[16] else None,
+                "revenue_usd": float(r[2]) if r[2] is not None else None,
+                "revenue_growth_pct": float(r[3]) if r[3] is not None else None,
+                "gross_margin_pct": float(r[5]) if r[5] is not None else None,
+                "ebitda_usd": float(r[6]) if r[6] is not None else None,
+                "ebitda_margin_pct": float(r[7]) if r[7] is not None else None,
+                "net_income_usd": float(r[8]) if r[8] is not None else None,
+                "total_debt_usd": float(r[10]) if r[10] is not None else None,
+                "cash_usd": float(r[11]) if r[11] is not None else None,
+                "free_cash_flow_usd": float(r[15]) if r[15] is not None else None,
+                "debt_to_ebitda": float(r[16]) if r[16] is not None else None,
                 "is_audited": r[18],
                 "data_source": r[19],
             })
@@ -1839,10 +1839,10 @@ async def generate_data_room_package(
         for r in val_rows:
             valuations.append({
                 "date": r[0].isoformat() if r[0] else None,
-                "enterprise_value_usd": float(r[1]) if r[1] else None,
-                "equity_value_usd": float(r[2]) if r[2] else None,
-                "ev_revenue_multiple": float(r[3]) if r[3] else None,
-                "ev_ebitda_multiple": float(r[4]) if r[4] else None,
+                "enterprise_value_usd": float(r[1]) if r[1] is not None else None,
+                "equity_value_usd": float(r[2]) if r[2] is not None else None,
+                "ev_revenue_multiple": float(r[3]) if r[3] is not None else None,
+                "ev_ebitda_multiple": float(r[4]) if r[4] is not None else None,
                 "type": r[5],
                 "methodology": r[6],
                 "event": r[7],
@@ -1951,16 +1951,16 @@ async def generate_data_room_package(
                 "date": r[2].isoformat() if r[2] else None,
                 "type": r[3],
                 "round": r[4],
-                "amount_usd": float(r[5]) if r[5] else None,
-                "ownership_pct": float(r[6]) if r[6] else None,
-                "entry_ev_usd": float(r[7]) if r[7] else None,
-                "entry_multiple": float(r[8]) if r[8] else None,
+                "amount_usd": float(r[5]) if r[5] is not None else None,
+                "ownership_pct": float(r[6]) if r[6] is not None else None,
+                "entry_ev_usd": float(r[7]) if r[7] is not None else None,
+                "entry_multiple": float(r[8]) if r[8] is not None else None,
                 "status": r[9],
                 "exit_date": r[10].isoformat() if r[10] else None,
                 "exit_type": r[11],
-                "exit_amount_usd": float(r[12]) if r[12] else None,
-                "exit_multiple": float(r[13]) if r[13] else None,
-                "exit_irr_pct": float(r[14]) if r[14] else None,
+                "exit_amount_usd": float(r[12]) if r[12] is not None else None,
+                "exit_multiple": float(r[13]) if r[13] is not None else None,
+                "exit_irr_pct": float(r[14]) if r[14] is not None else None,
             })
         package["sections"]["investment_history"] = {
             "count": len(investments),

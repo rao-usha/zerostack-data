@@ -122,7 +122,25 @@ async def list_pe_firms(
     - `search`: Search by firm name
     """
     try:
-        query = """
+        # One WHERE for the page and the total, so `total` can never
+        # disagree with the filters (it used to ignore `strategy`).
+        where = ["1=1"]
+        filter_params = {}
+        if firm_type:
+            where.append("firm_type = :firm_type")
+            filter_params["firm_type"] = firm_type
+        if strategy:
+            where.append("primary_strategy ILIKE :strategy")
+            filter_params["strategy"] = f"%{strategy}%"
+        if status:
+            where.append("status = :status")
+            filter_params["status"] = status
+        if search:
+            where.append("name ILIKE :search")
+            filter_params["search"] = f"%{search}%"
+        where_sql = " AND ".join(where)
+
+        query = f"""
             SELECT
                 id, name, legal_name, website,
                 headquarters_city, headquarters_state, headquarters_country,
@@ -130,27 +148,10 @@ async def list_pe_firms(
                 employee_count, founded_year, status, cik,
                 created_at
             FROM pe_firms
-            WHERE 1=1
+            WHERE {where_sql}
+            ORDER BY COALESCE(aum_usd_millions, 0) DESC, name LIMIT :limit OFFSET :offset
         """
-        params = {"limit": limit, "offset": offset}
-
-        if firm_type:
-            query += " AND firm_type = :firm_type"
-            params["firm_type"] = firm_type
-
-        if strategy:
-            query += " AND primary_strategy ILIKE :strategy"
-            params["strategy"] = f"%{strategy}%"
-
-        if status:
-            query += " AND status = :status"
-            params["status"] = status
-
-        if search:
-            query += " AND name ILIKE :search"
-            params["search"] = f"%{search}%"
-
-        query += " ORDER BY COALESCE(aum_usd_millions, 0) DESC, name LIMIT :limit OFFSET :offset"
+        params = dict(filter_params, limit=limit, offset=offset)
 
         result = db.execute(text(query), params)
         rows = result.fetchall()
@@ -166,7 +167,7 @@ async def list_pe_firms(
                     "location": {"city": row[4], "state": row[5], "country": row[6]},
                     "firm_type": row[7],
                     "primary_strategy": row[8],
-                    "aum_usd_millions": float(row[9]) if row[9] else None,
+                    "aum_usd_millions": float(row[9]) if row[9] is not None else None,
                     "employee_count": row[10],
                     "founded_year": row[11],
                     "status": row[12],
@@ -175,21 +176,10 @@ async def list_pe_firms(
                 }
             )
 
-        # Get total count
-        count_query = "SELECT COUNT(*) FROM pe_firms WHERE 1=1"
-        count_params = {}
-        if firm_type:
-            count_query += " AND firm_type = :firm_type"
-            count_params["firm_type"] = firm_type
-        if status:
-            count_query += " AND status = :status"
-            count_params["status"] = status
-        if search:
-            count_query += " AND name ILIKE :search"
-            count_params["search"] = f"%{search}%"
-
-        count_result = db.execute(text(count_query), count_params)
-        total = count_result.scalar()
+        # Get total count (same filters as the page)
+        total = db.execute(
+            text(f"SELECT COUNT(*) FROM pe_firms WHERE {where_sql}"), filter_params
+        ).scalar()
 
         return {
             "total": total,
@@ -243,7 +233,7 @@ async def search_pe_firms(
                     "name": row[1],
                     "firm_type": row[2],
                     "strategy": row[3],
-                    "aum_usd_millions": float(row[4]) if row[4] else None,
+                    "aum_usd_millions": float(row[4]) if row[4] is not None else None,
                     "location": f"{row[5]}, {row[6]}" if row[5] else None,
                 }
             )
@@ -324,7 +314,7 @@ async def create_pe_firm(firm: PEFirmCreate, db: Session = Depends(get_db)):
             headquarters_country=row[6],
             firm_type=row[7],
             primary_strategy=row[8],
-            aum_usd_millions=float(row[9]) if row[9] else None,
+            aum_usd_millions=float(row[9]) if row[9] is not None else None,
             founded_year=row[10],
             status=row[11],
             created_at=row[12].isoformat() if row[12] else None,
@@ -384,8 +374,8 @@ async def get_pe_firm(firm_id: int, db: Session = Depends(get_db)):
                 "name": f[1],
                 "fund_number": f[2],
                 "vintage_year": f[3],
-                "target_size_millions": float(f[4]) if f[4] else None,
-                "final_close_millions": float(f[5]) if f[5] else None,
+                "target_size_millions": float(f[4]) if f[4] is not None else None,
+                "final_close_millions": float(f[5]) if f[5] is not None else None,
                 "strategy": f[6],
                 "status": f[7],
             }
@@ -433,17 +423,17 @@ async def get_pe_firm(firm_id: int, db: Session = Depends(get_db)):
                 "geography_focus": row[10],
             },
             "scale": {
-                "aum_usd_millions": float(row[11]) if row[11] else None,
+                "aum_usd_millions": float(row[11]) if row[11] is not None else None,
                 "employee_count": row[12],
                 "office_locations": row[13],
             },
             "investment_criteria": {
-                "check_size_min_millions": float(row[14]) if row[14] else None,
-                "check_size_max_millions": float(row[15]) if row[15] else None,
-                "target_revenue_min_millions": float(row[16]) if row[16] else None,
-                "target_revenue_max_millions": float(row[17]) if row[17] else None,
-                "target_ebitda_min_millions": float(row[18]) if row[18] else None,
-                "target_ebitda_max_millions": float(row[19]) if row[19] else None,
+                "check_size_min_millions": float(row[14]) if row[14] is not None else None,
+                "check_size_max_millions": float(row[15]) if row[15] is not None else None,
+                "target_revenue_min_millions": float(row[16]) if row[16] is not None else None,
+                "target_revenue_max_millions": float(row[17]) if row[17] is not None else None,
+                "target_ebitda_min_millions": float(row[18]) if row[18] is not None else None,
+                "target_ebitda_max_millions": float(row[19]) if row[19] is not None else None,
             },
             "sec_registration": {
                 "cik": row[20],
@@ -461,7 +451,7 @@ async def get_pe_firm(firm_id: int, db: Session = Depends(get_db)):
             "data_quality": {
                 "sources": row[29],
                 "last_verified": row[30].isoformat() if row[30] else None,
-                "confidence": float(row[31]) if row[31] else None,
+                "confidence": float(row[31]) if row[31] is not None else None,
             },
             "metadata": {
                 "created_at": row[32].isoformat() if row[32] else None,
@@ -526,13 +516,13 @@ async def get_firm_portfolio(
                     "investment": {
                         "date": row[5].isoformat() if row[5] else None,
                         "type": row[6],
-                        "ownership_pct": float(row[7]) if row[7] else None,
+                        "ownership_pct": float(row[7]) if row[7] is not None else None,
                         "status": row[8],
                     },
                     "exit": {
                         "date": row[9].isoformat() if row[9] else None,
                         "type": row[10],
-                        "multiple": float(row[11]) if row[11] else None,
+                        "multiple": float(row[11]) if row[11] is not None else None,
                     }
                     if row[9]
                     else None,
@@ -579,17 +569,17 @@ async def get_firm_funds(firm_id: int, db: Session = Depends(get_db)):
                     "fund_number": row[2],
                     "vintage_year": row[3],
                     "size": {
-                        "target_millions": float(row[4]) if row[4] else None,
-                        "final_close_millions": float(row[5]) if row[5] else None,
-                        "called_pct": float(row[6]) if row[6] else None,
+                        "target_millions": float(row[4]) if row[4] is not None else None,
+                        "final_close_millions": float(row[5]) if row[5] is not None else None,
+                        "called_pct": float(row[6]) if row[6] is not None else None,
                     },
                     "strategy": row[7],
                     "sector_focus": row[8],
                     "geography_focus": row[9],
                     "terms": {
-                        "management_fee_pct": float(row[10]) if row[10] else None,
-                        "carried_interest_pct": float(row[11]) if row[11] else None,
-                        "preferred_return_pct": float(row[12]) if row[12] else None,
+                        "management_fee_pct": float(row[10]) if row[10] is not None else None,
+                        "carried_interest_pct": float(row[11]) if row[11] is not None else None,
+                        "preferred_return_pct": float(row[12]) if row[12] is not None else None,
                         "fund_life_years": row[13],
                         "investment_period_years": row[14],
                     },

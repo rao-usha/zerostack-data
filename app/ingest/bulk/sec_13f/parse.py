@@ -158,13 +158,43 @@ def find_member(zf: zipfile.ZipFile, basename: str) -> Optional[str]:
     return None
 
 
+# Members every 13F data set carries. A missing one is a broken or truncated
+# zip, never "no rows": loading it as empty would publish an empty table
+# (INFOTABLE) or NULL out every manager name (COVERPAGE) with status `loaded`.
+REQUIRED_MEMBERS = frozenset({"SUBMISSION.TSV", "COVERPAGE.TSV", "INFOTABLE.TSV"})
+
+# Columns that must be in a member's header whenever the member is present.
+# Keys plus what downstream reads -- not every optional column, so a column
+# the SEC adds (or one older data sets lack, like FIGI) never breaks a load.
+# A missing one would otherwise load as NULL on every row, silently.
+REQUIRED_HEADERS: Dict[str, tuple] = {
+    "SUBMISSION.TSV": ("ACCESSION_NUMBER", "FILING_DATE", "SUBMISSIONTYPE", "CIK", "PERIODOFREPORT"),
+    "COVERPAGE.TSV": ("ACCESSION_NUMBER", "REPORTCALENDARORQUARTER", "FILINGMANAGER_NAME",
+                      "REPORTTYPE"),
+    "SUMMARYPAGE.TSV": ("ACCESSION_NUMBER", "TABLEENTRYTOTAL", "TABLEVALUETOTAL"),
+    "SIGNATURE.TSV": ("ACCESSION_NUMBER", "NAME"),
+    "OTHERMANAGER.TSV": ("ACCESSION_NUMBER", "OTHERMANAGER_SK", "NAME"),
+    "OTHERMANAGER2.TSV": ("ACCESSION_NUMBER", "SEQUENCENUMBER", "NAME"),
+    "INFOTABLE.TSV": ("ACCESSION_NUMBER", "INFOTABLE_SK", "NAMEOFISSUER", "CUSIP", "VALUE",
+                      "SSHPRNAMT", "SSHPRNAMTTYPE"),
+}
+
+
 def iter_tsv(zf: zipfile.ZipFile, basename: str) -> Iterator[Dict[str, Optional[str]]]:
     """Stream one TSV member as dicts keyed by upper-case header. Blank -> None.
 
-    Yields nothing when the member is absent.
+    Optional members yield nothing when absent. A member in
+    ``REQUIRED_MEMBERS`` that is absent, or any member whose header lacks a
+    ``REQUIRED_HEADERS`` column, raises ``ValueError`` (the release fails).
     """
+    key = basename.upper()
     member = find_member(zf, basename)
     if member is None:
+        if key in REQUIRED_MEMBERS:
+            raise ValueError(
+                f"13F data set is missing required member {basename} "
+                f"(members: {[n.rsplit('/', 1)[-1] for n in zf.namelist()][:12]})"
+            )
         return
     if csv.field_size_limit() < CSV_FIELD_LIMIT:
         csv.field_size_limit(CSV_FIELD_LIMIT)
@@ -174,8 +204,16 @@ def iter_tsv(zf: zipfile.ZipFile, basename: str) -> Iterator[Dict[str, Optional[
         try:
             header = next(reader)
         except StopIteration:
-            return
+            header = []
         header = [h.strip().lstrip("﻿").strip('"').upper() for h in header]
+        missing = [c for c in REQUIRED_HEADERS.get(key, ()) if c not in header]
+        if missing:
+            raise ValueError(
+                f"13F member {basename} header is missing required column(s) {missing} "
+                f"(header: {header[:20]}); refusing to load them as NULL"
+            )
+        if not header:
+            return
         width = len(header)
         for row in reader:
             if not row or (len(row) == 1 and not row[0].strip()):
