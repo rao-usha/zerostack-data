@@ -631,7 +631,7 @@ async def _run_quality_gate(db, job: IngestionJob):
         # Find the most recent dataset registry entry for this source
         registry = (
             db.query(DatasetRegistry)
-            .filter(DatasetRegistry.source == job.source)
+            .filter(DatasetRegistry.source == job.source, DatasetRegistry.ingested())
             .order_by(DatasetRegistry.last_updated_at.desc())
             .first()
         )

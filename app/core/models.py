@@ -21,6 +21,8 @@ from sqlalchemy import (
     Index,
     Numeric,
 )
+from sqlalchemy import event
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.orm import declarative_base
 import enum
 
@@ -363,6 +365,34 @@ class DatasetRegistry(Base):
             f"<DatasetRegistry(id={self.id}, source={self.source}, "
             f"dataset_id={self.dataset_id}, table_name={self.table_name})>"
         )
+
+    @classmethod
+    def ingested(cls):
+        """Filter: rows an ingestor has touched (excludes catalog-only mirror rows).
+
+        The SPEC_123 catalog mirror inserts rows for catalog tables that no
+        ingestor registered, with ``last_updated_at = CATALOG_ONLY_TS``. DQ,
+        profiling and the quality gate must not treat those as ingested
+        datasets; the first ingestor update stamps a real time and they join.
+        """
+        return cls.last_updated_at > CATALOG_ONLY_TS
+
+
+# last_updated_at of a dataset_registry row the catalog mirror created and no
+# ingestor has touched yet (SPEC_123). The column is NOT NULL, hence a sentinel.
+CATALOG_ONLY_TS = datetime(1970, 1, 1)
+
+
+@event.listens_for(DatasetRegistry, "before_update")
+def _keep_catalog_block(mapper, connection, target) -> None:
+    """Ingestors replace source_metadata wholesale; keep the catalog block (SPEC_123)."""
+    hist = sa_inspect(target).attrs.source_metadata.history
+    if not hist.has_changes():
+        return
+    old = next((d for d in (hist.deleted or ()) if isinstance(d, dict)), None)
+    new = target.source_metadata
+    if old and "catalog" in old and not (isinstance(new, dict) and "catalog" in new):
+        target.source_metadata = {**(new if isinstance(new, dict) else {}), "catalog": old["catalog"]}
 
 
 class GeoJSONBoundaries(Base):

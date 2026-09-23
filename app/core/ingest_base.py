@@ -134,7 +134,12 @@ class BaseSourceIngestor(ABC):
             logger.debug(f"Updating existing dataset registry: {dataset_id}")
             existing.last_updated_at = datetime.utcnow()
             if source_metadata:
-                existing.source_metadata = source_metadata
+                # keep the catalog mirror's block (SPEC_123)
+                old = existing.source_metadata
+                catalog = old.get("catalog") if isinstance(old, dict) else None
+                existing.source_metadata = (
+                    {**source_metadata, "catalog": catalog} if catalog else source_metadata
+                )
             if display_name:
                 existing.display_name = display_name
             if description:
