@@ -465,3 +465,24 @@ def sample_census_metadata():
 
 
 
+
+
+@pytest.fixture(autouse=True)
+def _restore_app_dependency_overrides():
+    """Keep one test's ``app.dependency_overrides`` from leaking into the next.
+
+    Fixtures that override ``get_db`` on the shared app and clear it after
+    ``with TestClient(app)`` never reach the clear when lifespan shutdown
+    raises, and every later test then runs against their mock session.
+    Only touches ``app.main`` if a test already imported it.
+    """
+    import sys
+
+    mod = sys.modules.get("app.main")
+    before = dict(mod.app.dependency_overrides) if mod else None
+    yield
+    mod = sys.modules.get("app.main")
+    if mod is not None:
+        mod.app.dependency_overrides.clear()
+        if before:
+            mod.app.dependency_overrides.update(before)

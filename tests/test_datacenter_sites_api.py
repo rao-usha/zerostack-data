@@ -40,9 +40,11 @@ def client():
     from app.core.database import get_db
 
     app.dependency_overrides[get_db] = get_mock_db
-    with TestClient(app) as c:
-        yield c
-    app.dependency_overrides.clear()
+    try:
+        with TestClient(app) as c:
+            yield c
+    finally:
+        app.dependency_overrides.pop(get_db, None)
 
 
 @pytest.mark.unit
