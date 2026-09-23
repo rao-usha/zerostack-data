@@ -10,7 +10,6 @@ PG-backed tests need TEST_PG_URL pointing at a DISPOSABLE database.
 """
 import asyncio
 import importlib.util
-import io
 import os
 import re
 import zipfile
