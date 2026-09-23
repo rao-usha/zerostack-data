@@ -231,11 +231,11 @@ def _schedule(db, source, cron=None, frequency=None, active=1, created_at=None, 
 
 
 def _job(db, source, status, completed_at, config=None, schedule_id=None, error=None,
-         started_at=None):
+         started_at=None, batch_run_id=None):
     from app.core.models import IngestionJob
 
     row = IngestionJob(source=source, status=status, config=config or {},
-                       schedule_id=schedule_id, error_message=error,
+                       schedule_id=schedule_id, error_message=error, batch_run_id=batch_run_id,
                        created_at=(started_at or completed_at) - timedelta(minutes=1),
                        started_at=started_at or completed_at - timedelta(minutes=2),
                        completed_at=completed_at)
@@ -652,11 +652,27 @@ def test_statement_count_is_constant(pgdb):
     """T14: no per-dataset / per-row query loops, full catalog included."""
     from sqlalchemy import event
 
+    from sqlalchemy import text
+
     from app.catalog import get_catalog
 
-    specs = list(get_catalog()) + [_spec("t124_cnt", "bulk:t124cnt", slo=240,
-                                         coverage="SELECT max(d) FROM t124_cov")]
     engine = pgdb.get_bind()
+
+    def coverage_runs(spec):
+        # other suites can leave a catalog table behind in a different shape;
+        # such a dataset's coverage SQL fails here, and that path has its own
+        # test (T8c). Leave those out so the combined path is what is measured.
+        if not spec.coverage_sql:
+            return True
+        try:
+            with engine.connect() as conn:
+                conn.execute(text(spec.coverage_sql)).scalar()
+            return True
+        except Exception:
+            return False
+
+    specs = [s for s in get_catalog() if coverage_runs(s)] + [
+        _spec("t124_cnt", "bulk:t124cnt", slo=240, coverage="SELECT max(d) FROM t124_cov")]
     counter = {"n": 0}
 
     def count(*a, **k):
@@ -696,14 +712,14 @@ def test_statement_count_is_constant(pgdb):
     second = measure()
 
     assert first == second, (first, second)
-    # Cold: the per-store queries plus coverage. Coverage is one statement,
-    # or -- when some coverage SQL fails on this database (other suites leave
-    # differently shaped tables behind) -- one per coverage dataset, bounded
-    # by the catalog, never by rows.
-    n_coverage = sum(1 for s in specs if s.coverage_sql)
-    assert first <= 14 + 2 * n_coverage, first  # SET LOCAL + SELECT each
-    # Warm coverage cache: the per-store queries only.
-    assert measure(cold=False) <= 12
+    # Warm coverage cache: the per-store queries only (SET LOCAL timeout,
+    # existence, 5 stores, batch runs, schedules, schedule success/runs,
+    # heartbeats, relation stats).
+    warm = measure(cold=False)
+    assert warm <= 13, warm
+    # Cold: exactly one combined coverage statement on top (SET LOCAL + SELECT),
+    # never one per dataset.
+    assert first == warm + 2, (first, warm)
 
 
 # ---------------------------------------------------------------------------
@@ -1021,4 +1037,358 @@ def test_one_bad_coverage_sql_does_not_blank_the_others(pgdb):
     assert by["t124_good"]["status"] == "current"
     assert by["t124_good"]["clocks"]["coverage_through"] == "2026-08-31"
     assert by["t124_bad"]["status"] == "unknown"
-    assert by["t124_bad"]["status_reason"] == "coverage unavailable"
+    assert by["t124_bad"]["status_reason"] == "coverage unavailable: the coverage query failed"
+    assert by["t124_bad"]["clocks"]["coverage_error"] == "error"
+    assert by["t124_good"]["clocks"]["coverage_error"] is None
+
+
+# ---------------------------------------------------------------------------
+# Review fixes (spec-124-fix)
+# ---------------------------------------------------------------------------
+
+
+@pg
+def test_backfill_releases_sharing_one_discovered_at_are_not_behind(pgdb):
+    """R1: one run upserts every release in one transaction (one discovered_at).
+    Historic quarters of that run that failed or were skipped do not pin the
+    dataset to 'behind'; a release discovered by a later run does."""
+    cov = "SELECT max(d) FROM t124_cov"
+    specs = [_spec("t124_bf", "bulk:t124bf", slo=240, coverage=cov),
+             _spec("t124_bf2", "bulk:t124bf2", slo=240, coverage=cov)]
+    _healthy_bulk(pgdb, "t124bf")
+    _healthy_bulk(pgdb, "t124bf2")
+    run1 = NOW - timedelta(days=30)
+    for src in ("t124bf", "t124bf2"):
+        _release(pgdb, src, "2026-08", "loaded", run1, NOW - timedelta(days=29))
+        _release(pgdb, src, "2025-11", "failed", run1, error="BadZipFile: truncated")
+        _release(pgdb, src, "2025-10", "discovered", run1)   # max_releases cut it
+        _release(pgdb, src, "2025-09", "fetched", run1)
+    # a later run discovered a new release and has not loaded it
+    _release(pgdb, "t124bf2", "2026-09", "discovered", NOW - timedelta(days=1))
+
+    _, by = _build(pgdb, specs)
+    bf = by["t124_bf"]
+    assert bf["releases"]["unloaded"] == 0
+    assert bf["releases"]["failed"] == 1
+    assert bf["status"] == "current", bf["status_reason"]
+    bf2 = by["t124_bf2"]
+    assert bf2["releases"]["unloaded"] == 1
+    assert bf2["status"] == "behind"
+    assert "2026-09" in bf2["status_reason"]
+
+
+@pg
+def test_slow_coverage_query_is_isolated_and_remembered(pgdb, monkeypatch):
+    """R2: a slow coverage query times out alone, is reported as a timeout
+    (not an empty table), and next time runs apart from the combined
+    statement so it cannot blank the others."""
+    import app.services.dataset_status as ds
+    from app.core.models import ScheduleFrequency
+    from sqlalchemy import event
+
+    monkeypatch.setattr(ds, "COVERAGE_TIMEOUT_MS", 300)
+    monkeypatch.setattr(ds, "COVERAGE_FALLBACK_TIMEOUT_MS", 200)
+    monkeypatch.setattr(ds, "BACKGROUND_REFRESH", False)
+    slow = "SELECT max(d) FROM t124_old, (SELECT pg_sleep(1)) s"
+    specs = [_spec("t124_fast", "dispatch:t124fast", slo=240, coverage="SELECT max(d) FROM t124_cov"),
+             _spec("t124_slow", "dispatch:t124slow", slo=240, tables=("t124_old",), coverage=slow)]
+    for src in ("t124fast", "t124slow"):
+        s = _schedule(pgdb, src, frequency=ScheduleFrequency.MONTHLY)
+        _job(pgdb, src, "success", NOW - timedelta(days=2), schedule_id=s.id)
+
+    _, by = _build(pgdb, specs)
+    assert by["t124_fast"]["status"] == "current"
+    assert by["t124_slow"]["status"] == "unknown"
+    assert by["t124_slow"]["clocks"]["coverage_error"] == "timeout"
+    assert by["t124_slow"]["status_reason"] == "coverage unavailable: the coverage query timed out"
+
+    # expire both entries; the refresh (inline here) runs the known-slow one alone
+    with ds._coverage_lock:
+        for k, (_, v, e) in list(ds._coverage_cache.items()):
+            ds._coverage_cache[k] = (0.0, v, e)
+    seen = []
+
+    def spy(conn, cursor, statement, *a):
+        if "max(d)" in statement:
+            seen.append(statement)
+
+    engine = pgdb.get_bind()
+    event.listen(engine, "before_cursor_execute", spy)
+    try:
+        _, by = _build(pgdb, specs)
+    finally:
+        event.remove(engine, "before_cursor_execute", spy)
+    combined = [s for s in seen if "AS c0" in s]
+    assert combined and all("pg_sleep" not in s for s in combined), seen
+    assert by["t124_fast"]["status"] == "current"
+
+
+@pg
+def test_stale_coverage_is_served_while_refreshing_in_background(pgdb, monkeypatch):
+    """R2b: once computed, coverage never runs on the request path again."""
+    import threading
+
+    import app.services.dataset_status as ds
+
+    specs = [_spec("t124_swr", "dispatch:t124swr", slo=240, coverage="SELECT max(d) FROM t124_cov")]
+    _build(pgdb, specs)                                   # cold: computed inline
+    with ds._coverage_lock:
+        for k, (_, v, e) in list(ds._coverage_cache.items()):
+            ds._coverage_cache[k] = (0.0, v, e)
+    threads = []
+    real = ds._compute_coverage
+
+    def compute(engine, todo):
+        threads.append(threading.current_thread().name)
+        return real(engine, todo)
+
+    monkeypatch.setattr(ds, "_compute_coverage", compute)
+    _, by = _build(pgdb, specs)
+    assert by["t124_swr"]["clocks"]["coverage_through"] == "2026-08-31"   # the stale value
+    for t in threading.enumerate():
+        if t.name == "dataset-status-coverage":
+            t.join(5)
+    assert threads == ["dataset-status-coverage"]
+
+
+@pg
+def test_store_timeout_degrades_instead_of_failing(pgdb, monkeypatch):
+    """R9: every fact query runs under statement_timeout; a store that times
+    out is named in 'degraded' and absence-based statuses become unknown."""
+    import app.services.dataset_status as ds
+
+    monkeypatch.setattr(ds, "STATUS_TIMEOUT_MS", 100)
+    monkeypatch.setattr(ds, "_QUEUE_SQL",
+                        "SELECT pg_sleep(1) AS x WHERE CAST(:partial AS TEXT) IS NOT NULL "
+                        "AND CAST(:active_since AS TIMESTAMP) IS NOT NULL")
+    specs = [_spec("t124_deg", "dispatch:t124deg"), _spec("t124_degf", "dispatch:t124degf")]
+    _job(pgdb, "t124degf", "failed", NOW - timedelta(days=1), error="boom")
+
+    report, by = _build(pgdb, specs)
+    assert report["degraded"] == ["job_queue"]
+    assert by["t124_deg"]["status"] == "unknown"
+    assert by["t124_deg"]["status_reason"].startswith("evidence incomplete (job_queue unavailable)")
+    # positive evidence from the stores that answered still counts
+    assert by["t124_degf"]["status"] == "failing"
+
+
+@pytest.mark.unit
+def test_redact_masks_secrets():
+    """R7"""
+    from app.services.dataset_status import redact
+
+    msg = ("Client error '403 Forbidden' for url 'https://api.eia.gov/v2/electricity/"
+           "?api_key=ABCSECRET123&frequency=monthly&token=t0k'")
+    out = redact(msg)
+    assert "ABCSECRET123" not in out and "t0k" not in out
+    assert "api_key=***" in out and "frequency=monthly" in out
+    assert "SECRET" not in redact("Authorization: Bearer SECRETTOKEN.abc")
+    assert redact("postgresql://user:hunter2@db:5432/x") == "postgresql://user:***@db:5432/x"
+    assert redact("monkey=1 donkey=2") == "monkey=1 donkey=2"
+    assert redact(None) is None
+
+
+@pg
+def test_error_text_admin_only_and_redacted(client, pgdb):
+    """R7: users see that a run failed and when; admins also see the
+    (redacted) error text."""
+    _job(pgdb, "t124rd", "failed", datetime.utcnow() - timedelta(hours=2),
+         config={"dataset": "beta"},
+         error="HTTPStatusError: 403 for url 'https://x.example/api?api_key=SECRET999&q=1'")
+
+    client.state["principal"] = ADMIN
+    d = {x["key"]: x for x in client.get("/api/v1/datasets/status").json()["datasets"]}
+    assert d["t124_r_disp"]["status"] == "failing"
+    assert "api_key=***" in d["t124_r_disp"]["status_reason"]
+    assert "SECRET999" not in d["t124_r_disp"]["status_reason"]
+
+    client.state["principal"] = USER
+    d = {x["key"]: x for x in client.get("/api/v1/datasets/status").json()["datasets"]}
+    assert d["t124_r_disp"]["status"] == "failing"
+    assert "HTTPStatusError" not in d["t124_r_disp"]["status_reason"]
+    assert "x.example" not in d["t124_r_disp"]["status_reason"]
+
+
+@pg
+def test_in_process_run_counts_as_already_running(pgdb):
+    """R8: with WORKER_MODE=0 a recent pending/running ingestion_jobs row is
+    the only sign of a run in flight; in queue mode such rows are ignored
+    (PLAN_085 §8.2 zombies) because job_queue is the evidence."""
+    specs = [_spec("t124_ip", "dispatch:t124ip"), _spec("t124_ipold", "dispatch:t124ipo")]
+    _job(pgdb, "t124ip", "running", NOW - timedelta(minutes=5))
+    _job(pgdb, "t124ipo", "running", NOW - timedelta(days=3))   # an old zombie
+
+    _, by = _build(pgdb, specs, worker_mode=False)
+    assert "already_running" in [b["code"] for b in by["t124_ip"]["can_run"]["blockers"]]
+    assert by["t124_ipold"]["can_run"]["allowed"] is True
+    # the running row is not a terminal run
+    assert by["t124_ip"]["clocks"]["last_run_at"] is None
+    _heartbeat(pgdb)
+    _, by = _build(pgdb, specs, worker_mode=True)
+    assert "already_running" not in [b["code"] for b in by["t124_ip"]["can_run"]["blockers"]]
+
+
+@pg
+def test_run_lock_refuses_a_concurrent_request(client, pgdb, monkeypatch):
+    """R8: check-then-enqueue is serialized per dataset."""
+    import app.api.v1.jobs as jobs
+    import app.core.job_queue_service as jqs
+    import app.services.dataset_status as ds
+
+    monkeypatch.setattr(jqs, "WORKER_MODE", False)
+
+    async def fake_run(job_id, source, config):
+        return None
+
+    monkeypatch.setattr(jobs, "run_ingestion_job", fake_run)
+    engine = pgdb.get_bind()
+    with ds.run_lock(engine, "t124_r_disp") as held:
+        assert held
+        r = client.post("/api/v1/datasets/t124_r_disp/run")
+    assert r.status_code == 409
+    msgs = [b["message"] for b in r.json()["can_run"]["blockers"]]
+    assert any("another run request" in m for m in msgs)
+    # released: the request goes through, and a second one sees it in flight
+    r = client.post("/api/v1/datasets/t124_r_disp/run")
+    assert r.status_code == 202, r.text
+
+
+@pg
+def test_second_run_in_process_is_refused(client, pgdb, monkeypatch):
+    """R8: WORKER_MODE=0, the first POST's job is pending/running: the second is refused."""
+    import app.api.v1.jobs as jobs
+    import app.core.job_queue_service as jqs
+
+    monkeypatch.setattr(jqs, "WORKER_MODE", False)
+
+    async def fake_run(job_id, source, config):
+        return None   # leaves the job pending, as a long in-process run would
+
+    monkeypatch.setattr(jobs, "run_ingestion_job", fake_run)
+    assert client.post("/api/v1/datasets/t124_r_disp/run").status_code == 202
+    r = client.post("/api/v1/datasets/t124_r_disp/run")
+    assert r.status_code == 409
+    assert "already_running" in [b["code"] for b in r.json()["can_run"]["blockers"]]
+
+
+@pg
+def test_batch_missed_runs(pgdb):
+    """Scope: missed_runs_30d for nightly-batch datasets."""
+    specs = [_spec("t124_bm", "dispatch:t124bm", cadence="daily"),
+             _spec("t124_bm2", "dispatch:t124bm2", cadence="daily")]
+    batch = frozenset({"t124bm", "t124bm2"})
+    _, by = _build(pgdb, specs, batch_keys=batch)
+    assert by["t124_bm"]["schedule"]["missed_runs_30d"] is None   # no batch has ever run
+    # the batch has existed for 10 days (10 fires of 02:00 since NOW-10d 12:00)
+    _job(pgdb, "other_src", "success", NOW - timedelta(days=10), batch_run_id="batch_first")
+    for i in (1, 2, 3):
+        _job(pgdb, "t124bm", "success", NOW - timedelta(days=i, hours=9),
+             batch_run_id=f"batch_{i}")
+    _, by = _build(pgdb, specs, batch_keys=batch)
+    assert by["t124_bm"]["schedule"]["kind"] == "batch"
+    assert by["t124_bm"]["schedule"]["missed_runs_30d"] == 10 - 3
+    assert by["t124_bm2"]["schedule"]["missed_runs_30d"] == 10
+    # an older batch: the whole 30-day window counts
+    _job(pgdb, "other_src", "success", NOW - timedelta(days=45), batch_run_id="batch_old")
+    _, by = _build(pgdb, specs, batch_keys=batch)
+    assert by["t124_bm"]["schedule"]["missed_runs_30d"] == 30 - 3
+    assert by["t124_bm2"]["schedule"]["missed_runs_30d"] == 30
+
+
+@pytest.mark.unit
+def test_freshness_lists_never_run_catalog_sources():
+    """Scope (item 8): catalog producers never attempted, scheduled or SLA'd
+    are listed apart as never_run; attempted ones are not."""
+    from unittest.mock import MagicMock, patch
+
+    from app.api.v1.freshness import _catalog_job_sources, get_freshness_dashboard
+
+    catalog = _catalog_job_sources()
+    assert "bulk:sec_13f" in catalog
+    assert "sec_13f" in catalog["bulk:sec_13f"][1]
+
+    db = MagicMock()
+    q = MagicMock()
+    q.filter.return_value.all.return_value = []
+    q.all.return_value = []
+    q.distinct.return_value.all.return_value = [MagicMock(source="bulk:sec_13f")]
+    db.query.return_value = q
+    fake = {"bulk:sec_13f": ({"bulk:sec_13f"}, ["sec_13f"]),
+            "treasury": ({"treasury", "treasury:auctions"}, ["treasury_auctions"])}
+    with patch("app.services.data_watchdog.last_success_by_source", return_value={}), \
+            patch("app.api.v1.freshness._catalog_job_sources", return_value=fake):
+        result = get_freshness_dashboard(db=db)
+    assert result["never_run"] == [{"source": "treasury", "datasets": ["treasury_auctions"],
+                                    "freshness": "never_run"}]
+    assert result["never_run_count"] == 1
+    assert [s["source"] for s in result["sources"]] == ["bulk:sec_13f"]
+
+
+@pg
+def test_migration_0014_gives_up_on_a_held_lock():
+    """R5: the ALTER does not queue behind a long transaction forever."""
+    import time as _time
+
+    from sqlalchemy import create_engine, text
+
+    mod = _migration("0014_dataset_status")
+    engine = create_engine(PG_URL)
+    holder = engine.connect()
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("DROP TABLE IF EXISTS public.collection_audit_log CASCADE"))
+            conn.execute(text("DROP TABLE IF EXISTS public.ingestion_jobs CASCADE"))
+            conn.execute(text("CREATE TABLE ingestion_jobs (id SERIAL PRIMARY KEY, "
+                              "source VARCHAR(50) NOT NULL)"))
+        tx = holder.begin()
+        holder.execute(text("SELECT count(*) FROM ingestion_jobs"))   # AccessShareLock held
+
+        sql = mod.upgrade_sql(lock_timeout="100ms", attempts=3, sleep_s=0.05)
+        started = _time.monotonic()
+        with pytest.raises(Exception) as exc:
+            with engine.begin() as conn:
+                conn.execute(text(sql))
+        assert _time.monotonic() - started < 5
+        assert "lock" in str(exc.value).lower()
+        tx.rollback()
+
+        with engine.begin() as conn:   # the lock is gone: it applies
+            conn.execute(text(sql))
+            assert conn.execute(text(
+                "SELECT 1 FROM information_schema.columns WHERE table_name = 'ingestion_jobs' "
+                "AND column_name = 'dataset_key'")).first()
+    finally:
+        holder.close()
+        with engine.begin() as conn:
+            conn.execute(text("DROP TABLE IF EXISTS public.ingestion_jobs CASCADE"))
+        engine.dispose()
+
+
+@pg
+def test_startup_refuses_an_unmigrated_schema():
+    """R4/R6: a failed 0014 must stop startup, not break every IngestionJob query."""
+    from sqlalchemy import create_engine, text
+
+    from app.core.migrate import SchemaNotMigrated, missing_mapped_columns, verify_mapped_columns
+
+    engine = create_engine(PG_URL)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("DROP TABLE IF EXISTS public.collection_audit_log CASCADE"))
+            conn.execute(text("DROP TABLE IF EXISTS public.ingestion_jobs CASCADE"))
+        assert missing_mapped_columns(engine) == []      # fresh DB: create_all makes them
+        with engine.begin() as conn:
+            conn.execute(text("CREATE TABLE ingestion_jobs (id SERIAL PRIMARY KEY)"))
+            conn.execute(text("CREATE TABLE collection_audit_log (id SERIAL PRIMARY KEY, "
+                              "actor VARCHAR(255))"))
+        assert missing_mapped_columns(engine) == ["ingestion_jobs.dataset_key"]
+        with pytest.raises(SchemaNotMigrated, match="ingestion_jobs.dataset_key"):
+            verify_mapped_columns(engine)
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE ingestion_jobs ADD COLUMN dataset_key VARCHAR(64)"))
+        verify_mapped_columns(engine)
+    finally:
+        with engine.begin() as conn:
+            conn.execute(text("DROP TABLE IF EXISTS public.collection_audit_log CASCADE"))
+            conn.execute(text("DROP TABLE IF EXISTS public.ingestion_jobs CASCADE"))
+        engine.dispose()

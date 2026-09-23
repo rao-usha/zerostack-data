@@ -188,15 +188,17 @@ with several stage datasets stay NULL unless the run endpoint sets it.
 
 SPEC_128 already fixed both defects (never-succeeded sources that were
 attempted, scheduled or SLA'd are listed; no SLA and no schedule →
-`unknown`). Not changed here; catalog datasets that were never attempted are
-reported by `/datasets/status` as `never_run`.
+`unknown`). The review fix adds the remaining gap: catalog producers with no
+job, schedule or SLA at all are listed in a separate `never_run` list
+(`{source, datasets, freshness: "never_run"}`) with `never_run_count`, so
+`sources`/`total_sources` keep their meaning for the existing dashboard.
 
 ## Performance
 
 A constant number of statements per request, independent of the number of
-job/release/schedule rows: table existence, 5 run stores, schedules,
-per-schedule success, per-schedule runs, heartbeats, relation stats (≤ 12
-with a warm coverage cache), plus the combined coverage statement (SET LOCAL
+job/release/schedule rows: statement timeout, table existence, 5 run stores,
+nightly-batch runs, schedules, per-schedule success, per-schedule runs,
+heartbeats, relation stats (≤ 13 with a warm coverage cache), plus the combined coverage statement (SET LOCAL
 + SELECT) when the 5-minute cache is cold. Only when that combined statement
 fails (a coverage SQL that does not match the table on this database) does
 coverage fall back to one statement per coverage dataset -- bounded by the
@@ -205,6 +207,61 @@ APScheduler job store is read once when the in-process scheduler runs. Row
 counts are planner estimates from the one `pg_class` query
 (`rows_exact=false`) unless the SPEC_123 live cache holds exact counts. T14
 asserts the count is identical as rows grow and bounded cold and warm.
+
+## Review fixes (spec-124-fix)
+
+- **Unloaded releases** count only non-loaded, non-superseded rows discovered
+  by a *later* run than the newest loaded one (`discovered_at >`, not `>=`):
+  one run upserts every release in one transaction, so a backfill shares one
+  `discovered_at`, and its failed/skipped historic quarters no longer pin the
+  dataset to `behind`. Release keys cannot order releases (13F keys are
+  `01jun2026-31aug2026_form13f`). A newer release left unloaded by the same
+  run as a loaded one is left to the coverage clock.
+- **Coverage**: cache entries carry an error code (`timeout` | `error` |
+  `deadline`); `clocks.coverage_error` also says `missing_tables` / `empty`,
+  and the `unknown` reason names it. A query that failed or timed out is
+  remembered and run alone next time, so it cannot fail the combined
+  statement. Stale entries are served while a background thread refreshes
+  them: only a cold process computes coverage on the request path (combined
+  1.5 s, then alone at 1 s each within 3 s). The index on
+  `sec_financial_facts(filing_date)` is left to an operator (a CONCURRENTLY
+  build on the largest SEC table does not belong in a startup migration).
+- **statement_timeout** (5 s, `SET LOCAL`) on every fact query of a request.
+  A store that times out or errors is named in `degraded`; statuses that rest
+  on the absence of evidence (never_run, dormant, current, awaiting_upstream)
+  then become `unknown`. No 500.
+- **Error text** is redacted (`api_key=`, `token=`, `key=`, bearer tokens, URL
+  passwords …) and shown in `failing` reasons to admins only. SPEC_125 must
+  still escape every string (reasons, blocker/warning messages, schedule
+  names): they are DB text.
+- **already_running** with WORKER_MODE=0 also counts recent (24 h)
+  pending/running `ingestion_jobs` rows (in-process runs have no job_queue
+  row). The run route computes the verdict and enqueues under a per-dataset
+  advisory lock (`pg_try_advisory_lock(124, hashtext(key))`); a concurrent
+  request gets 409 `already_running`.
+- **Migration 0014** runs its ALTERs under `lock_timeout = 3s`, retried 10
+  times in PL/pgSQL subtransactions (locks released between attempts), then
+  fails. Startup (API lifespan and worker) then refuses to serve:
+  `app.core.migrate.verify_mapped_columns` raises `SchemaNotMigrated` when an
+  ORM-mapped, migration-added column (`ingestion_jobs.dataset_key`,
+  `collection_audit_log.actor`) is missing, instead of letting every
+  IngestionJob query fail with UndefinedColumn. Deploying with workers
+  stopped avoids the lock wait entirely.
+- **missed_runs_30d** for nightly-batch datasets: 02:00 cron fires since
+  max(30 days ago, first batch job ever) minus distinct `batch_run_id`s that
+  ran the dataset.
+
+| # | Test | Kind |
+|---|---|---|
+| R1 | releases sharing one discovered_at; later-run release is behind | PG |
+| R2 | slow coverage query: timeout reason, isolated next time; stale served while refreshing in background | PG |
+| R3 | T14: cold = warm + 2 exactly (combined coverage path), catalog specs whose SQL fails on the test DB excluded | PG |
+| R4 | startup refuses an unmigrated schema | PG |
+| R5 | migration 0014 gives up on a held lock, applies once released | PG |
+| R7 | redact(); error text admin-only | unit + PG |
+| R8 | in-process run is already_running; run lock refuses a concurrent request; second in-process POST refused | PG |
+| R9 | store timeout → degraded, absence statuses unknown | PG |
+| R10 | batch missed_runs_30d; freshness never_run list | PG + unit |
 
 ## Acceptance Criteria
 
@@ -253,7 +310,10 @@ asserts the count is identical as rows grow and bounded cold and warm.
 | app/services/data_watchdog.py | Modify (batched `last_success_by_schedule`) |
 | app/services/dataset_status.py | Create (facts, derivation, verdict, enqueue) |
 | app/api/v1/dataset_status.py | Create (router + pydantic models) |
-| app/main.py | Modify (register router + OpenAPI tag) |
+| app/main.py | Modify (register router + OpenAPI tag; verify mapped columns at startup) |
+| app/core/migrate.py | Modify (`verify_mapped_columns`, review fix) |
+| app/worker/main.py | Modify (verify mapped columns, review fix) |
+| app/api/v1/freshness.py | Modify (`never_run` list, review fix) |
 | tests/test_spec_124_dataset_status_api.py | Create |
 
 ## Out of scope

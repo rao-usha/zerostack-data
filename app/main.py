@@ -270,6 +270,9 @@ async def lifespan(app: FastAPI):
         engine = get_engine()
         create_tables(engine)
         logger.info("Database tables verified via create_all()")
+        # A failed migration must not leave ORM-mapped columns missing (SPEC_124)
+        from app.core.migrate import verify_mapped_columns
+        verify_mapped_columns(engine)
     except Exception as e:
         logger.error(f"create_tables failed: {e}")
         raise

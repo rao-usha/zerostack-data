@@ -599,10 +599,11 @@ def main():
     """Entrypoint for python -m app.worker.main."""
     # Apply migrations, then ensure tables exist (worker might start before API)
     from app.core.database import create_tables
-    from app.core.migrate import run_migrations
+    from app.core.migrate import run_migrations, verify_mapped_columns
 
     run_migrations()
     create_tables()
+    verify_mapped_columns()  # refuse to run jobs against an unmigrated schema
 
     asyncio.run(poll_loop())
 

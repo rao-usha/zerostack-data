@@ -20,7 +20,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.catalog.spec import KINDS, STATUS_PUBLIC
-from app.core.authz import require_admin
+from app.core.authz import ROLE_ADMIN, current_principal, require_admin
 from app.core.database import get_db
 from app.services import dataset_status as ds
 
@@ -58,6 +58,8 @@ class Clocks(BaseModel):
     expected_through: Optional[str] = None
     expectation_basis: Optional[str] = None  # coverage | last_success | None
     lag_days: Optional[int] = None
+    # why coverage_through is null: timeout | error | deadline | missing_tables | empty
+    coverage_error: Optional[str] = None
 
 
 class Releases(BaseModel):
@@ -127,6 +129,7 @@ class DatasetStatusResponse(BaseModel):
     count: int
     total: int
     worker: WorkerState
+    degraded: List[str] = []  # stores that timed out or failed this request
     datasets: List[DatasetStatus]
 
 
@@ -158,19 +161,24 @@ def get_dataset_status(
     source: Optional[str] = Query(None, description="source family, e.g. sec, fred, site_intel"),
     status: Optional[str] = Query(None, description=f"one of {', '.join(ds.STATUSES)}"),
     db: Session = Depends(get_db),
+    principal: Dict[str, Any] = Depends(current_principal),
 ):
     """Every catalog dataset with its run, publish and coverage clocks and one status.
 
     Statuses: current, awaiting_upstream, behind, stalled, failing, partial,
     blocked, dormant, never_run, unknown. There is no ``current`` without an
     expectation (an SLO): that is ``unknown``. ``summary`` counts the datasets
-    left after the kind/source/status_public filters.
+    left after the kind/source/status_public filters. Run error text (redacted)
+    appears in ``failing`` reasons for admins only. ``degraded`` names stores
+    that could not be read in time; statuses resting on missing evidence are
+    then ``unknown``.
     """
     _check("status_public", status_public, STATUS_PUBLIC)
     _check("kind", kind, KINDS)
     _check("status", status, ds.STATUSES)
     return ds.build_status(db, kind=kind, source=source, status_public=status_public,
-                           status=status)
+                           status=status,
+                           include_errors=(principal or {}).get("role") == ROLE_ADMIN)
 
 
 @router.post("/{key}/run", status_code=202, response_model=RunResponse,
@@ -192,16 +200,24 @@ def run_dataset(
     if spec is None:
         raise HTTPException(status_code=404, detail=f"unknown dataset {key!r}")
 
-    report = ds.build_status(db, specs=specs, keys=[key])
-    verdict = report["datasets"][0]["can_run"]
-    if not verdict["allowed"]:
-        codes = ", ".join(b["code"] for b in verdict["blockers"])
-        return JSONResponse(status_code=409, content={
-            "detail": f"{key} cannot run now: {codes}",
-            "can_run": verdict,
-        })
+    # Check and enqueue under one per-dataset lock: two concurrent requests
+    # cannot both pass the already_running check.
+    with ds.run_lock(db.get_bind(), key) as locked:
+        report = ds.build_status(db, specs=specs, keys=[key])
+        verdict = report["datasets"][0]["can_run"]
+        if not locked:
+            verdict["blockers"].append({
+                "code": "already_running",
+                "message": "another run request for this dataset is being processed"})
+            verdict["allowed"] = False
+        if not verdict["allowed"]:
+            codes = ", ".join(dict.fromkeys(b["code"] for b in verdict["blockers"]))
+            return JSONResponse(status_code=409, content={
+                "detail": f"{key} cannot run now: {codes}",
+                "can_run": verdict,
+            })
 
-    actor = principal.get("email") or principal.get("name")
-    out = ds.enqueue_run(db, spec, actor=actor, background_tasks=background_tasks, specs=specs)
+        actor = principal.get("email") or principal.get("name")
+        out = ds.enqueue_run(db, spec, actor=actor, background_tasks=background_tasks, specs=specs)
     logger.info(f"[dataset_status] {actor} queued {key} via {spec.producer}: {out}")
     return {**out, "can_run": verdict}

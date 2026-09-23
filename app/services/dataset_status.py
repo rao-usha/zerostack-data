@@ -22,19 +22,35 @@ number of datasets or job rows: one aggregate query per store, one for the
 schedules, one for per-schedule success, one for heartbeats, one for relation
 stats, one combined coverage statement (cached). Never a loop of queries per
 dataset -- ``get_all_source_health`` did 3 per source and took ~17 s.
+
+Every statement runs under ``statement_timeout`` (``STATUS_TIMEOUT_MS``). A
+store that times out is reported in ``degraded`` and statuses that rest on
+the *absence* of evidence (never_run, dormant, current, awaiting_upstream)
+become ``unknown`` rather than a 500 or a confident wrong answer.
+
+Coverage is cached per dataset and refreshed in the background once stale
+(stale-while-revalidate), so only a cold process start computes it on the
+request path. A coverage query that fails or times out is remembered and
+retried alone, so it cannot blank the others.
+
+Error text from run stores is redacted (``redact``) and only shown to admins.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import re
 import threading
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from sqlalchemy import text
+from sqlalchemy.engine import Engine
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.catalog.datasets import BATCH_SCHEDULED_DISPATCH
@@ -53,6 +69,9 @@ STATUSES = (
     "partial", "blocked", "dormant", "never_run", "unknown",
 )
 
+# Statuses that rest on the absence of evidence: unknown when a store could not be read.
+ABSENCE_STATUSES = ("never_run", "dormant", "current", "awaiting_upstream")
+
 FAILING_WINDOW = timedelta(days=30)     # a failure older than this is history, not "failing"
 ACTIVE_WINDOW = timedelta(hours=24)     # a queued/running row older than this is not "already running"
 WORKER_LIVE_MINUTES = 5
@@ -60,10 +79,13 @@ STALL_FACTOR = 1.5                      # same as the SPEC_128 watchdog
 MISSED_RUNS_WINDOW = timedelta(days=30)
 BATCH_CRON = "0 2 * * *"                # main.py registers the nightly batch at 02:00 UTC
 BATCH_JOB_ID = "batch_collection"
-COVERAGE_TTL_S = 300
-COVERAGE_TIMEOUT_MS = 3000             # the one combined coverage statement
-COVERAGE_FALLBACK_TIMEOUT_MS = 1000    # each statement when the combined one failed
-COVERAGE_FALLBACK_DEADLINE_S = 5.0     # after this, the rest are "unavailable" until the TTL
+STATUS_TIMEOUT_MS = 5000               # every fact query of a status request
+COVERAGE_TTL_S = 300                   # then served stale while a background refresh runs
+COVERAGE_ERROR_TTL_S = 60              # a failed/skipped coverage is retried sooner
+COVERAGE_TIMEOUT_MS = 1500             # the one combined coverage statement
+COVERAGE_FALLBACK_TIMEOUT_MS = 1000    # each statement run alone
+COVERAGE_FALLBACK_DEADLINE_S = 3.0     # after this, the rest are "deadline" until retried
+BACKGROUND_REFRESH = True              # stale coverage refreshed off the request path
 PARTIAL_PREFIX = "PARTIAL:"             # app.core.ingestion_job_sync.PARTIAL_PREFIX
 SUPERSEDED_PREFIX = "superseded:"       # app.ingest.bulk.retention.SUPERSEDED_PREFIX
 BUSY_PREFIX = "busy:"                   # app.marts.build_ledger.BUSY_PREFIX
@@ -86,6 +108,26 @@ RERUN_WARNINGS = {
     "currency_only": "keeps only the newest edition: a rerun refreshes currency, it does not recover history",
     "append_only": "a rerun appends rows; nothing is deduplicated",
 }
+
+
+# Secrets that upstream error strings can carry: query parameters of a
+# failed request URL (httpx puts the full URL in HTTPStatusError), bearer
+# tokens and URL userinfo.
+_SECRET_PARAM = re.compile(
+    r"(?i)\b((?:api[_-]?key|apikey|access[_-]?token|auth[_-]?token|token|key|secret|"
+    r"client[_-]?secret|password|passwd|pwd|registrationkey|signature|sig|userid)=)"
+    r"[^&\s'\"<>]+")
+_BEARER = re.compile(r"(?i)\b(bearer\s+)[A-Za-z0-9._~+/=-]+")
+_USERINFO = re.compile(r"(://[^/\s:@]+:)[^@\s/]+@")
+
+
+def redact(message: Optional[str]) -> Optional[str]:
+    """Mask secret values in a stored error string before it leaves the API."""
+    if not message:
+        return message
+    message = _SECRET_PARAM.sub(r"\1***", message)
+    message = _BEARER.sub(r"\1***", message)
+    return _USERINFO.sub(r"\1***@", message)
 
 
 def catalog_specs() -> Tuple[DatasetSpec, ...]:
@@ -183,6 +225,7 @@ class Evidence:
     last_success_at: Optional[datetime] = None
     success_duration_s: Optional[float] = None
     active: int = 0
+    jobs_active: int = 0     # recent pending/running ingestion_jobs (in-process runs, WORKER_MODE=0)
     mart_refusal: Optional[str] = None
     mart_running: bool = False
     releases: Optional[Dict[str, Any]] = None
@@ -265,8 +308,11 @@ FROM q
 GROUP BY job_type, bulk_source, source, dataset, sources
 """
 
-# Terminal rows only: PENDING/RUNNING ingestion_jobs rows are unreliable
-# (PLAN_085 §8.2); a live run is visible in job_queue.
+# Terminal rows are the run evidence: PENDING/RUNNING ingestion_jobs rows
+# are unreliable (PLAN_085 §8.2) and a worker run is visible in job_queue.
+# Recent pending/running rows are only counted (``active``): with
+# WORKER_MODE=0 an in-process run has no job_queue row, and they are the only
+# sign that one is in flight.
 _JOBS_SQL = """
 WITH j AS (
     SELECT id, {dataset_key} AS dataset_key, source, config->>'dataset' AS dataset,
@@ -279,22 +325,49 @@ WITH j AS (
            EXTRACT(EPOCH FROM (completed_at - started_at)) AS dur
     FROM ingestion_jobs
     WHERE LOWER(CAST(status AS TEXT)) IN ('success', 'failed')
+       OR (LOWER(CAST(status AS TEXT)) IN ('pending', 'running') AND created_at >= :active_since)
 )
 SELECT dataset_key, source, dataset,
-       MAX(ts) AS term_at,
-       (array_agg(stx ORDER BY ts DESC, id DESC))[1] AS term_status,
-       (array_agg(err ORDER BY ts DESC, id DESC))[1] AS term_error,
-       (array_agg(dur ORDER BY ts DESC, id DESC))[1] AS last_duration_s,
+       MAX(ts) FILTER (WHERE stx <> 'pending' AND stx <> 'running') AS term_at,
+       (array_agg(stx ORDER BY ts DESC, id DESC)
+            FILTER (WHERE stx <> 'pending' AND stx <> 'running'))[1] AS term_status,
+       (array_agg(err ORDER BY ts DESC, id DESC)
+            FILTER (WHERE stx <> 'pending' AND stx <> 'running'))[1] AS term_error,
+       (array_agg(dur ORDER BY ts DESC, id DESC)
+            FILTER (WHERE stx <> 'pending' AND stx <> 'running'))[1] AS last_duration_s,
        MAX(completed_at) FILTER (WHERE stx IN ('success', 'partial')) AS success_at,
        (array_agg(dur ORDER BY completed_at DESC)
-            FILTER (WHERE stx IN ('success', 'partial') AND dur IS NOT NULL))[1] AS success_duration_s
+            FILTER (WHERE stx IN ('success', 'partial') AND dur IS NOT NULL))[1] AS success_duration_s,
+       COUNT(*) FILTER (WHERE stx IN ('pending', 'running')) AS active
 FROM j
 GROUP BY dataset_key, source, dataset
 """
 
+# Nightly-batch jobs per producer in the missed-runs window, and the first
+# batch job at all (the batch cannot have missed nights before it existed).
+# Always at least one row, so a batch that has not run for the whole window
+# still reports its first_at (and every night as missed).
+_BATCH_RUNS_SQL = """
+SELECT b.source, b.dataset, b.runs, f.first_at
+FROM (SELECT MIN(created_at) AS first_at FROM ingestion_jobs WHERE batch_run_id IS NOT NULL) f
+LEFT JOIN (
+    SELECT source, config->>'dataset' AS dataset, COUNT(DISTINCT batch_run_id) AS runs
+    FROM ingestion_jobs
+    WHERE batch_run_id IS NOT NULL AND created_at >= :since
+    GROUP BY source, config->>'dataset'
+) b ON TRUE
+"""
+
 # Superseded rows (SPEC_122: failed + 'superseded:') are housekeeping, never
-# failures. "unloaded" = published and not loaded, at or after the newest
-# loaded release (old failed backfill quarters are not "behind").
+# failures. "unloaded" = published and not loaded, discovered by a LATER run
+# than the newest loaded release. discovered_at is the ledger insert time and
+# one run upserts every discovered release in one transaction (NOW() is the
+# transaction start), so a whole backfill shares one discovered_at: its
+# historic quarters that failed or were skipped (max_releases) are not
+# "behind" -- failures show in ``failed``/failing. Release keys do not sort by
+# period across sources (13F: '01jun2026-31aug2026_form13f'), so they cannot
+# order releases. A newer release left unloaded by the SAME run as a loaded
+# one is not counted here; the coverage clock still reports it.
 _RELEASES_SQL = """
 WITH r AS (
     SELECT id, source, release_key, status, bytes, discovered_at, fetched_at, loaded_at,
@@ -313,7 +386,7 @@ SELECT source,
        COUNT(*) FILTER (WHERE sup) AS superseded,
        COUNT(*) FILTER (WHERE status = 'failed' AND NOT sup) AS failed,
        COUNT(*) FILTER (WHERE status <> 'loaded' AND NOT sup
-                          AND (newest_loaded IS NULL OR discovered_at >= newest_loaded)) AS unloaded,
+                          AND (newest_loaded IS NULL OR discovered_at > newest_loaded)) AS unloaded,
        MAX(updated_at) FILTER (WHERE status = 'failed' AND NOT sup) AS last_failed_at,
        (array_agg(err ORDER BY updated_at DESC)
             FILTER (WHERE status = 'failed' AND NOT sup))[1] AS last_failed_error,
@@ -375,8 +448,8 @@ GROUP BY source
 """
 
 _RELATIONS_SQL = """
-SELECT n.nspname, c.relname, c.reltuples::bigint,
-       CASE WHEN c.relkind IN ('r', 'm') THEN pg_total_relation_size(c.oid) END
+SELECT n.nspname, c.relname, c.reltuples::bigint AS reltuples,
+       CASE WHEN c.relkind IN ('r', 'm') THEN pg_total_relation_size(c.oid) END AS size
 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
 WHERE c.relkind IN ('r', 'p', 'v', 'm', 'f')
   AND n.nspname NOT IN ('pg_catalog', 'information_schema')
@@ -394,6 +467,9 @@ class Facts:
     live_workers: int = 0
     last_heartbeat_at: Optional[datetime] = None
     relations: Dict[str, Tuple[Optional[int], Optional[int]]] = field(default_factory=dict)
+    batch_runs_30d: Dict[str, int] = field(default_factory=dict)   # dataset key -> nightly runs
+    batch_first_at: Optional[datetime] = None
+    degraded: List[str] = field(default_factory=list)              # stores that timed out/failed
 
     def ev(self, key: str) -> Evidence:
         return self.evidence.setdefault(key, Evidence())
@@ -414,15 +490,52 @@ def _payload_from_queue_row(r) -> Dict[str, Any]:
     }
 
 
+def _is_pg(db: Session) -> bool:
+    try:
+        return db.get_bind().dialect.name == "postgresql"
+    except Exception:
+        return False
+
+
+def _set_status_timeout(db: Session) -> None:
+    """Bound every fact query of this request (for the transaction's lifetime)."""
+    if _is_pg(db):
+        db.execute(text(f"SET LOCAL statement_timeout = {int(STATUS_TIMEOUT_MS)}"))
+
+
+def _degrade(db: Session, facts: Facts, store: str, e: Exception) -> None:
+    logger.warning(f"[dataset_status] {store} unavailable: {type(e).__name__}")
+    facts.degraded.append(store)
+    db.rollback()                 # the aborted transaction; the next statement starts a new one
+    try:
+        _set_status_timeout(db)
+    except SQLAlchemyError:
+        db.rollback()
+
+
+def _fetch(db: Session, facts: Facts, store: str, sql: str, params=None) -> List[Any]:
+    """Run one fact query; on timeout/error mark ``store`` degraded and go on."""
+    try:
+        return db.execute(text(sql), params or {}).mappings().all()
+    except SQLAlchemyError as e:
+        _degrade(db, facts, store, e)
+        return []
+
+
+def _err(value: Optional[str]) -> Optional[str]:
+    return redact(value) or None
+
+
 def collect_facts(db: Session, pmap: ProducerMap, now: datetime) -> Facts:
     facts = Facts(now=now)
+    _set_status_timeout(db)
     (has_queue, has_jobs, has_releases, has_marts, has_collectors, has_schedules,
      has_heartbeats, has_dataset_key) = db.execute(text(_EXISTS_SQL)).one()
     active_since = now - ACTIVE_WINDOW
 
     if has_queue:
-        rows = db.execute(text(_QUEUE_SQL), {"partial": PARTIAL_PREFIX + "%",
-                                             "active_since": active_since}).mappings().all()
+        rows = _fetch(db, facts, "job_queue", _QUEUE_SQL,
+                      {"partial": PARTIAL_PREFIX + "%", "active_since": active_since})
         for r in rows:
             producers = pmap.producers_for_queue(r["job_type"], _payload_from_queue_row(r))
             keys = {k for p in producers for k in pmap.datasets_for(p)}
@@ -430,13 +543,14 @@ def collect_facts(db: Session, pmap: ProducerMap, now: datetime) -> Facts:
                 ev = facts.ev(key)
                 ev.add(Event("job_queue", r["last_at"], r["last_status"], _f(r["last_duration_s"])))
                 if r["term_at"]:
-                    ev.add(Event("job_queue", r["term_at"], r["term_status"], None, r["term_error"] or None))
+                    ev.add(Event("job_queue", r["term_at"], r["term_status"], None, _err(r["term_error"])))
                 ev.success(r["success_at"], _f(r["success_duration_s"]))
                 ev.active += int(r["active"] or 0)
 
     if has_jobs:
         sql = _JOBS_SQL.format(dataset_key="dataset_key" if has_dataset_key else "CAST(NULL AS TEXT)")
-        rows = db.execute(text(sql), {"partial": PARTIAL_PREFIX + "%"}).mappings().all()
+        rows = _fetch(db, facts, "ingestion_jobs", sql,
+                      {"partial": PARTIAL_PREFIX + "%", "active_since": active_since})
         for r in rows:
             source = r["source"] or ""
             if source.startswith("job:"):
@@ -448,13 +562,24 @@ def collect_facts(db: Session, pmap: ProducerMap, now: datetime) -> Facts:
                     pmap.producer_for_job(source, {"dataset": r["dataset"]} if r["dataset"] else {}))
             for key in keys:
                 ev = facts.ev(key)
-                ev.add(Event("ingestion_jobs", r["term_at"], r["term_status"],
-                             _f(r["last_duration_s"]), r["term_error"] or None))
+                if r["term_at"]:
+                    ev.add(Event("ingestion_jobs", r["term_at"], r["term_status"],
+                                 _f(r["last_duration_s"]), _err(r["term_error"])))
                 ev.success(r["success_at"], _f(r["success_duration_s"]))
+                ev.jobs_active += int(r["active"] or 0)
+
+        for r in _fetch(db, facts, "ingestion_jobs (batch runs)", _BATCH_RUNS_SQL,
+                        {"since": now - MISSED_RUNS_WINDOW}):
+            facts.batch_first_at = _naive_utc(r["first_at"])
+            if not r["source"]:
+                continue
+            producer = pmap.producer_for_job(r["source"], {"dataset": r["dataset"]} if r["dataset"] else {})
+            for key in pmap.datasets_for(producer):
+                facts.batch_runs_30d[key] = facts.batch_runs_30d.get(key, 0) + int(r["runs"] or 0)
 
     if has_releases:
-        rows = db.execute(text(_RELEASES_SQL),
-                          {"superseded": SUPERSEDED_PREFIX + "%"}).mappings().all()
+        rows = _fetch(db, facts, "source_release", _RELEASES_SQL,
+                      {"superseded": SUPERSEDED_PREFIX + "%"})
         for r in rows:
             for key in pmap.datasets_for(f"bulk:{r['source']}"):
                 ev = facts.ev(key)
@@ -473,11 +598,11 @@ def collect_facts(db: Session, pmap: ProducerMap, now: datetime) -> Facts:
                     ev.success(r["last_loaded_at"])
                 if r["last_failed_at"]:
                     ev.add(Event("source_release", r["last_failed_at"], "failed", None,
-                                 r["last_failed_error"] or None))
+                                 _err(r["last_failed_error"])))
 
     if has_marts:
-        rows = db.execute(text(_MARTS_SQL), {"busy": BUSY_PREFIX + "%",
-                                             "active_since": active_since}).mappings().all()
+        rows = _fetch(db, facts, "mart_build", _MARTS_SQL,
+                      {"busy": BUSY_PREFIX + "%", "active_since": active_since})
         for r in rows:
             job_type = MART_JOB_TYPES.get(r["mart"])
             if not job_type:
@@ -486,15 +611,16 @@ def collect_facts(db: Session, pmap: ProducerMap, now: datetime) -> Facts:
                 ev = facts.ev(key)
                 if r["last_at"]:
                     ev.add(Event("mart_build", r["last_at"], r["last_status"],
-                                 _f(r["last_duration_s"]), r["last_reason"] or None))
+                                 _f(r["last_duration_s"]), _err(r["last_reason"])))
                 ev.success(r["success_at"], _f(r["success_duration_s"]))
                 if r["last_status"] == "refused":
-                    ev.mart_refusal = r["last_reason"] or "refused on its inputs"
+                    ev.mart_refusal = _err(r["last_reason"]) or "refused on its inputs"
                 if r["running"]:
                     ev.mart_running = True
 
     if has_collectors:
-        rows = db.execute(text(_COLLECTORS_SQL), {"active_since": active_since}).mappings().all()
+        rows = _fetch(db, facts, "site_intel_collection_job", _COLLECTORS_SQL,
+                      {"active_since": active_since})
         for r in rows:
             for key in pmap.datasets_for(f"collector:{r['source']}"):
                 ev = facts.ev(key)
@@ -502,101 +628,186 @@ def collect_facts(db: Session, pmap: ProducerMap, now: datetime) -> Facts:
                              _f(r["last_duration_s"])))
                 if r["term_at"]:
                     ev.add(Event("site_intel_collection_job", r["term_at"], r["term_status"],
-                                 None, r["term_error"] or None))
+                                 None, _err(r["term_error"])))
                 ev.success(r["success_at"], _f(r["success_duration_s"]))
                 ev.active += int(r["active"] or 0)
 
     if has_schedules:
-        facts.schedules = [dict(r) for r in db.execute(text(
+        facts.schedules = [dict(r) for r in _fetch(
+            db, facts, "ingestion_schedules",
             "SELECT id, name, source, config, frequency, cron_expression, is_active, "
-            "next_run_at, created_at FROM ingestion_schedules ORDER BY id"
-        )).mappings().all()]
+            "next_run_at, created_at FROM ingestion_schedules ORDER BY id")]
         if facts.schedules and has_jobs:
             from app.services.data_watchdog import last_success_by_schedule
 
             if has_queue:
-                facts.schedule_success = last_success_by_schedule(db)
-            facts.schedule_runs_30d = {int(r[0]): int(r[1]) for r in db.execute(text(
-                "SELECT schedule_id, COUNT(*) FROM ingestion_jobs "
-                "WHERE schedule_id IS NOT NULL AND created_at >= :since GROUP BY schedule_id"
-            ), {"since": now - MISSED_RUNS_WINDOW}).all()}
+                try:
+                    facts.schedule_success = last_success_by_schedule(db)
+                except SQLAlchemyError as e:
+                    _degrade(db, facts, "schedule success", e)
+            facts.schedule_runs_30d = {int(r["schedule_id"]): int(r["n"]) for r in _fetch(
+                db, facts, "schedule runs",
+                "SELECT schedule_id, COUNT(*) AS n FROM ingestion_jobs "
+                "WHERE schedule_id IS NOT NULL AND created_at >= :since GROUP BY schedule_id",
+                {"since": now - MISSED_RUNS_WINDOW})}
 
     if has_heartbeats:
-        live, last = db.execute(text(
-            "SELECT COUNT(*) FILTER (WHERE last_seen_at >= :cutoff), MAX(last_seen_at) "
-            "FROM worker_heartbeats"
-        ), {"cutoff": now - timedelta(minutes=WORKER_LIVE_MINUTES)}).one()
-        facts.live_workers = int(live or 0)
-        facts.last_heartbeat_at = _naive_utc(last)
+        for r in _fetch(db, facts, "worker_heartbeats",
+                        "SELECT COUNT(*) FILTER (WHERE last_seen_at >= :cutoff) AS live, "
+                        "MAX(last_seen_at) AS last FROM worker_heartbeats",
+                        {"cutoff": now - timedelta(minutes=WORKER_LIVE_MINUTES)}):
+            facts.live_workers = int(r["live"] or 0)
+            facts.last_heartbeat_at = _naive_utc(r["last"])
 
     from app.catalog.tables import normalize
 
-    for schema, name, tuples, nbytes in db.execute(text(_RELATIONS_SQL)).all():
+    for r in _fetch(db, facts, "relation stats", _RELATIONS_SQL):
+        tuples, nbytes = r["reltuples"], r["size"]
         rows = int(tuples) if tuples is not None and tuples >= 0 else None
-        facts.relations[normalize(schema, name)] = (rows, int(nbytes) if nbytes is not None else None)
+        facts.relations[normalize(r["nspname"], r["relname"])] = (
+            rows, int(nbytes) if nbytes is not None else None)
     return facts
 
 
 # =============================================================================
-# Coverage (one combined statement, cached)
+# Coverage (cached; one combined statement; slow queries isolated)
 # =============================================================================
 
-_coverage_cache: Dict[str, Tuple[float, Any]] = {}
+# coverage key -> (monotonic time, value, error). error: None | 'timeout' |
+# 'error' | 'deadline' (not tried: the time budget ran out).
+_coverage_cache: Dict[str, Tuple[float, Any, Optional[str]]] = {}
+_coverage_suspect: set = set()      # failed/timed out last time: run alone
+_coverage_refreshing: set = set()   # a background refresh is in flight
 _coverage_lock = threading.Lock()
+
+COVERAGE_ERRORS = {
+    "timeout": "the coverage query timed out",
+    "error": "the coverage query failed",
+    "deadline": "not computed yet (time budget spent); retried shortly",
+    "missing_tables": "its tables do not exist",
+    "empty": "the coverage query returned no date",
+}
 
 
 def clear_cache() -> None:
     with _coverage_lock:
         _coverage_cache.clear()
+        _coverage_suspect.clear()
 
 
 def _coverage_key(spec: DatasetSpec) -> str:
     return f"{spec.key}\x00{spec.coverage_sql}"
 
 
-def coverage_for(db: Session, specs: Sequence[DatasetSpec]) -> Dict[str, Any]:
-    """spec.key -> coverage value (date/datetime/None), for specs whose tables
-    exist. All cache misses in ONE statement under a statement timeout; if
-    that statement fails (one bad coverage SQL), each is retried alone."""
-    out: Dict[str, Any] = {}
-    misses: List[DatasetSpec] = []
+def _is_timeout(e: Exception) -> bool:
+    orig = getattr(e, "orig", e)
+    code = getattr(orig, "pgcode", None) or getattr(orig, "sqlstate", None)
+    return code == "57014" or "statement timeout" in str(e).lower()
+
+
+def _local_timeout(conn, engine, timeout_ms: int) -> None:
+    if engine.dialect.name == "postgresql":
+        conn.execute(text(f"SET LOCAL statement_timeout = {int(timeout_ms)}"))
+
+
+def _compute_coverage(engine, specs: Sequence[DatasetSpec]) -> Dict[str, Tuple[Any, Optional[str]]]:
+    """Compute and cache coverage for ``specs``: one combined statement for
+    those not known to be slow or broken; the rest (and all of them, if the
+    combined one fails) one by one, each under its own timeout, within
+    ``COVERAGE_FALLBACK_DEADLINE_S``."""
+    with _coverage_lock:
+        alone = [s for s in specs if _coverage_key(s) in _coverage_suspect]
+    combined = [s for s in specs if s not in alone]
+    values: Dict[str, Tuple[Any, Optional[str]]] = {}
+    if combined:
+        select = ", ".join(
+            f"({s.coverage_sql.strip().rstrip(';')}) AS c{i}" for i, s in enumerate(combined))
+        try:
+            with engine.connect() as conn:
+                with conn.begin():
+                    _local_timeout(conn, engine, COVERAGE_TIMEOUT_MS)
+                    row = conn.execute(text(f"SELECT {select}")).one()
+            values.update({s.key: (row[i], None) for i, s in enumerate(combined)})
+        except Exception as e:
+            logger.info(f"[dataset_status] combined coverage failed ({type(e).__name__}); one by one")
+            alone = combined + alone
+    if alone:
+        started = time.monotonic()
+        with engine.connect() as conn:
+            for s in alone:
+                if time.monotonic() - started > COVERAGE_FALLBACK_DEADLINE_S:
+                    values[s.key] = (None, "deadline")
+                    continue
+                try:
+                    with conn.begin():
+                        _local_timeout(conn, engine, COVERAGE_FALLBACK_TIMEOUT_MS)
+                        values[s.key] = (conn.execute(text(s.coverage_sql)).scalar(), None)
+                except Exception as e:
+                    kind = "timeout" if _is_timeout(e) else "error"
+                    logger.info(f"[dataset_status] coverage for {s.key}: {kind} ({type(e).__name__})")
+                    values[s.key] = (None, kind)
+    with _coverage_lock:
+        for s in specs:
+            value, error = values.get(s.key, (None, "deadline"))
+            key = _coverage_key(s)
+            _coverage_cache[key] = (time.monotonic(), value, error)
+            if error in ("timeout", "error"):
+                _coverage_suspect.add(key)
+            elif error is None:
+                _coverage_suspect.discard(key)
+    return values
+
+
+def _refresh(engine, specs: Sequence[DatasetSpec]) -> None:
+    """Recompute stale entries, in a background thread when we can."""
+    with _coverage_lock:
+        todo = [s for s in specs if _coverage_key(s) not in _coverage_refreshing]
+        _coverage_refreshing.update(_coverage_key(s) for s in todo)
+    if not todo:
+        return
+
+    def work():
+        try:
+            _compute_coverage(engine, todo)
+        except Exception as e:
+            logger.warning(f"[dataset_status] coverage refresh failed: {type(e).__name__}")
+        finally:
+            with _coverage_lock:
+                _coverage_refreshing.difference_update(_coverage_key(s) for s in todo)
+
+    if BACKGROUND_REFRESH and isinstance(engine, Engine):
+        threading.Thread(target=work, name="dataset-status-coverage", daemon=True).start()
+    else:
+        work()
+
+
+def coverage_for(db: Session, specs: Sequence[DatasetSpec]) -> Dict[str, Tuple[Any, Optional[str]]]:
+    """spec.key -> (coverage value, error code), for specs whose tables exist.
+
+    Fresh entries come from the cache. Stale ones are served as they are
+    while a background refresh recomputes them (stale-while-revalidate).
+    Only entries never computed in this process are computed on the request
+    path. A real NULL is ``(None, None)``; a failure carries its error code.
+    """
+    out: Dict[str, Tuple[Any, Optional[str]]] = {}
+    cold: List[DatasetSpec] = []
+    stale: List[DatasetSpec] = []
     now_mono = time.monotonic()
     with _coverage_lock:
         for spec in specs:
             hit = _coverage_cache.get(_coverage_key(spec))
-            if hit and now_mono - hit[0] < COVERAGE_TTL_S:
-                out[spec.key] = hit[1]
-            else:
-                misses.append(spec)
-    if not misses:
-        return out
-
-    engine = db.get_bind()
-    values: Dict[str, Any] = {}
-    select = ", ".join(
-        f"({s.coverage_sql.strip().rstrip(';')}) AS c{i}" for i, s in enumerate(misses)
-    )
-    try:
-        with engine.connect() as conn:
-            with conn.begin():
-                conn.execute(text(f"SET LOCAL statement_timeout = {int(COVERAGE_TIMEOUT_MS)}"))
-                row = conn.execute(text(f"SELECT {select}")).one()
-        values = {s.key: row[i] for i, s in enumerate(misses)}
-    except Exception as e:
-        logger.info(f"[dataset_status] combined coverage failed ({type(e).__name__}); per dataset")
-        from app.catalog.live import coverage_through
-
-        started = time.monotonic()
-        for s in misses:
-            if time.monotonic() - started > COVERAGE_FALLBACK_DEADLINE_S:
-                values[s.key] = None  # unavailable this time; retried after the TTL
+            if hit is None:
+                cold.append(spec)
                 continue
-            res = coverage_through(engine, s, timeout_ms=COVERAGE_FALLBACK_TIMEOUT_MS)
-            values[s.key] = res["coverage_through"]
-    with _coverage_lock:
-        for s in misses:
-            _coverage_cache[_coverage_key(s)] = (time.monotonic(), values.get(s.key))
-    out.update(values)
+            out[spec.key] = (hit[1], hit[2])
+            ttl = COVERAGE_TTL_S if hit[2] is None else COVERAGE_ERROR_TTL_S
+            if now_mono - hit[0] >= ttl:
+                stale.append(spec)
+    engine = db.get_bind()
+    if cold:
+        out.update(_compute_coverage(engine, cold))
+    if stale:
+        _refresh(engine, stale)
     return out
 
 
@@ -720,6 +931,7 @@ class Context:
     live_jobs: Dict[str, datetime]
     batch_defaults: Dict[str, Dict[str, Any]]
     schedules_by_dataset: Dict[str, List[Dict[str, Any]]]
+    include_errors: bool = True     # raw (redacted) run error text: admins only
     _key_memo: Dict[str, Optional[str]] = field(default_factory=dict)
 
     def missing_key(self, source: str) -> Optional[str]:
@@ -800,7 +1012,10 @@ def can_run_verdict(spec: DatasetSpec, ev: Evidence, ctx: Context) -> Dict[str, 
             blockers.append({"code": "no_live_worker",
                              "message": "no worker heartbeat in the last "
                                         f"{WORKER_LIVE_MINUTES} min; the job would wait in the queue"})
-    if ev.active or ev.mart_running:
+    # With WORKER_MODE=0 an in-process run leaves no job_queue row: its
+    # pending/running ingestion_jobs row is the only sign it is in flight.
+    in_process = 0 if ctx.worker_mode else ev.jobs_active
+    if ev.active or in_process or ev.mart_running:
         blockers.append({"code": "already_running",
                          "message": "a run of this producer is already queued or running"})
 
@@ -859,9 +1074,25 @@ def _tables(spec: DatasetSpec, ctx: Context, claimed) -> Tuple[List[Dict[str, An
     return tables, None
 
 
+def _batch_missed(key: str, facts: Facts) -> Optional[int]:
+    """Nights the nightly batch should have run this dataset in the window
+    (not before the first batch job ever) minus the batch runs that included it."""
+    if facts.batch_first_at is None:
+        return None
+    start = max(facts.now - MISSED_RUNS_WINDOW, facts.batch_first_at)
+    fires = _cron_fires(BATCH_CRON, start, facts.now)
+    if fires is None:
+        return None
+    return max(0, fires - facts.batch_runs_30d.get(key, 0))
+
+
 def derive(spec: DatasetSpec, ev: Evidence, ctx: Context, coverage: Any,
-           has_rows: bool) -> Tuple[str, str, List[Dict[str, str]], Optional[Dict[str, Any]], Dict[str, Any]]:
-    """(status, reason, blockers, schedule block, clocks) for one dataset."""
+           has_rows: bool, coverage_error: Optional[str] = None,
+           ) -> Tuple[str, str, List[Dict[str, str]], Optional[Dict[str, Any]], Dict[str, Any]]:
+    """(status, reason, blockers, schedule block, clocks) for one dataset.
+
+    ``coverage_error``: why ``coverage`` is None when that is not a real NULL
+    (a ``COVERAGE_ERRORS`` code)."""
     now = ctx.now
     cadence_h = CADENCE_HOURS.get(spec.cadence)
 
@@ -889,7 +1120,8 @@ def derive(spec: DatasetSpec, ev: Evidence, ctx: Context, coverage: Any,
                     "cron": BATCH_CRON, "active": True, "cadence_hours": cadence_h,
                     "next_run_at": _iso(live_next),
                     "next_run_source": "apscheduler" if live_next else None,
-                    "last_success_at": _iso(ev.last_success_at), "missed_runs_30d": None}
+                    "last_success_at": _iso(ev.last_success_at),
+                    "missed_runs_30d": _batch_missed(spec.key, ctx.facts)}
         if cadence_h and stall_reason is None:
             since = ev.last_success_at
             if since is None and ev.last_run is not None:
@@ -925,6 +1157,8 @@ def derive(spec: DatasetSpec, ev: Evidence, ctx: Context, coverage: Any,
         "expected_through": expected.isoformat() if expected else None,
         "expectation_basis": basis,
         "lag_days": lag_days,
+        "coverage_error": (coverage_error or "empty")
+        if spec.coverage_sql and cov_date is None else None,
     }
 
     # --- blockers ---------------------------------------------------------
@@ -945,7 +1179,7 @@ def derive(spec: DatasetSpec, ev: Evidence, ctx: Context, coverage: Any,
     if blockers:
         return "blocked", blockers[0]["message"], blockers, schedule, clocks
     if recent and term.status in ("failed", "refused"):
-        why = f": {term.error}" if term.error else ""
+        why = f": {term.error}" if term.error and ctx.include_errors else ""
         return "failing", f"latest run failed {_iso(term.at)} ({term.store}){why}", blockers, schedule, clocks
     if recent and term.status == "partial":
         return "partial", f"latest run succeeded only in part {_iso(term.at)}", blockers, schedule, clocks
@@ -970,7 +1204,9 @@ def derive(spec: DatasetSpec, ev: Evidence, ctx: Context, coverage: Any,
                 blockers, schedule, clocks
         return "behind", "no success within cadence + SLO", blockers, schedule, clocks
     if cov_date is None:
-        return "unknown", "coverage unavailable", blockers, schedule, clocks
+        code = clocks["coverage_error"] or "empty"
+        return ("unknown", f"coverage unavailable: {COVERAGE_ERRORS.get(code, code)}",
+                blockers, schedule, clocks)
     if cov_date >= expected:
         return "current", f"coverage {cov_date} meets expected {expected}", blockers, schedule, clocks
     publish = rel["last_publish_at"] if rel else None
@@ -1029,9 +1265,13 @@ def build_status(
     status_public: Optional[str] = None,
     status: Optional[str] = None,
     keys: Optional[Iterable[str]] = None,
+    include_errors: bool = True,
 ) -> Dict[str, Any]:
     """The whole status payload. ``summary`` counts the datasets left after
-    the kind/source/status_public filters (before the status filter)."""
+    the kind/source/status_public filters (before the status filter).
+
+    ``include_errors``: put the (redacted) text of the latest run error in a
+    ``failing`` reason. Callers pass False for non-admin principals."""
     all_specs = tuple(specs) if specs is not None else tuple(catalog_specs())
     now = now or datetime.utcnow()
     pmap = ProducerMap(all_specs)
@@ -1052,6 +1292,7 @@ def build_status(
         live_jobs=_live_jobs(_default_scheduler() if scheduler == "default" else scheduler),
         batch_defaults=_batch_defaults(pmap),
         schedules_by_dataset=_schedules_by_dataset(facts, pmap),
+        include_errors=include_errors,
     )
 
     from app.catalog.live import claimed_tables
@@ -1066,6 +1307,8 @@ def build_status(
                 all(t in facts.relations for t in spec.tables):
             need_coverage.append(spec)
     coverage = coverage_for(db, need_coverage) if need_coverage else {}
+    if facts.degraded:
+        logger.warning(f"[dataset_status] degraded: {', '.join(facts.degraded)}")
 
     datasets = []
     summary = {s: 0 for s in STATUSES}
@@ -1073,9 +1316,19 @@ def build_status(
         ev = facts.evidence.get(spec.key) or Evidence()
         existing = [t for t in tables if t["exists"]]
         rows_total = sum(t["rows"] or 0 for t in existing) if existing else None
-        cov = cached_cov if cached_cov is not None else coverage.get(spec.key)
+        if cached_cov is not None:
+            cov, cov_error = cached_cov, None
+        elif spec in need_coverage:
+            cov, cov_error = coverage.get(spec.key, (None, "deadline"))
+        else:
+            cov, cov_error = None, "missing_tables"
         st, reason, blockers, schedule, clocks = derive(
-            spec, ev, ctx, cov, has_rows=bool(rows_total))
+            spec, ev, ctx, cov, has_rows=bool(rows_total), coverage_error=cov_error)
+        if facts.degraded and st in ABSENCE_STATUSES:
+            # these rest on evidence NOT being there; some of it could not be read
+            reason = (f"evidence incomplete ({', '.join(facts.degraded)} unavailable); "
+                      f"would be {st}: {reason}")
+            st = "unknown"
         summary[st] += 1
         rel = ev.releases
         datasets.append({
@@ -1112,6 +1365,7 @@ def build_status(
             "live_workers": facts.live_workers,
             "last_heartbeat_at": _iso(facts.last_heartbeat_at),
         },
+        "degraded": list(facts.degraded),
         "datasets": datasets,
     }
 
@@ -1119,6 +1373,39 @@ def build_status(
 # =============================================================================
 # Run
 # =============================================================================
+
+
+# Advisory-lock namespace for run requests (first int of the two-int form;
+# bulk source locks use 122).
+RUN_LOCK_NAMESPACE = 124
+
+
+@contextmanager
+def run_lock(engine, key: str):
+    """Serialize run requests for one dataset across API processes.
+
+    Yields False if another request holds it. The verdict is computed and the
+    job enqueued while the lock is held, so two concurrent POSTs cannot both
+    pass the ``already_running`` check. Non-PostgreSQL engines always get it.
+    """
+    if getattr(getattr(engine, "dialect", None), "name", "") != "postgresql":
+        yield True
+        return
+    conn = engine.connect().execution_options(isolation_level="AUTOCOMMIT")
+    acquired = False
+    try:
+        acquired = bool(conn.execute(
+            text("SELECT pg_try_advisory_lock(:ns, hashtext(:k))"),
+            {"ns": RUN_LOCK_NAMESPACE, "k": key},
+        ).scalar())
+        yield acquired
+    finally:
+        try:
+            if acquired:
+                conn.execute(text("SELECT pg_advisory_unlock(:ns, hashtext(:k))"),
+                             {"ns": RUN_LOCK_NAMESPACE, "k": key})
+        finally:
+            conn.close()
 
 
 def dispatch_target(key: str, pmap: ProducerMap, batch_defaults: Dict[str, Dict[str, Any]]
