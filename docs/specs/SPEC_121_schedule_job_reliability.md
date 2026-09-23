@@ -155,6 +155,11 @@ runs with the error (or "interrupted" on cancellation).
 | T14 | `test_cleanup_stuck_jobs_runs_sweep` (PG) | hook wired |
 | T15 | `test_schedule_unblocks_after_2x_cadence` (PG) | reconcile + proceed; young → WARNING skip |
 | T16 | `test_bulk_ingest_finishes_when_discover_raises` (PG) | finally |
+| T17 | `test_sweep_links_queue_rows_with_null_job_table_id` (PG) | review fix: sweep uses the worker link rule |
+| T18 | `test_unstick_links_resubmitted_queue_row` (PG) | review fix: unstick sets job_table_id, NULL-linked rows count as live |
+| T19 | `test_schedule_cancels_hung_blocker_after_2x_cadence` (PG) | review fix: hung live blocker cancelled, schedule runs |
+| T20 | `test_schedule_keeps_young_live_blocker` (PG) | live blocker under 2x cadence untouched |
+| T21 | `test_heartbeat_stops_cancelled_blocker` (PG) | the cancellation reaches the worker heartbeat |
 
 ## Files to Create/Modify
 
@@ -165,6 +170,7 @@ runs with the error (or "interrupted" on cancellation).
 | app/worker/executors/bulk_ingest.py | Modify (finally) |
 | app/core/scheduler_service.py | Modify (job_defaults, grace, catch-up, skip handling, sweep hook) |
 | docker-compose.yml | Modify (restart, depends_on, pin) |
+| app/api/v1/jobs.py | Modify (unstick: set job_table_id; payload-linked queue rows count as live) |
 | tests/test_spec_121_schedule_job_reliability.py | Create |
 
 ## Out of Scope
@@ -174,6 +180,25 @@ runs with the error (or "interrupted" on cancellation).
 - A catch-up pass for runs missed by more than the grace (PLAN_085 D4).
 - Watchdog/alerting (SPEC_128). `/health` status casing (SPEC_128).
 - Pointing `DATABASE_URL` at `cloudsqlproxy:5432` directly (`.env`, live).
+
+## Review fixes (spec-121-fix)
+
+- **Sweep link rule.** The sweep's LATERAL join now matches
+  `linked_ingestion_job_id`: `payload->>'ingestion_job_id' = ij.id` and
+  `job_table_id = ij.id OR job_table_id IS NULL`. Before this, rows resubmitted
+  by `/batch/{id}/unstick` (which passed no `job_table_id`) looked queue-less
+  and were failed after 24 h while their worker job was live. Unstick now also
+  passes `job_table_id=job_id`, and its "already queued" check accepts
+  payload-linked rows.
+- **Hung blockers.** When a schedule's blocker is older than 2x cadence and
+  its queue row is still live (claimed/running but hung, since job:/bulk
+  payloads get no worker execution timeout, or pending with no worker), the
+  scheduler cancels the queue row (`cancel_blocking_queue_job`: status failed,
+  "Cancelled by scheduler: ..." message, which the worker heartbeat turns into
+  `JobCancelledError`), fails the IngestionJob, and runs the schedule.
+- **Compose.** api/worker wait for `postgres` (healthy) again and for
+  `cloudsqlproxy` (healthy, `required: false`). Without GCP credentials the
+  proxy never gets healthy; Compose warns and starts api/worker anyway.
 
 ## Feedback History
 

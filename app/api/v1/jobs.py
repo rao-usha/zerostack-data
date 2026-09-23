@@ -2059,7 +2059,9 @@ def unstick_batch(batch_run_id: str, db: Session = Depends(get_db)):
               AND ij.created_at < NOW() - INTERVAL '2 hours'
               AND NOT EXISTS (
                   SELECT 1 FROM job_queue jq
-                  WHERE jq.job_table_id = ij.id
+                  WHERE (jq.job_table_id = ij.id
+                         OR (jq.job_table_id IS NULL
+                             AND jq.payload ->> 'ingestion_job_id' = ij.id::text))
                     AND jq.status IN ('pending', 'claimed', 'running')
               )
         """),
@@ -2086,6 +2088,7 @@ def unstick_batch(batch_run_id: str, db: Session = Depends(get_db)):
                             "trigger": "batch",
                         },
                         priority=5,
+                        job_table_id=job_id,  # SPEC_121: link for write-back/sweep
                     )
                     resubmitted += 1
 

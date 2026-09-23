@@ -126,13 +126,17 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    # SPEC_121: .env DATABASE_URL points at the Cloud SQL proxy
-    # (host.docker.internal:5435), not the local postgres service, so wait for
-    # the proxy. Local-only dev (DATABASE_URL unset -> postgres) runs e.g.
-    # `docker-compose up -d postgres && docker-compose up -d --no-deps api worker`.
+    # SPEC_121: .env DATABASE_URL points at the Cloud SQL proxy, so wait for
+    # it to be healthy. `required: false` (Compose >= 2.20) keeps local-only dev
+    # working: without GCP credentials the proxy never gets healthy, Compose
+    # warns and starts api/worker anyway against the default local postgres,
+    # which is still waited for.
     depends_on:
+      postgres:
+        condition: service_healthy
       cloudsqlproxy:
         condition: service_healthy
+        required: false
     restart: unless-stopped
     # Make the host machine reachable from inside the container as
     # `host.docker.internal`. Required for talking to cloud-sql-proxy (running
@@ -169,8 +173,11 @@ services:
       MAX_CONCURRENCY: 4
       LOG_LEVEL: INFO
     depends_on:  # see api
+      postgres:
+        condition: service_healthy
       cloudsqlproxy:
         condition: service_healthy
+        required: false
     restart: unless-stopped
     volumes:
       - ./app:/app/app

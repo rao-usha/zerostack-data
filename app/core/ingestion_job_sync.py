@@ -175,8 +175,10 @@ _ACTIVE_WITH_LATEST_QUEUE = """
     LEFT JOIN LATERAL (
         SELECT jq.id, jq.status, jq.completed_at, jq.created_at, jq.started_at, jq.error_message
         FROM job_queue jq
-        WHERE jq.job_table_id = ij.id
-          AND (jq.payload ->> 'ingestion_job_id') = ij.id::text
+        WHERE (jq.payload ->> 'ingestion_job_id') = ij.id::text
+          -- same rule as linked_ingestion_job_id: a NULL job_table_id links
+          -- too (e.g. /batch/{id}/unstick resubmits used to leave it unset)
+          AND (jq.job_table_id = ij.id OR jq.job_table_id IS NULL)
         ORDER BY jq.id DESC
         LIMIT 1
     ) q ON TRUE
@@ -262,6 +264,51 @@ def reconcile_ingestion_job(db: Session, ingestion_job_id: int, now: Optional[da
     new_status = _apply(db, row, now, timedelta(0), timedelta(0))
     db.commit()
     return new_status
+
+
+LIVE_QUEUE_STATUSES = ("pending", "blocked", "claimed", "running")
+
+
+def cancel_blocking_queue_job(
+    db: Session, ingestion_job_id: int, reason: str, now: Optional[datetime] = None
+) -> Optional[int]:
+    """Cancel the live queue job behind an over-age active ingestion job.
+
+    For a blocker whose worker job is hung (job:/bulk payloads carry no
+    ``source``, so the worker applies no execution timeout, and the heartbeat
+    keeps a hung executor looking alive) or queued with no worker to claim it.
+    The queue row is marked failed with a "Cancelled" message, which the
+    worker's heartbeat loop turns into JobCancelledError, and the ingestion job
+    is failed with the same reason. Commits. Returns the cancelled queue id,
+    or None when there is no live linked queue row (an in-process run is
+    cleanup_stuck_jobs' to time out).
+    """
+    now = now or datetime.utcnow()
+    row = db.execute(
+        text(_ACTIVE_WITH_LATEST_QUEUE + " AND ij.id = :id"), {"id": ingestion_job_id}
+    ).fetchone()
+    if row is None or row[4] is None or (row[5] or "") not in LIVE_QUEUE_STATUSES:
+        return None
+    q_id = row[4]
+    message = f"Cancelled by scheduler: {reason}"[:2000]
+    cancelled = db.execute(
+        text(
+            """
+            UPDATE job_queue
+            SET status = 'failed', error_message = :msg, completed_at = :now
+            WHERE id = :qid AND lower(status) IN ('pending', 'blocked', 'claimed', 'running')
+            RETURNING id
+            """
+        ),
+        {"msg": message, "now": now, "qid": q_id},
+    ).fetchone()
+    if cancelled is None:
+        db.rollback()
+        return None
+    mirror_queue_outcome(db, ingestion_job_id, succeeded=False, error=message, completed_at=now)
+    db.commit()
+    logger.warning(f"Cancelled queue job {q_id} blocking ingestion job {ingestion_job_id}: {reason}")
+    return q_id
 
 
 def _hours(delta: timedelta) -> str:

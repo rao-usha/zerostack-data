@@ -204,6 +204,10 @@ def test_compose_restart_depends_pin():
         deps = svc.get("depends_on") or {}
         assert "cloudsqlproxy" in deps, name
         assert deps["cloudsqlproxy"]["condition"] == "service_healthy", name
+        # review fix: local dev without GCP credentials must still start, and
+        # the default local postgres keeps its readiness wait
+        assert deps["cloudsqlproxy"].get("required") is False, name
+        assert deps["postgres"]["condition"] == "service_healthy", name
 
     image = services["cloudsqlproxy"]["image"]
     tag = image.rsplit(":", 1)[1]
@@ -567,3 +571,142 @@ def test_bulk_ingest_finishes_when_discover_raises(pgdb, monkeypatch):
     assert status == "failed"
     assert completed is not None
     assert "sec.gov unreachable" in error
+
+
+# ---------------------------------------------------------------------------
+# Review fixes (spec-121-fix)
+# ---------------------------------------------------------------------------
+
+
+@pg
+def test_sweep_links_queue_rows_with_null_job_table_id(pgdb):
+    """T17: /batch/{id}/unstick resubmitted with no job_table_id. The worker's
+    link rule accepts that; the sweep must too, or it fails a row >24h old as
+    'no job_queue row' while its queue job is still live."""
+    from app.core.ingestion_job_sync import reconcile_orphaned_ingestion_jobs
+
+    engine, factory = pgdb
+    old = datetime.utcnow() - timedelta(days=2)
+
+    live = _ing(engine, source="fred", created_at=old)
+    _queue(engine, ing_id=live, job_type="ingestion", status="running", job_table_id=None)
+
+    done = _ing(engine, source="fred", created_at=old)
+    _queue(engine, ing_id=done, job_type="ingestion", status="success", job_table_id=None,
+           completed_at=old, created_at=old)
+
+    # a NULL job_table_id with a different payload id links nothing
+    other = _ing(engine, source="fred", created_at=datetime.utcnow())
+    _queue(engine, ing_id=other, job_type="ingestion", status="success", job_table_id=None,
+           payload={"ingestion_job_id": other + 1000}, completed_at=old)
+
+    db = factory()
+    try:
+        result = reconcile_orphaned_ingestion_jobs(db)
+    finally:
+        db.close()
+
+    assert result["jobs"] == [{"id": done, "status": "success"}]
+    assert _ing_row(engine, live)[0] == "pending"
+    assert _ing_row(engine, other)[0] == "pending"
+
+
+@pg
+def test_unstick_links_resubmitted_queue_row(pgdb):
+    """T18: unstick sets job_table_id on its resubmit, and a queue row it (or
+    an older build) submitted with a NULL job_table_id counts as live."""
+    from sqlalchemy import text
+
+    from app.api.v1.jobs import unstick_batch
+
+    engine, factory = pgdb
+    old = datetime.utcnow() - timedelta(hours=5)
+    stuck = _ing(engine, source="fred", created_at=old)
+    covered = _ing(engine, source="fred", created_at=old)
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE ingestion_jobs SET batch_run_id='b1' WHERE id IN (:a, :b)"),
+                     {"a": stuck, "b": covered})
+    _queue(engine, ing_id=covered, job_type="ingestion", status="pending", job_table_id=None,
+           payload={"ingestion_job_id": covered, "batch_id": "b1"})
+
+    db = factory()
+    try:
+        assert unstick_batch("b1", db)["resubmitted"] == 1
+        db.commit()
+    finally:
+        db.close()
+    with engine.connect() as conn:
+        rows = conn.execute(text(
+            "SELECT job_table_id FROM job_queue WHERE payload->>'ingestion_job_id' = :i"),
+            {"i": str(stuck)}).fetchall()
+    assert [r[0] for r in rows] == [stuck]
+
+
+@pg
+def test_schedule_cancels_hung_blocker_after_2x_cadence(pgdb, caplog):
+    """T19: a job:/bulk worker job has no execution timeout and a hung
+    executor keeps heartbeating, so its IngestionJob stays PENDING forever.
+    Past 2x cadence the schedule cancels the queue job and runs."""
+    from sqlalchemy import text
+
+    from app.core.scheduler_service import run_scheduled_job
+
+    engine, factory = pgdb
+    sid = _schedule(engine, source="job:entity_resolve", cron="0 4 * * *")  # daily
+    ancient = datetime.utcnow() - timedelta(days=3)
+    hung = _ing(engine, source="job:entity_resolve", schedule_id=sid, created_at=ancient)
+    hung_q = _queue(engine, ing_id=hung, job_type="entity_resolve", status="running",
+                    created_at=ancient)
+
+    with caplog.at_level(logging.WARNING):
+        asyncio.run(run_scheduled_job(sid))
+
+    status, completed, error, _ = _ing_row(engine, hung)
+    assert status == "failed" and completed is not None
+    assert "Cancelled" in error
+    with engine.connect() as conn:
+        q_status, q_error = conn.execute(text(
+            "SELECT status, error_message FROM job_queue WHERE id=:i"), {"i": hung_q}).one()
+        jobs = conn.execute(text(
+            "SELECT status FROM ingestion_jobs WHERE schedule_id=:s ORDER BY id"), {"s": sid}).fetchall()
+    # the form the worker heartbeat treats as a cancellation
+    assert q_status == "failed" and "Cancelled" in q_error
+    assert [j[0] for j in jobs] == ["failed", "pending"]
+    assert any("Cancelled queue job" in r.message for r in caplog.records)
+
+
+@pg
+def test_schedule_keeps_young_live_blocker(pgdb):
+    """T20: under 2x cadence a live queue job is never cancelled."""
+    from sqlalchemy import text
+
+    from app.core.scheduler_service import run_scheduled_job
+
+    engine, factory = pgdb
+    sid = _schedule(engine, source="job:entity_resolve", cron="0 4 * * *")
+    recent = datetime.utcnow() - timedelta(hours=30)
+    busy = _ing(engine, source="job:entity_resolve", schedule_id=sid, created_at=recent)
+    busy_q = _queue(engine, ing_id=busy, job_type="entity_resolve", status="running")
+
+    asyncio.run(run_scheduled_job(sid))
+
+    assert _ing_row(engine, busy)[0] == "pending"
+    with engine.connect() as conn:
+        assert conn.execute(text("SELECT status FROM job_queue WHERE id=:i"),
+                            {"i": busy_q}).scalar() == "running"
+
+
+@pg
+def test_heartbeat_stops_cancelled_blocker(pgdb, monkeypatch):
+    """T21: the scheduler's cancellation reaches a running executor."""
+    import app.worker.main as wm
+    from app.core.ingestion_job_sync import cancel_blocking_queue_job
+
+    engine, factory = pgdb
+    ing = _ing(engine)
+    qid = _queue(engine, ing_id=ing, status="running")
+    assert cancel_blocking_queue_job(factory(), ing, "test") == qid
+
+    monkeypatch.setattr(wm, "HEARTBEAT_INTERVAL", 0)
+    with pytest.raises(wm.JobCancelledError):
+        asyncio.run(asyncio.wait_for(wm._heartbeat_loop(factory, qid), timeout=5))

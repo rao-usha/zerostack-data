@@ -359,10 +359,18 @@ def _clear_orphaned_blocker(db: Session, schedule: IngestionSchedule, active: In
     limit = ORPHAN_CADENCE_MULTIPLIER * schedule_cadence_seconds(schedule)
 
     if age > limit:
-        from app.core.ingestion_job_sync import reconcile_ingestion_job
+        from app.core.ingestion_job_sync import cancel_blocking_queue_job, reconcile_ingestion_job
 
         try:
             outcome = reconcile_ingestion_job(db, active.id)
+            if outcome is None:
+                # Its queue job is still live after 2x cadence: hung (job:/bulk
+                # payloads get no worker timeout) or never claimed. Cancel it.
+                if cancel_blocking_queue_job(
+                    db, active.id,
+                    f"{status} for {age / 3600:.1f}h (> {ORPHAN_CADENCE_MULTIPLIER}x cadence)",
+                ):
+                    outcome = "failed"
         except Exception as e:
             db.rollback()
             logger.error(f"Schedule {schedule.name}: could not reconcile job {active.id}: {e}")
