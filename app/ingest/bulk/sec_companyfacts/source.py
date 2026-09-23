@@ -143,6 +143,7 @@ def snapshot_date(release: Release) -> date:
 class SecCompanyFactsSource(BulkSource):
     name = "sec_companyfacts"
     parser_version = "1"
+    snapshot = True  # conditional GET on the last loaded ETag + raw retention (SPEC_122)
 
     def __init__(self, batch_companies: int = 500, batch_rows: int = 200_000):
         self.batch_companies = max(1, batch_companies)

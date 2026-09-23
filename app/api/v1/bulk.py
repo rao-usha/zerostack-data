@@ -14,6 +14,7 @@ from app.core.database import get_db
 from app.core.job_queue_service import submit_job
 from app.core.scheduler_service import install_default_bulk_schedules
 from app.ingest.bulk.registry import list_sources
+from app.ingest.bulk.retention import cleanup as run_raw_cleanup
 
 router = APIRouter(prefix="/bulk", tags=["Bulk Ingestion"])
 
@@ -99,3 +100,22 @@ def get_releases(
         {"source": source, "status": status, "limit": limit},
     ).mappings().all()
     return {"releases": [dict(r) for r in rows]}
+
+
+@router.post("/raw/cleanup", summary="Prune raw bulk files (dry-run by default)")
+def cleanup_raw_files(
+    source: Optional[List[str]] = Query(
+        None, description="Bulk source(s); default: the date-keyed snapshot sources"
+    ),
+    keep: Optional[int] = Query(None, ge=1, description="Loaded files to keep per source "
+                                                        "(default BULK_RAW_RETENTION)"),
+    dry_run: bool = Query(True, description="List files and bytes to free without deleting"),
+):
+    """SPEC_122: supersede stale snapshot rows, then keep the newest ``keep``
+    loaded raw files per source. Files of unloaded releases are never deleted."""
+    sources = source if isinstance(source, list) and source else None
+    if sources:
+        unknown = sorted(set(sources) - set(list_sources()))
+        if unknown:
+            raise HTTPException(status_code=404, detail=f"Unknown bulk source(s): {unknown}")
+    return run_raw_cleanup(sources=sources, keep=keep, dry_run=dry_run)

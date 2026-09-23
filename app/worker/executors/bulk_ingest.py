@@ -140,7 +140,12 @@ async def execute(job: JobQueue, db: Session):
             error = f"bulk_ingest {name} interrupted before completion"
         _finish_ingestion_job(ingestion_job_id, summary, error=error)
 
-    if summary["rows"] == 0:
+    if summary["rows"] == 0 and summary.get("unchanged"):
+        job.progress_message = (
+            f"unchanged upstream: {summary['unchanged']} snapshot(s) not modified "
+            f"({summary['failed']} failed, {summary['skipped']} already loaded)"
+        )
+    elif summary["rows"] == 0:
         job.progress_message = (
             f"warning: 0 rows loaded ({summary['skipped']} already loaded, {summary['failed']} failed)"
         )
@@ -148,5 +153,11 @@ async def execute(job: JobQueue, db: Session):
         job.progress_message = (
             f"{summary['rows']} rows from {summary['loaded']} release(s); "
             f"{summary['failed']} failed, {summary['skipped']} skipped"
+        )
+    # SPEC_122: bytes downloaded vs download avoided (conditional GET)
+    if summary.get("bytes_downloaded") or summary.get("bytes_saved"):
+        job.progress_message += (
+            f"; {summary.get('bytes_downloaded', 0) / 1e6:.0f} MB downloaded, "
+            f"{summary.get('bytes_saved', 0) / 1e6:.0f} MB saved"
         )
     db.commit()

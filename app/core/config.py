@@ -237,6 +237,11 @@ class Settings(BaseSettings):
         default="data/raw",
         description="Directory for raw bulk downloads (raw.source_release local_path)",
     )
+    # SPEC_122: raw files kept per snapshot source (newest loaded; minimum 1)
+    bulk_raw_retention: int = Field(
+        default=2,
+        description="Newest loaded raw files kept on disk per snapshot bulk source (env BULK_RAW_RETENTION)",
+    )
 
     # Yelp Fusion API Configuration (REQUIRED for Yelp ingestion)
     yelp_api_key: Optional[str] = Field(
