@@ -5,7 +5,7 @@ Uses APScheduler to run ingestion jobs on configurable schedules.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, List
 from sqlalchemy.orm import Session
 
@@ -167,6 +167,64 @@ def _inject_incremental_params(
 # Global scheduler instance
 _scheduler: Optional["AsyncIOScheduler"] = None
 
+# SPEC_121: APScheduler's own default misfire_grace_time is 1 second, so any run
+# the event loop was busy for was silently dropped. Schedules registered by
+# register_schedule get a grace scaled to their cadence; this default covers the
+# system jobs and the domain collection schedulers.
+SCHEDULER_JOB_DEFAULTS = {
+    "coalesce": True,  # several missed runs fire once, not N times
+    "max_instances": 1,
+    "misfire_grace_time": 3600,
+}
+
+# Misfire grace for a schedule: an eighth of its cadence, within these bounds.
+MIN_MISFIRE_GRACE_SECONDS = 300
+MAX_MISFIRE_GRACE_SECONDS = 86400
+
+# A schedule whose previous job is still active after this many cadences treats
+# that job as orphaned and reconciles it instead of skipping forever.
+ORPHAN_CADENCE_MULTIPLIER = 2
+
+_FREQUENCY_SECONDS = {
+    ScheduleFrequency.HOURLY: 3600,
+    ScheduleFrequency.DAILY: 86400,
+    ScheduleFrequency.WEEKLY: 7 * 86400,
+    ScheduleFrequency.MONTHLY: 30 * 86400,
+    ScheduleFrequency.QUARTERLY: 91 * 86400,
+}
+
+
+def schedule_cadence_seconds(schedule: IngestionSchedule) -> int:
+    """Seconds between two runs of a schedule (cron: two consecutive fires)."""
+    if schedule.frequency == ScheduleFrequency.CUSTOM and schedule.cron_expression:
+        try:
+            from apscheduler.triggers.cron import CronTrigger as _CronTrigger
+
+            trigger = _CronTrigger.from_crontab(schedule.cron_expression, timezone=timezone.utc)
+            now = datetime.now(timezone.utc)
+            first = trigger.get_next_fire_time(None, now)
+            second = trigger.get_next_fire_time(first, first + timedelta(seconds=1)) if first else None
+            if first and second:
+                return int((second - first).total_seconds())
+        except Exception as e:
+            logger.warning(f"Could not read cron {schedule.cron_expression!r}: {e}")
+        return 86400
+    return _FREQUENCY_SECONDS.get(schedule.frequency, 86400)
+
+
+def schedule_misfire_grace_seconds(schedule: IngestionSchedule) -> int:
+    """How late a run may still fire: hourly ~7 min, daily 3 h, monthly 1 day."""
+    return int(
+        min(
+            max(schedule_cadence_seconds(schedule) // 8, MIN_MISFIRE_GRACE_SECONDS),
+            MAX_MISFIRE_GRACE_SECONDS,
+        )
+    )
+
+
+def _build_scheduler(jobstores: Dict[str, Any]) -> "AsyncIOScheduler":
+    return AsyncIOScheduler(jobstores=jobstores, job_defaults=dict(SCHEDULER_JOB_DEFAULTS))
+
 
 def get_scheduler() -> "AsyncIOScheduler":
     """Get or create the global scheduler instance with persistent job store."""
@@ -180,7 +238,7 @@ def get_scheduler() -> "AsyncIOScheduler":
         jobstores = {
             "default": SQLAlchemyJobStore(url=settings.database_url),
         }
-        _scheduler = AsyncIOScheduler(jobstores=jobstores)
+        _scheduler = _build_scheduler(jobstores)
     return _scheduler
 
 
@@ -222,10 +280,7 @@ async def run_scheduled_job(schedule_id: int):
             )
             .first()
         )
-        if active:
-            logger.info(
-                f"Schedule {schedule.name} skipped — job {active.id} still {active.status.value}"
-            )
+        if active and not _clear_orphaned_blocker(db, schedule, active):
             return
 
         # Bulk sources ("bulk:<name>") run as worker bulk_ingest jobs, not
@@ -288,6 +343,52 @@ async def run_scheduled_job(schedule_id: int):
         logger.error(f"Error running scheduled job {schedule_id}: {e}", exc_info=True)
     finally:
         db.close()
+
+
+def _clear_orphaned_blocker(db: Session, schedule: IngestionSchedule, active: IngestionJob) -> bool:
+    """Decide whether an active job may keep blocking this schedule (SPEC_121).
+
+    Returns True when the blocker was reconciled and the schedule may run.
+    A blocker younger than ORPHAN_CADENCE_MULTIPLIER cadences is respected;
+    an older one is reconciled against its queue row (see
+    ingestion_job_sync.reconcile_ingestion_job) instead of skipping forever.
+    """
+    status = getattr(active.status, "value", active.status)
+    since = active.started_at or active.created_at
+    age = (datetime.utcnow() - since).total_seconds() if since else 0
+    limit = ORPHAN_CADENCE_MULTIPLIER * schedule_cadence_seconds(schedule)
+
+    if age > limit:
+        from app.core.ingestion_job_sync import cancel_blocking_queue_job, reconcile_ingestion_job
+
+        try:
+            outcome = reconcile_ingestion_job(db, active.id)
+            if outcome is None:
+                # Its queue job is still live after 2x cadence: hung (job:/bulk
+                # payloads get no worker timeout) or never claimed. Cancel it.
+                if cancel_blocking_queue_job(
+                    db, active.id,
+                    f"{status} for {age / 3600:.1f}h (> {ORPHAN_CADENCE_MULTIPLIER}x cadence)",
+                ):
+                    outcome = "failed"
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Schedule {schedule.name}: could not reconcile job {active.id}: {e}")
+            outcome = None
+        if outcome:
+            db.expire_all()
+            logger.warning(
+                f"Schedule {schedule.name}: job {active.id} was {status} for "
+                f"{age / 3600:.1f}h (> {ORPHAN_CADENCE_MULTIPLIER}x cadence) — "
+                f"reconciled to {outcome}, running now"
+            )
+            return True
+
+    logger.warning(
+        f"Schedule {schedule.name} skipped — job {active.id} still {status} "
+        f"({age / 3600:.1f}h old)"
+    )
+    return False
 
 
 async def _run_bulk_schedule(db: Session, schedule: IngestionSchedule) -> None:
@@ -499,6 +600,21 @@ def register_schedule(schedule: IngestionSchedule) -> bool:
 
         # Create trigger
         trigger = _get_trigger_for_schedule(schedule)
+        grace = schedule_misfire_grace_seconds(schedule)
+
+        # Re-registering at startup recomputes next_run_time from now, which
+        # loses a run missed while the API was down. Keep a missed fire time
+        # still within the grace (same trigger only); coalesce fires it once.
+        extra = {}
+        missed = getattr(existing_job, "next_run_time", None) if existing_job else None
+        if missed is not None and str(existing_job.trigger) == str(trigger):
+            late = (datetime.now(timezone.utc) - missed).total_seconds()
+            if 0 < late <= grace:
+                extra["next_run_time"] = missed
+                logger.warning(
+                    f"Schedule {schedule.name} missed its {missed.isoformat()} run "
+                    f"({late / 60:.0f} min ago) — running it now"
+                )
 
         # Add job to scheduler
         scheduler.add_job(
@@ -508,6 +624,10 @@ def register_schedule(schedule: IngestionSchedule) -> bool:
             args=[schedule.id],
             name=schedule.name,
             replace_existing=True,
+            misfire_grace_time=grace,
+            coalesce=True,
+            max_instances=1,
+            **extra,
         )
 
         logger.info(
@@ -1217,6 +1337,17 @@ async def cleanup_stuck_jobs(
     SessionLocal = get_session_factory()
     db = SessionLocal()
 
+    # SPEC_121: settle ingestion jobs whose worker job already finished (or
+    # that never got one). Its own failure must not stop the stuck-job pass.
+    orphans_reconciled = 0
+    try:
+        from app.core.ingestion_job_sync import reconcile_orphaned_ingestion_jobs
+
+        orphans_reconciled = reconcile_orphaned_ingestion_jobs(db)["reconciled"]
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Orphan ingestion job sweep failed: {e}", exc_info=True)
+
     try:
         # Get ALL running jobs (we check per-source timeout individually)
         running_jobs = (
@@ -1230,7 +1361,8 @@ async def cleanup_stuck_jobs(
 
         if not running_jobs:
             logger.info("No running jobs found during cleanup")
-            return {"cleaned_up": 0, "jobs": [], "retried": 0, "timeout_hours": timeout_hours}
+            return {"cleaned_up": 0, "jobs": [], "retried": 0, "timeout_hours": timeout_hours,
+                    "orphans_reconciled": orphans_reconciled}
 
         # Mark stuck jobs as failed (check per-source timeout)
         cleaned_jobs = []
@@ -1268,7 +1400,8 @@ async def cleanup_stuck_jobs(
 
         if not cleaned_jobs:
             logger.info("No stuck jobs found during cleanup")
-            return {"cleaned_up": 0, "jobs": [], "retried": 0, "timeout_hours": timeout_hours}
+            return {"cleaned_up": 0, "jobs": [], "retried": 0, "timeout_hours": timeout_hours,
+                    "orphans_reconciled": orphans_reconciled}
 
         db.commit()
 
@@ -1307,6 +1440,7 @@ async def cleanup_stuck_jobs(
             "retried": retried,
             "timeout_hours": timeout_hours,
             "cleanup_time": datetime.utcnow().isoformat(),
+            "orphans_reconciled": orphans_reconciled,
         }
 
     except Exception as e:

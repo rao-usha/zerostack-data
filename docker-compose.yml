@@ -51,7 +51,9 @@ x-api-keys: &api-keys
 
 services:
   cloudsqlproxy:
-    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:latest
+    # Pinned (SPEC_121): :latest could change the proxy under a running system
+    # on any pull. 2.22.1 is what :latest resolved to on 2026-09-23.
+    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.22.1
     # --health-check exposes /startup, /readiness and /liveness on 9090, which
     # is what the `wait` subcommand below polls. Without it the healthcheck can
     # only ever fail, and a proxy that works while reporting "unhealthy" is
@@ -124,9 +126,18 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    # SPEC_121: .env DATABASE_URL points at the Cloud SQL proxy, so wait for
+    # it to be healthy. `required: false` (Compose >= 2.20) keeps local-only dev
+    # working: without GCP credentials the proxy never gets healthy, Compose
+    # warns and starts api/worker anyway against the default local postgres,
+    # which is still waited for.
     depends_on:
       postgres:
         condition: service_healthy
+      cloudsqlproxy:
+        condition: service_healthy
+        required: false
+    restart: unless-stopped
     # Make the host machine reachable from inside the container as
     # `host.docker.internal`. Required for talking to cloud-sql-proxy (running
     # on the host's 127.0.0.1:5435) from runtime code — PLAN_065 / SPEC_061 MIP
@@ -161,9 +172,13 @@ services:
       WORKER_MAX_CONCURRENT: "6"
       MAX_CONCURRENCY: 4
       LOG_LEVEL: INFO
-    depends_on:
+    depends_on:  # see api
       postgres:
         condition: service_healthy
+      cloudsqlproxy:
+        condition: service_healthy
+        required: false
+    restart: unless-stopped
     volumes:
       - ./app:/app/app
       - ./alembic:/app/alembic
