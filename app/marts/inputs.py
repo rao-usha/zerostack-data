@@ -199,6 +199,14 @@ def _period_sort_key(r: Mapping[str, Any]):
     return (d or date.min, r["discovered_at"], r["id"])
 
 
+def _is_snapshot(source: str) -> bool:
+    try:
+        from app.ingest.bulk.registry import get_source
+        return bool(getattr(get_source(source), "snapshot", False))
+    except Exception:
+        return False
+
+
 def check_source(conn, source: str, now: datetime, max_age_days: float) -> Dict[str, Any]:
     """Assess one input. Returns a JSON-able record with ``ok`` and ``problem``."""
     rows = conn.execute(text(
@@ -234,7 +242,13 @@ def check_source(conn, source: str, now: datetime, max_age_days: float) -> Dict[
     record["loaded_at"] = _iso(max(latest_loaded)) if latest_loaded else None
 
     bad = [r for r in latest if r["status"] != "loaded"]
-    age = (now - first_seen).total_seconds() / 86400
+    # Snapshot sources (SPEC_122) mint no release when upstream is unchanged;
+    # they bump loaded_at on the previous one instead, so that re-verification
+    # is what "current" means for them.
+    as_of = first_seen
+    if _is_snapshot(source) and latest_loaded:
+        as_of = max(first_seen, max(latest_loaded))
+    age = (now - as_of).total_seconds() / 86400
     record["age_days"] = round(age, 1)
     if bad:
         parts = ", ".join(

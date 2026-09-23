@@ -1425,3 +1425,32 @@ def test_bulk_partial_advances_schedule_watermark(pgq, monkeypatch):
             last = conn.execute(text("SELECT last_run_at FROM ingestion_schedules WHERE id = :s"),
                                 {"s": sid}).scalar()
         assert (last is not None) is advances
+
+
+# --- SPEC_122 x SPEC_126a: snapshot sources re-verified by conditional GET -----
+@pg
+def test_snapshot_source_freshness_follows_unchanged_recheck(pgl):
+    """An unchanged snapshot (SPEC_122 304 / ETag match) mints no new release
+    and bumps ``loaded_at`` on the previous one. The input check must treat that
+    re-verification as current, or 7 quiet days would refuse the mart."""
+    from app.marts.inputs import check_source
+
+    # first seen 10 days ago, re-verified unchanged 1 hour ago
+    _release(pgl, "sec_edgar_submissions", "snapshot:2026-09-13",
+             loaded_days_ago=0.04, discovered_days_ago=10)
+    with pgl.connect() as conn:
+        rec = check_source(conn, "sec_edgar_submissions", datetime.utcnow(), 7)
+    assert rec["ok"], rec
+    assert rec["age_days"] < 1
+
+
+@pg
+def test_non_snapshot_source_still_ages_from_first_sighting(pgl):
+    """Reloading an archive release must not make an old period look fresh."""
+    from app.marts.inputs import check_source
+
+    _release(pgl, "sec_adv_roster", "ria:2026-02", loaded_days_ago=0.04,
+             discovered_days_ago=200)
+    with pgl.connect() as conn:
+        rec = check_source(conn, "sec_adv_roster", datetime.utcnow(), 75)
+    assert not rec["ok"]

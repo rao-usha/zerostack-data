@@ -289,3 +289,14 @@ Not ported, on purpose:
   cancel/timeout rollback; watchdog closes dead `running` rows; SPEC_119
   bands restored and admin-cliff / title gates ported; first-build floors;
   partial alert rule; bulk watermark.
+
+## Post-merge fix (2026-09-23): snapshot sources × SPEC_122
+
+SPEC_122 mints no release when a snapshot is unchanged upstream and bumps
+`loaded_at` on the previous release instead. `check_source` aged inputs from
+the newest period's `discovered_at`, so seven quiet days would have refused the
+mart on current data. For `BulkSource.snapshot` sources only, age is now
+measured from `max(first_seen, loaded_at)`; archive sources still age from first
+sighting (a reload must not make an old period look fresh). Tests:
+`test_snapshot_source_freshness_follows_unchanged_recheck`,
+`test_non_snapshot_source_still_ages_from_first_sighting`.
