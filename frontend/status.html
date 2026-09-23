@@ -60,6 +60,9 @@
         .live-dot.live { background: #4ade80; }
         .live-dot.reconnecting { background: var(--warning); }
         .live-dot.polling { background: var(--text-muted); }
+        #generated-at .stale-flag { display: none; }
+        #generated-at.stale { color: var(--warning); }
+        #generated-at.stale .stale-flag { display: inline; }
         .nav-link { color: var(--text-muted); text-decoration: none; border: 1px solid var(--border); padding: 0.35rem 0.75rem; border-radius: 6px; }
         .nav-link:hover { color: var(--text); background: var(--bg-input); }
 
@@ -411,20 +414,69 @@
         }
 
         /** GET /jobs filter for a producer's recent runs, or null when its runs
-         *  are not ingestion_jobs rows (collectors, in-process api routers). */
+         *  are not ingestion_jobs rows (collectors, in-process api routers).
+         *  The server resolves `producer=` with the same job -> producer map the
+         *  status API uses, so a bare dispatch key (dispatch:treasury) never
+         *  picks up its qualified siblings (dispatch:treasury:auctions) and
+         *  split jobs (<source>:split_<n>) are included. */
         function jobsQueryFor(producer) {
             if (!producer) return null;
             var base = producer.split('#')[0];
-            if (base.indexOf('bulk:') === 0 || base.indexOf('job:') === 0) {
-                return { source: base, dataset: null };
-            }
-            if (base.indexOf('dispatch:') === 0) {
-                var key = base.slice('dispatch:'.length);
-                var i = key.indexOf(':');
-                return i === -1 ? { source: key, dataset: null }
-                                : { source: key.slice(0, i), dataset: key.slice(i + 1) };
-            }
+            if (/^(bulk|job|dispatch):./.test(base)) return { producer: base };
             return null;
+        }
+
+        function parseIso(iso) {
+            if (!iso) return null;
+            var s = /[zZ]|[+-]\d\d:?\d\d$/.test(iso) || iso.length <= 10 ? iso : iso + 'Z';
+            var t = Date.parse(s);
+            return isNaN(t) ? null : t;
+        }
+        function humanSpan(ms) {
+            var a = Math.abs(ms) / 1000;
+            if (a < 90) return Math.round(a) + 's';
+            if (a < 5400) return Math.round(a / 60) + 'm';
+            if (a < 129600) return Math.round(a / 3600) + 'h';
+            if (a < 86400 * 60) return Math.round(a / 86400) + 'd';
+            if (a < 86400 * 730) return Math.round(a / (86400 * 30.4)) + 'mo';
+            return (a / (86400 * 365)).toFixed(1) + 'y';
+        }
+
+        /** The text a [data-rel] time cell shows at `now` (ms): "5m ago",
+         *  "in 2h", "3h overdue". `rel` is 'ago' or 'until'. */
+        function relText(iso, rel, now) {
+            var t = parseIso(iso);
+            if (t === null) return '';
+            var d = rel === 'until' ? t - now : now - t;
+            var h = humanSpan(d);
+            if (rel === 'until') return d >= 0 ? 'in ' + h : h + ' overdue';
+            return d >= 0 ? h + ' ago' : 'in ' + h;
+        }
+
+        /** Whether a status body generated at `generatedAt` is older than maxAgeMs. */
+        function isStale(generatedAt, now, maxAgeMs) {
+            var t = parseIso(generatedAt);
+            return t !== null && now - t > maxAgeMs;
+        }
+
+        /** The live-update plan for a status body: SSE only when queue jobs
+         *  emit events (worker mode) and the viewer may open the stream. */
+        function livePlan(data, admin) {
+            var w = (data && data.worker) || {};
+            if (w.worker_mode === false) {
+                return { sse: false, retry: false, reason: 'in-process mode (WORKER_MODE=0): jobs emit no queue events' };
+            }
+            if (!admin) return { sse: false, retry: false, reason: 'the job stream needs the admin role' };
+            return { sse: true, retry: true, reason: null };
+        }
+
+        /** How many datasets' coverage the server has not computed yet (its
+         *  stale-while-revalidate cache was cold): worth an early re-fetch. */
+        function pendingCoverage(datasets) {
+            return (datasets || []).filter(function (d) {
+                var e = (d.clocks || {}).coverage_error;
+                return e === 'deadline' || e === 'timeout';
+            }).length;
         }
 
         /** core.mart_build `mart` for a producer, or null. */
@@ -454,6 +506,12 @@
             groupByKind: groupByKind,
             changedKeys: changedKeys,
             jobsQueryFor: jobsQueryFor,
+            parseIso: parseIso,
+            humanSpan: humanSpan,
+            relText: relText,
+            isStale: isStale,
+            livePlan: livePlan,
+            pendingCoverage: pendingCoverage,
             martFor: martFor,
             bulkSourceFor: bulkSourceFor,
         };
@@ -478,6 +536,16 @@
         };
         const FALLBACK_POLL_MS = 90000;   // reload cadence only when SSE is unavailable
         const SSE_RETRY_MS = 300000;      // try the stream again while polling
+        // A slow clock that always runs: re-render relative times, flag a stale
+        // snapshot, retry a failed load, and re-fetch at least every
+        // SAFETY_REFRESH_MS even while SSE is up (time alone moves statuses,
+        // api/scheduler work emits no queue events, and the coverage cache
+        // revalidates in the background).
+        const TICK_MS = 60000;
+        const SAFETY_REFRESH_MS = 300000;
+        const STALE_AFTER_MS = 600000;      // flag the snapshot as stale past this age
+        const COVERAGE_CATCHUP_MS = 20000;  // one early re-fetch while coverage is still computing
+        const COVERAGE_CATCHUP_MAX = 3;
         const REFRESH_DEBOUNCE_MS = 2500;
         const SSE_MAX_FAILS = 3;
 
@@ -525,30 +593,23 @@
             const t = Date.parse(s);
             return isNaN(t) ? null : t;
         }
-        function human(ms) {
-            const a = Math.abs(ms) / 1000;
-            if (a < 90) return Math.round(a) + 's';
-            if (a < 5400) return Math.round(a / 60) + 'm';
-            if (a < 129600) return Math.round(a / 3600) + 'h';
-            if (a < 86400 * 60) return Math.round(a / 86400) + 'd';
-            if (a < 86400 * 730) return Math.round(a / (86400 * 30.4)) + 'mo';
-            return (a / (86400 * 365)).toFixed(1) + 'y';
-        }
-        function ago(iso) {
-            const t = parseTs(iso);
-            if (t === null) return '';
-            const d = Date.now() - t;
-            return d >= 0 ? human(d) + ' ago' : 'in ' + human(d);
-        }
-        function until(iso) {
-            const t = parseTs(iso);
-            if (t === null) return '';
-            const d = t - Date.now();
-            return d >= 0 ? 'in ' + human(d) : human(d) + ' overdue';
+        function ago(iso) { return C.relText(iso, 'ago', Date.now()); }
+        function until(iso) { return C.relText(iso, 'until', Date.now()); }
+        /** A relative time that retick() keeps current. */
+        function relSpan(iso, kind) {
+            return `<span title="${esc(iso)}" data-ts="${esc(iso)}" data-rel="${kind}">${esc(C.relText(iso, kind, Date.now()))}</span>`;
         }
         function timeCell(iso, rel) {
             if (!iso) return '<span class="muted">&mdash;</span>';
-            return `<span title="${esc(iso)}">${esc(rel(iso))}</span>`;
+            return relSpan(iso, rel === until ? 'until' : 'ago');
+        }
+        function retick() {
+            const now = Date.now();
+            document.querySelectorAll('[data-rel]').forEach(el => {
+                el.textContent = C.relText(el.getAttribute('data-ts'), el.getAttribute('data-rel'), now);
+            });
+            const g = document.getElementById('generated-at');
+            if (g && state.data) g.classList.toggle('stale', C.isStale(state.data.generated_at, now, STALE_AFTER_MS));
         }
         function fmtNum(n) {
             if (n === null || n === undefined) return '&mdash;';
@@ -563,7 +624,7 @@
         }
         function fmtDuration(s) {
             if (s === null || s === undefined) return '';
-            return human(s * 1000);
+            return C.humanSpan(s * 1000);
         }
         function statusBadge(status) {
             return `<span class="job-status-badge st-${esc(status)}" title="${esc(STATUS_HELP[status] || '')}">${esc(String(status).replace(/_/g, ' '))}</span>`;
@@ -588,7 +649,8 @@
             }
             if (resp.status === 403) return { forbidden: true };
             if (!resp.ok) return { error: 'HTTP ' + resp.status };
-            try { return { data: await resp.json() }; } catch (e) { return { error: 'bad JSON' }; }
+            const truncated = !!(resp.headers && resp.headers.get && resp.headers.get('X-Producer-Scan-Truncated') === 'true');
+            try { return { data: await resp.json(), truncated: truncated }; } catch (e) { return { error: 'bad JSON' }; }
         }
 
         // ---- notices -------------------------------------------------------
@@ -631,7 +693,7 @@
             const w = state.data.worker || {};
             const workerText = w.worker_mode
                 ? `${fmtNum(w.live_workers)} live worker${w.live_workers === 1 ? '' : 's'} (queue mode)` +
-                  (w.last_heartbeat_at ? `, last heartbeat <span title="${esc(w.last_heartbeat_at)}">${esc(ago(w.last_heartbeat_at))}</span>` : '')
+                  (w.last_heartbeat_at ? `, last heartbeat ${relSpan(w.last_heartbeat_at, 'ago')}` : '')
                 : 'in-process mode (WORKER_MODE off): jobs run inside the API';
             const cards = C.STATUS_ORDER.map(s => {
                 const n = counts[s] || 0;
@@ -993,6 +1055,9 @@
             if (p) return p;
             const list = (slot.data && slot.data.builds) || [];
             if (!list.length) return `<div class="muted small">${esc((slot.data && slot.data.note) || 'No builds recorded.')}</div>`;
+            // The server withholds error text from non-admins; the public view
+            // hides it from admins too.
+            const showErrors = isAdmin && state.view === 'operator';
             return list.map(b => {
                 const gates = b.gate_results && typeof b.gate_results === 'object'
                     ? Object.entries(b.gate_results).map(([name, g]) => {
@@ -1006,11 +1071,12 @@
                     : '';
                 return `<div class="build">
                     ${runBadge(b.status)} ${b.dry_run ? '<span class="muted small">dry run</span>' : ''}
-                    <span title="${esc(b.started_at || '')}">${esc(ago(b.started_at))}</span>
+                    ${b.started_at ? relSpan(b.started_at, 'ago') : ''}
                     ${b.finished_at && b.started_at ? `<span class="muted small">&middot; ${esc(fmtDuration((parseTs(b.finished_at) - parseTs(b.started_at)) / 1000))}</span>` : ''}
                     ${b.code_version ? `<span class="muted small mono">&middot; ${esc(b.code_version)}</span>` : ''}
                     ${b.refusal_reason ? `<div class="err-text" style="margin-top:0.25rem">Refused: ${esc(b.refusal_reason)}</div>` : ''}
-                    ${b.error ? `<div class="err-text" style="margin-top:0.25rem">${esc(String(b.error).slice(0, 400))}</div>` : ''}
+                    ${b.error && showErrors ? `<div class="err-text" style="margin-top:0.25rem">${esc(String(b.error).slice(0, 400))}</div>` : ''}
+                    ${(b.error || b.error_hidden) && !showErrors ? '<div class="muted small" style="margin-top:0.25rem">Error text is shown to admins in the operator view.</div>' : ''}
                     ${inputs ? `<ul class="reason-list blockers" style="margin-top:0.3rem">${inputs}</ul>` : ''}
                     ${gates ? `<div style="margin-top:0.35rem">${gates}</div>` : ''}
                 </div>`;
@@ -1021,7 +1087,11 @@
             const p = pendingHtml(slot);
             if (p) return p;
             const list = slot.data || [];
-            if (!list.length) return '<div class="muted small">No ingestion jobs recorded for this producer.</div>';
+            const more = slot.truncated
+                ? '<div class="info-note">Only the most recent jobs of this source were searched; older runs of this producer may exist.</div>' : '';
+            if (!list.length) return slot.truncated
+                ? '<div class="muted small">None among the most recent jobs of this source (search limit reached).</div>'
+                : '<div class="muted small">No ingestion jobs recorded for this producer.</div>';
             const rows = list.map(j => {
                 const dur = j.started_at && j.completed_at ? fmtDuration((parseTs(j.completed_at) - parseTs(j.started_at)) / 1000) : '';
                 return `<tr>
@@ -1034,7 +1104,7 @@
                     <td>${j.error_message ? `<span class="err-text">${esc(String(j.error_message).slice(0, 240))}</span>` : ''}</td>
                 </tr>`;
             }).join('');
-            return `<div class="scroll-x"><table class="mini-table"><thead><tr><th>Job</th><th>Status</th><th>Created</th><th>Took</th><th>Rows</th><th>Trigger</th><th>Error</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+            return `<div class="scroll-x"><table class="mini-table"><thead><tr><th>Job</th><th>Status</th><th>Created</th><th>Took</th><th>Rows</th><th>Trigger</th><th>Error</th></tr></thead><tbody>${rows}</tbody></table></div>${more}`;
         }
 
         async function loadExtras(d) {
@@ -1046,16 +1116,9 @@
             const q = C.jobsQueryFor(d.producer);
             if (q) {
                 jobs.push((isAdmin
-                    ? getJson(`${ENDPOINTS.jobs}?source=${encodeURIComponent(q.source)}&limit=${q.dataset ? 60 : 10}`)
+                    ? getJson(`${ENDPOINTS.jobs}?producer=${encodeURIComponent(q.producer)}&limit=10`)
                     : Promise.resolve({ forbidden: true })
-                ).then(res => {
-                    if (res.data) {
-                        let list = res.data;
-                        if (q.dataset) list = list.filter(j => (j.config || {}).dataset === q.dataset);
-                        res = { data: list.slice(0, 10) };
-                    }
-                    slot.runs = res;
-                }));
+                ).then(res => { slot.runs = res; }));
             }
             const bulk = C.bulkSourceFor(d.producer);
             if (bulk) {
@@ -1083,7 +1146,7 @@
             if (!res.data) {
                 notices.load = { cls: 'error', html: res.forbidden
                     ? 'You do not have access to dataset status.'
-                    : `Could not load dataset status (${esc(res.error)}). Retrying on the next update.` };
+                    : `Could not load dataset status (${esc(res.error)}). Retrying within ${Math.round(TICK_MS / 1000)} seconds.` };
                 renderNotices();
                 return null;
             }
@@ -1099,8 +1162,10 @@
             const old = state.data;
             state.data = data;
             state.byKey = new Map(data.datasets.map(d => [d.key, d]));
+            state.fetchedAt = Date.now();
             document.getElementById('generated-at').innerHTML =
-                `as of <span title="${esc(data.generated_at)}">${esc(ago(data.generated_at))}</span>`;
+                `as of ${relSpan(data.generated_at, 'ago')}<span class="stale-flag"> &middot; stale</span>`;
+            retick();
             renderBanner();
             renderLagStrip();
 
@@ -1112,6 +1177,8 @@
                     if (d && Array.from(affectedPrefixes).some(p => C.matchesPrefix(d.producer, p))) stale.add(key);
                 });
             }
+            applyLivePlan(data);
+            scheduleCoverageCatchup(data);
             if (!old) { fillKindFilter(); renderTable(); return; }
 
             const changed = C.changedKeys(old.datasets, data.datasets);
@@ -1168,7 +1235,8 @@
         }
 
         // ---- live updates (SSE with a stream token; slow poll fallback) ----
-        const live = { es: null, fails: 0, poll: null, retry: null, debounce: null, prefixes: new Set() };
+        const live = { es: null, fails: 0, poll: null, retry: null, debounce: null, prefixes: new Set(),
+                       plan: C.livePlan(null, isAdmin), tick: null, catchups: 0, catchup: null };
 
         function setLive(mode, text) {
             document.getElementById('live-dot').className = 'live-dot ' + mode;
@@ -1202,7 +1270,42 @@
             notices.live = { cls: 'info', html: `Live job stream unavailable (${esc(reason)}); reloading every ${Math.round(FALLBACK_POLL_MS / 1000)} seconds.` };
             renderNotices();
             if (!live.poll) live.poll = setInterval(pollTick, FALLBACK_POLL_MS);
-            if (isAdmin && !live.retry) live.retry = setInterval(retryStream, SSE_RETRY_MS);
+            if (live.plan.retry && !live.retry) live.retry = setInterval(retryStream, SSE_RETRY_MS);
+        }
+
+        /** Always-on slow clock (TICK_MS): keeps relative times and the stale
+         *  flag current, retries a failed load, and re-fetches when nothing
+         *  has for SAFETY_REFRESH_MS (quiet queue, api/scheduler work, time-
+         *  driven statuses such as stalled or an overdue next run). */
+        function tick() {
+            retick();
+            const since = Date.now() - (state.fetchedAt || 0);
+            if (notices.load || since >= SAFETY_REFRESH_MS) refresh();
+        }
+
+        /** A cold coverage cache answers 'deadline' and computes in the
+         *  background: fetch again shortly so the page picks up the result. */
+        function scheduleCoverageCatchup(data) {
+            if (live.catchup || live.catchups >= COVERAGE_CATCHUP_MAX) return;
+            if (!C.pendingCoverage(data.datasets)) return;
+            live.catchups += 1;
+            live.catchup = setTimeout(() => { live.catchup = null; refresh(); }, COVERAGE_CATCHUP_MS);
+        }
+
+        /** Re-plan live updates when a status body says how jobs run. */
+        function applyLivePlan(data) {
+            const plan = C.livePlan(data, isAdmin);
+            const was = live.plan;
+            live.plan = plan;
+            if (!plan.sse) {
+                if (live.es) { live.es.close(); live.es = null; }
+                if (live.retry) { clearInterval(live.retry); live.retry = null; }
+                if (!live.poll || was.sse) startFallback(plan.reason);
+            } else if (!was.sse && !live.es) {
+                stopFallback();
+                live.fails = 0;
+                connectStream();
+            }
         }
         function stopFallback() {
             if (live.poll) { clearInterval(live.poll); live.poll = null; }
@@ -1220,7 +1323,7 @@
 
         async function connectStream() {
             if (live.es) return;
-            if (!isAdmin) { startFallback('the job stream needs the admin role'); return; }
+            if (!live.plan.sse) { startFallback(live.plan.reason); return; }
             // EventSource cannot send headers: a fresh short-lived stream token
             // per (re)connect (SPEC_127).
             let url;
@@ -1229,6 +1332,7 @@
             const es = new EventSource(url);
             live.es = es;
             es.onopen = () => {
+                if (!live.plan.sse) { es.close(); if (live.es === es) live.es = null; return; }
                 const wasPolling = !!live.poll;
                 live.fails = 0;
                 stopFallback();
@@ -1270,6 +1374,7 @@
 
         async function init() {
             wire();
+            live.tick = setInterval(tick, TICK_MS);
             const [data] = await Promise.all([loadStatus(), loadCatalog()]);
             if (!data) {
                 document.getElementById('banner').innerHTML = '<div class="empty">Dataset status is unavailable.</div>';
@@ -1278,6 +1383,7 @@
                 startFallback('status failed to load');
                 return;
             }
+            live.plan = C.livePlan(data, isAdmin);
             applyStatus(data);
             connectStream();
         }

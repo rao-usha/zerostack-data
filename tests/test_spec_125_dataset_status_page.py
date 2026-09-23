@@ -4,10 +4,18 @@ Tests for SPEC 125 — the dataset status page (frontend/status.html).
 Static checks on the page (auth.js, read-only, API paths that exist, live
 updates through a stream token, narrow-width columns) and on the repaired
 index.html panel. The page's pure helpers (`StatusCore`, in the
-`<script id="status-core">` block) run under node when it is installed.
-Browser tests are not run: Playwright is not available here.
+`<script id="status-core">` block) run under node when it is installed; the
+DOM smoke scenarios (tests/js/status_page_smoke.js) run under node + jsdom
+when `jsdom` resolves (e.g. via NODE_PATH). Real-browser tests are not run:
+Playwright is not available here.
+
+Review fixes (T9-T12): recent runs come from GET /jobs?producer= (resolved
+server side, split jobs included, bare dispatch keys kept apart from their
+qualified siblings); the page keeps refreshing while SSE is quiet and polls
+in WORKER_MODE=0; /pe/marts/builds shows error text to admins only.
 """
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -20,6 +28,8 @@ STATUS = REPO / "frontend" / "status.html"
 INDEX = REPO / "frontend" / "index.html"
 JWT_SECRET = "spec125-test-secret-" + "x" * 48
 _DUMMY_DB = "postgresql://nobody:nobody@localhost:1/nothing"
+PG_URL = os.environ.get("TEST_PG_URL")
+pg = pytest.mark.skipif(not PG_URL, reason="TEST_PG_URL not set")
 
 
 @pytest.fixture(scope="module")
@@ -109,15 +119,16 @@ class TestStatusPage:
         assert "NexdataAuth.streamUrl('/api/v1/job-queue/stream')" in status_html \
             or "NexdataAuth.streamUrl(ENDPOINTS.stream)" in status_html
         assert not re.search(r"new EventSource\(\s*['\"`]/api", status_html)
-        m = re.search(r"FALLBACK_POLL_MS\s*=\s*(\d[\d_]*)", status_html)
-        assert m, "fallback poll interval must be a named constant"
-        assert int(m.group(1).replace("_", "")) >= 60000
-        # the only interval timer is the fallback poll (and the SSE retry)
+        # every timer the page runs on its own is slow (>= 60 s): the fallback
+        # poll, the SSE retry, and the always-on tick / safety refresh
+        for name in ("FALLBACK_POLL_MS", "SSE_RETRY_MS", "TICK_MS", "SAFETY_REFRESH_MS"):
+            m = re.search(name + r"\s*=\s*(\d[\d_]*)", status_html)
+            assert m, f"{name} must be a named constant"
+            assert int(m.group(1).replace("_", "")) >= 60000, name
         intervals = re.findall(r"setInterval\(([^)]*)", status_html)
+        assert intervals
         for args in intervals:
-            assert "FALLBACK_POLL_MS" in args or "SSE_RETRY_MS" in args, args
-        m = re.search(r"SSE_RETRY_MS\s*=\s*(\d[\d_]*)", status_html)
-        assert m and int(m.group(1).replace("_", "")) >= 60000
+            assert re.search(r"\b(FALLBACK_POLL_MS|SSE_RETRY_MS|TICK_MS)\b", args), args
 
     def test_t5_narrow_widths_collapse_columns(self, status_html):
         queries = re.findall(r"@media\s*\(max-width:\s*(\d+)px\)\s*\{(.*?)\n\s*\}",
@@ -196,7 +207,17 @@ out.changed = Array.from(C.changedKeys(
   [{key: 'a', status: 'current'}, {key: 'b', status: 'current'}, {key: 'new', status: 'x'}],
 )).sort();
 out.jobs = ['bulk:sec_adv', 'job:pe_mart_build#firms', 'dispatch:fred:series', 'dispatch:census',
-            'collector:power_plants', 'api:foo'].map(C.jobsQueryFor);
+            'collector:power_plants', 'api:foo', 'dispatch:'].map(C.jobsQueryFor);
+const NOW = Date.parse('2026-09-23T12:00:00Z');
+out.rel = [C.relText('2026-09-23T11:55:00Z', 'ago', NOW), C.relText('2026-09-23T11:55:00', 'ago', NOW),
+           C.relText('2026-09-23T14:00:00Z', 'until', NOW), C.relText('2026-09-23T09:00:00Z', 'until', NOW),
+           C.relText(null, 'ago', NOW)];
+out.stale = [C.isStale('2026-09-23T11:55:00Z', NOW, 600000), C.isStale('2026-09-23T11:45:00Z', NOW, 600000),
+             C.isStale(null, NOW, 600000)];
+out.plan = [C.livePlan({worker: {worker_mode: false}}, true), C.livePlan({worker: {worker_mode: true}}, false),
+            C.livePlan({worker: {worker_mode: true}}, true), C.livePlan(null, true)].map(p => [p.sse, p.retry]);
+out.pending = C.pendingCoverage([{clocks: {coverage_error: 'deadline'}}, {clocks: {coverage_error: 'timeout'}},
+                                 {clocks: {coverage_error: 'empty'}}, {clocks: {}}, {}]);
 out.mart = ['job:pe_mart_build#funds', 'job:entity_resolve', 'bulk:x'].map(C.martFor);
 out.bulk = ['bulk:sec_adv_schedule_d', 'job:x'].map(C.bulkSourceFor);
 console.log(JSON.stringify(out));
@@ -244,11 +265,232 @@ class TestStatusCoreNode:
 
     def test_producer_lookups(self, out):
         assert out["jobs"] == [
-            {"source": "bulk:sec_adv", "dataset": None},
-            {"source": "job:pe_mart_build", "dataset": None},
-            {"source": "fred", "dataset": "series"},
-            {"source": "census", "dataset": None},
-            None, None,
+            {"producer": "bulk:sec_adv"},
+            {"producer": "job:pe_mart_build"},
+            {"producer": "dispatch:fred:series"},
+            {"producer": "dispatch:census"},
+            None, None, None,
         ]
         assert out["mart"] == ["pe_marts", "entity_resolve", None]
         assert out["bulk"] == ["sec_adv_schedule_d", None]
+
+    def test_t10_relative_times_and_staleness(self, out):
+        assert out["rel"] == ["5m ago", "5m ago", "in 2h", "3h overdue", ""]
+        assert out["stale"] == [False, True, False]
+
+    def test_t10_live_plan(self, out):
+        # WORKER_MODE=0: no SSE (no queue events would come), poll instead
+        assert out["plan"] == [[False, False], [False, False], [True, True], [True, True]]
+        assert out["pending"] == 2
+
+
+# =============================================================================
+# T9-T10 — page wiring after the review fixes (static)
+# =============================================================================
+
+
+@pytest.mark.unit
+class TestReviewFixesStatic:
+    def test_t9_runs_filtered_server_side(self, status_html):
+        assert "?producer=${encodeURIComponent(q.producer)}" in status_html
+        # no client-side config.dataset filtering and no source= history query
+        assert "(j.config || {}).dataset" not in status_html
+        assert "${ENDPOINTS.jobs}?source=" not in status_html
+        assert "X-Producer-Scan-Truncated" in status_html
+
+    def test_t10_refreshes_without_events(self, status_html):
+        assert "C.livePlan(" in status_html and "worker_mode === false" in status_html
+        assert "SAFETY_REFRESH_MS" in status_html and "function tick()" in status_html
+        assert 'data-rel="${kind}"' in status_html
+        assert "Retrying on the next update" not in status_html
+
+    def test_t11_build_error_admin_only(self, status_html):
+        assert re.search(r"b\.error && showErrors", status_html)
+        assert "const showErrors = isAdmin && state.view === 'operator'" in status_html
+
+
+# =============================================================================
+# T9 — GET /jobs?producer= (server-side producer filter)
+# =============================================================================
+
+
+@pytest.mark.unit
+def test_t9_producer_source_candidates():
+    from app.api.v1.jobs import producer_source_candidates as cands
+
+    assert cands("dispatch:treasury") == ["treasury"]
+    assert cands("dispatch:treasury:auctions") == ["treasury", "treasury:auctions"]
+    assert cands("bulk:sec_adv") == ["bulk:sec_adv"]
+    assert cands("job:pe_mart_build#firms") == ["job:pe_mart_build"]
+    assert cands("collector:power_plants") == []
+    assert cands("api:foo") == [] and cands("") == [] and cands("dispatch:") == []
+
+
+@pytest.fixture
+def pgjobs():
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.orm import sessionmaker
+
+    from app.core.models import Base, IngestionJob
+
+    engine = create_engine(PG_URL)
+    with engine.begin() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS public.ingestion_jobs CASCADE"))
+    Base.metadata.create_all(engine, tables=[IngestionJob.__table__])
+    rows = [
+        # (source, config, minutes ago)
+        ("treasury", '{"dataset": "auctions"}', 1),
+        ("treasury", "{}", 2),
+        ("treasury:split_1", "{}", 3),
+        ("treasury", '{"dataset": "not_a_catalog_key"}', 4),
+        ("treasury", '{"dataset": "auctions"}', 5),
+        ("treasuryx", "{}", 6),
+        ("fred", "{}", 7),
+    ]
+    with engine.begin() as conn:
+        for src, cfg, ago in rows:
+            conn.execute(text(
+                "INSERT INTO ingestion_jobs (source, status, config, created_at, retry_count, "
+                "max_retries, data_origin) VALUES (:s, 'success', CAST(:c AS json), "
+                "NOW() - make_interval(mins => :m), 0, 3, 'real')"), {"s": src, "c": cfg, "m": ago})
+    db = sessionmaker(bind=engine)()
+    yield db
+    db.close()
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM ingestion_jobs"))
+    engine.dispose()
+
+
+def _producer_jobs(db, producer, **kw):
+    from fastapi import Response
+
+    from app.api.v1 import jobs
+
+    resp = Response()
+    out = jobs.list_jobs(response=resp, source=None, status=None, batch_run_id=None,
+                         trigger=None, producer=producer, limit=kw.get("limit", 10),
+                         offset=kw.get("offset", 0), db=db)
+    return [(j.source, (j.config or {}).get("dataset")) for j in out], resp.headers
+
+
+@pg
+def test_t9_bare_dispatch_key_excludes_qualified_siblings(pgjobs):
+    from app.catalog.job_keys import default_map
+
+    assert "treasury:auctions" in default_map().dispatch_keys, "catalog changed: pick another pair"
+    got, headers = _producer_jobs(pgjobs, "dispatch:treasury")
+    assert got == [("treasury", None), ("treasury:split_1", None),
+                   ("treasury", "not_a_catalog_key")]
+    assert "x-producer-scan-truncated" not in headers
+
+
+@pg
+def test_t9_qualified_key_finds_its_jobs(pgjobs):
+    got, _ = _producer_jobs(pgjobs, "dispatch:treasury:auctions")
+    assert got == [("treasury", "auctions"), ("treasury", "auctions")]
+    got, _ = _producer_jobs(pgjobs, "dispatch:treasury:auctions", limit=1, offset=1)
+    assert got == [("treasury", "auctions")]
+    assert _producer_jobs(pgjobs, "collector:power_plants")[0] == []
+
+
+@pg
+def test_t9_scan_cap_is_reported(pgjobs, monkeypatch):
+    from app.api.v1 import jobs
+
+    monkeypatch.setattr(jobs, "PRODUCER_SCAN_BATCH", 1)
+    monkeypatch.setattr(jobs, "PRODUCER_SCAN_MAX", 2)
+    got, headers = _producer_jobs(pgjobs, "dispatch:treasury")
+    assert got == [("treasury", None)]          # newest auctions row skipped, cap hit
+    assert headers.get("x-producer-scan-truncated") == "true"
+
+
+# =============================================================================
+# T11 — /pe/marts/builds: error text for admins only, free text redacted
+# =============================================================================
+
+
+@pytest.mark.unit
+def test_t11_present_build_redacts_and_gates_errors():
+    from app.api.v1.mart_builds import present_build
+
+    row = {"id": 1, "status": "failed",
+           "error": "HTTPStatusError for https://x/api?api_key=SEKRET123 boom",
+           "refusal_reason": "input fetch failed: https://y/?token=TOK999",
+           "inputs": [{"source": "sec_adv", "ok": False, "problem": "GET ?apikey=K1 failed"},
+                      {"source": "x", "ok": True}]}
+    admin = present_build(dict(row), include_errors=True)
+    assert "SEKRET123" not in admin["error"] and "boom" in admin["error"]
+    viewer = present_build(dict(row), include_errors=False)
+    assert viewer["error"] is None and viewer["error_hidden"] is True
+    for b in (admin, viewer):
+        assert "TOK999" not in b["refusal_reason"]
+        assert "K1" not in b["inputs"][0]["problem"]
+        assert b["inputs"][1] == {"source": "x", "ok": True}
+    ok = present_build({"id": 2, "status": "success", "error": None}, include_errors=False)
+    assert ok["error"] is None and ok["error_hidden"] is False
+
+
+@pg
+def test_t11_builds_endpoint_hides_error_from_non_admin():
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.orm import sessionmaker
+
+    from app.api.v1 import mart_builds
+    from app.core.authz import ROLE_ADMIN
+
+    engine = create_engine(PG_URL)
+    with engine.begin() as conn:
+        conn.execute(text("CREATE SCHEMA IF NOT EXISTS core"))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS core.mart_build (
+                id BIGSERIAL PRIMARY KEY, mart VARCHAR(64) NOT NULL,
+                status VARCHAR(16) NOT NULL DEFAULT 'running', dry_run BOOLEAN NOT NULL DEFAULT FALSE,
+                started_at TIMESTAMP NOT NULL DEFAULT NOW(), finished_at TIMESTAMP,
+                code_version VARCHAR(64), inputs JSONB, stage_counts JSONB, gate_results JSONB,
+                overrides JSONB, refusal_reason TEXT, error TEXT, ingestion_job_id INTEGER,
+                job_queue_id INTEGER)"""))
+        conn.execute(text("DELETE FROM core.mart_build"))
+        conn.execute(text("INSERT INTO core.mart_build (mart, status, error) "
+                          "VALUES ('pe_marts', 'failed', 'psycopg2 trace password=hunter2')"))
+    db = sessionmaker(bind=engine)()
+    try:
+        viewer = mart_builds.list_builds(mart=None, status=None, limit=5, db=db,
+                                         principal={"role": "viewer"})
+        assert viewer["builds"][0]["error"] is None
+        assert viewer["builds"][0]["error_hidden"] is True
+        admin = mart_builds.list_builds(mart=None, status=None, limit=5, db=db,
+                                        principal={"role": ROLE_ADMIN})
+        assert "psycopg2 trace" in admin["builds"][0]["error"]
+        assert "hunter2" not in admin["builds"][0]["error"]
+    finally:
+        db.close()
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM core.mart_build"))
+        engine.dispose()
+
+
+# =============================================================================
+# T12 — DOM smoke under node + jsdom (skipped when jsdom does not resolve)
+# =============================================================================
+
+SMOKE = REPO / "tests" / "js" / "status_page_smoke.js"
+
+
+def _jsdom_available() -> bool:
+    if NODE is None:
+        return False
+    proc = subprocess.run([NODE, "-e", "require.resolve('jsdom')"], capture_output=True,
+                          text=True, timeout=30, env=dict(os.environ))
+    return proc.returncode == 0
+
+
+@pytest.mark.unit
+@pytest.mark.skipif(not _jsdom_available(), reason="node + jsdom not available (set NODE_PATH)")
+@pytest.mark.parametrize("scenario", ["admin", "inprocess", "viewer", "coverage"])
+def test_t12_dom_smoke(scenario):
+    proc = subprocess.run([NODE, str(SMOKE), str(REPO), scenario], capture_output=True,
+                          text=True, timeout=120, env=dict(os.environ))
+    assert proc.returncode == 0, proc.stderr
+    out = json.loads(proc.stdout.strip().splitlines()[-1])
+    assert out["ok"], proc.stdout
+    assert not out["fail"], out["fail"]
