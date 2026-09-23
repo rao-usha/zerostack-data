@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Header, Depends, Request
 from pydantic import BaseModel, Field, EmailStr
 from typing import Optional
 
+from app.core.client_ip import client_ip
 from app.core.database import get_db
 from app.users.auth import AuthService
 
@@ -271,7 +272,7 @@ def reset_password(request: PasswordResetConfirm):
 async def request_login_code(request: RequestCodeRequest, http_request: Request):
     """Email a passwordless sign-in code + magic link. Always returns a neutral
     message — never reveals whether the email exists, never returns the code."""
-    request_ip = http_request.client.host if http_request.client else None
+    request_ip = client_ip(http_request)
     db = next(get_db())
     try:
         auth_service = AuthService(db)

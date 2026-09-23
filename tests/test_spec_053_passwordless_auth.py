@@ -181,7 +181,10 @@ class TestSpec053PasswordlessAuth:
         assert "access_token" in bundle and "refresh_token" in bundle
 
         # the access token is a real, verifiable JWT
-        info = svc.verify_token(bundle["access_token"])
+        # SPEC_127: passwordless tokens are playground-audience tokens
+        from app.users.auth import AUD_PLAYGROUND
+
+        info = svc.verify_token(bundle["access_token"], audiences=(AUD_PLAYGROUND,))
         assert info["email"] == email
 
         # row consumed, user verified

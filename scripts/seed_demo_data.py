@@ -18,11 +18,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Base URL for API
 BASE_URL = os.getenv("NEXDATA_URL", "http://localhost:8001")
+# SPEC_127: admin-scope key (scripts/create_api_key.py)
+API_HEADERS = {"X-API-Key": os.environ["NEXDATA_API_KEY"]} if os.environ.get("NEXDATA_API_KEY") else {}
 
 def api_get(endpoint: str):
     """Make GET request to API."""
     try:
-        resp = requests.get(f"{BASE_URL}{endpoint}", timeout=30)
+        resp = requests.get(f"{BASE_URL}{endpoint}", timeout=30, headers=API_HEADERS)
         return resp.json() if resp.ok else None
     except Exception as e:
         print(f"  Error: {e}")
@@ -31,7 +33,7 @@ def api_get(endpoint: str):
 def api_post(endpoint: str, data: dict = None):
     """Make POST request to API."""
     try:
-        resp = requests.post(f"{BASE_URL}{endpoint}", json=data or {}, timeout=60)
+        resp = requests.post(f"{BASE_URL}{endpoint}", json=data or {}, timeout=60, headers=API_HEADERS)
         return resp.json() if resp.ok else None
     except Exception as e:
         print(f"  Error: {e}")

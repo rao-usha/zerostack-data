@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.core.client_ip import client_ip
 from app.core.config import get_settings
 from app.core.database import get_db
 
@@ -143,7 +144,7 @@ class PlaygroundQuota:
                 limit = settings.playground_free_runs_per_day
         else:
             subject_type = "ip"
-            subject_key = request.client.host if request.client else "unknown"
+            subject_key = client_ip(request)
             limit = settings.playground_anon_runs_per_ip
 
         quota = QuotaService(db)
@@ -501,7 +502,7 @@ def get_quota(
         )
     else:
         subject_type = "ip"
-        subject_key = request.client.host if request.client else "unknown"
+        subject_key = client_ip(request)
         limit = settings.playground_anon_runs_per_ip
 
     result = QuotaService(db).peek(subject_type, subject_key, limit)

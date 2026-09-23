@@ -173,7 +173,10 @@ def seed_via_api(base_url: str = "http://localhost:8001"):
                 "headquarters_country": firm.get("hq_country", "USA") if not firm.get("hq_state") else "USA",
             }
 
-            resp = requests.post(f"{base_url}/api/v1/pe/firms", json=payload, timeout=30)
+            resp = requests.post(
+                f"{base_url}/api/v1/pe/firms", json=payload, timeout=30,
+                headers={"X-API-Key": os.environ["NEXDATA_API_KEY"]} if os.environ.get("NEXDATA_API_KEY") else {},
+            )
             if resp.ok:
                 print(f"  + {firm['name']}")
                 success_count += 1

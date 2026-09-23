@@ -117,8 +117,17 @@ per database URL.
 `USER_WRITE_ENDPOINTS` (POST, no persistence or LLM at the router layer):
 `compare.compare_portfolios`, `app_rankings.compare_apps`,
 `site_intel_sites.{search_sites, compare_sites, score_site, unified_score,
-unified_compare}`, `lineage.compute_impact_analysis`,
-`deal_models.run_sensitivity`, `pe_macro.score_lbo_entry`.
+unified_compare}`, `deal_models.run_sensitivity`, `pe_macro.score_lbo_entry`.
+(`lineage.compute_impact_analysis` was removed in review: it caches its result
+into `impact_analysis` rows, so it is a write and needs admin.)
+
+Operator tooling: `current_principal` (and the job-queue dependency) also
+accept an **admin-scope** API key in `X-API-Key` as an admin principal, so
+skills, curl, `scripts/nexdata_client.py`, the seed scripts and the eval
+runner can authenticate without a 60-minute browser JWT
+(`scripts/create_api_key.py EMAIL` mints one; tooling reads
+`NEXDATA_API_KEY`). `read`/`write` keys stay `/public`-only and get 401
+elsewhere.
 
 A route-table test enumerates `app.routes` and fails if any `/api/v1` or
 `/graphql` route outside the public list lacks one of these dependencies, or
@@ -130,7 +139,36 @@ take the owner from the request body, so their writes stay admin; the
 `/jobs/monitor` HTML page cannot be opened by browser navigation under auth
 (it is an admin JSON-authenticated route) — use the console's Jobs tab;
 `site_intel_sites` SSE streams are user-level GETs with a header, and no
-frontend page uses them.
+frontend page uses them. `users` has no SQLAlchemy model (it is created by
+`AuthService`'s lazy DDL), so `role` lives in that DDL and migration 0012
+rather than on an ORM class. `ADMIN_EMAILS` only promotes verified accounts;
+self-registered password accounts have no email-verification flow, so in
+practice the first admin comes from `scripts/create_user.py --admin`.
+
+### Review fixes
+
+- **Pre-hijack.** With `ALLOW_SIGNUP=true` an attacker could register a
+  victim's address; the victim's later passwordless sign-in set
+  `is_verified=TRUE` and so vouched for the attacker's password (and let
+  `ADMIN_EMAILS` promote it). `_finalize_login` now drops `password_hash` and
+  resets `role` when it verifies a previously unverified row.
+- **Caller IP.** `request.client.host` is the nginx container for every
+  browser, so per-IP Atlas/playground quotas were one global bucket.
+  `app/core/client_ip.py` takes `X-Real-IP` (set by nginx, not forgeable
+  through it), else the right-most `X-Forwarded-For` hop, but only when the
+  peer is in `TRUSTED_PROXY_CIDRS` (private networks by default). Used by
+  Atlas, the playground quota/peek, and `/auth/request-code`.
+- **Profiles.** `/data-quality/profile(s)/{table}` stores and serves the top
+  values of string columns — a second generic table reader. It now applies
+  `is_exportable` (404 for denied tables, `profile_table` refuses them), and
+  migration 0012 deletes existing snapshots of denied tables.
+- **Frontend.** `frontend/d3/*.html` load `/js/auth.js`; `resources.html`
+  links to same-origin API paths (auth.js turns the click into an
+  authenticated fetch); the playground stores its token under
+  `nexdata_playground_token` so a playground sign-in no longer logs the
+  console out.
+- **Tests in the api container.** `tests/conftest.py` forces
+  `REQUIRE_AUTH=false` (the container sets it to true).
 
 ### Export deny list
 
@@ -197,6 +235,13 @@ PG-backed (`TEST_PG_URL`):
   scope 403.
 - Atlas quota: anonymous caller gets 429 after the limit; admin unmetered.
 - export preview of `users` 404 even for admin.
+- Review fixes: pre-hijack (passwordless verification discards an unverified
+  password; verified accounts keep theirs); admin-scope key is an admin
+  principal, read/write keys 401 outside `/public`; `create_api_key.py`;
+  denied-table profiles 404 and are purged by the migration; Atlas quota
+  buckets per browser behind nginx; `client_ip` trust rules; d3 pages load
+  auth.js (recursive glob); no plain `:8001/api` links; conftest forces auth
+  off.
 
 ## Out of scope
 

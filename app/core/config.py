@@ -68,6 +68,15 @@ class Settings(BaseSettings):
         description="Daily Atlas LLM/Places calls for a signed-in non-admin user",
     )
 
+    trusted_proxy_cidrs: str = Field(
+        default="127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,::1/128,fc00::/7",
+        description=(
+            "Comma-separated networks whose X-Real-IP / X-Forwarded-For is trusted "
+            "when deriving a caller's IP for quotas (the bundled nginx runs on a "
+            "private Docker network). Empty = never trust forwarding headers."
+        ),
+    )
+
     def admin_email_set(self) -> set:
         """ADMIN_EMAILS as a normalized set of lowercase addresses."""
         return {

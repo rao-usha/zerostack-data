@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.core.export_policy import is_exportable
 from app.core.models import (
     DataProfileSnapshot,
     DataProfileColumn,
@@ -197,6 +198,14 @@ def _get_top_values(db: Session, table_name: str, col: str, from_clause: str, li
         return []
 
 
+def is_profilable(db: Session, table_name: str) -> bool:
+    """SPEC_127: profiles store top_values of string columns, so they are a
+    table reader like /export. Apply the same policy: auth, key, lead and
+    credential-bearing tables are never profiled or served."""
+    columns = [c["name"] for c in _get_schema_info(db, table_name)]
+    return is_exportable(table_name, columns)
+
+
 # =============================================================================
 # Main profiling functions
 # =============================================================================
@@ -245,6 +254,10 @@ def profile_table(
         columns = _get_schema_info(db, table_name)
         if not columns:
             logger.warning(f"No columns found for {table_name}")
+            return None
+
+        if not is_exportable(table_name, [c["name"] for c in columns]):
+            logger.warning(f"Table {table_name} is not profilable (SPEC_127 policy), skipping")
             return None
 
         # Determine if sampling is needed

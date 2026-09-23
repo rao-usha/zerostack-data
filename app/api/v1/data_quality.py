@@ -1100,6 +1100,13 @@ def _column_to_response(c: DataProfileColumn) -> ProfileColumnResponse:
     )
 
 
+def _require_profilable(db: Session, table_name: str) -> None:
+    """404 for tables the export policy denies (SPEC_127) — same answer as a
+    table that was never profiled, so the deny list is not enumerable."""
+    if not data_profiling_service.is_profilable(db, table_name):
+        raise HTTPException(status_code=404, detail=f"No profile found for {table_name}")
+
+
 # NOTE: /profile/all must come BEFORE /profile/{table_name} to avoid
 # FastAPI matching "all" as a table_name parameter.
 @router.post("/profile/all")
@@ -1119,6 +1126,7 @@ def profile_table(
     db: Session = Depends(get_db),
 ) -> ProfileSnapshotResponse:
     """Profile a specific table on-demand."""
+    _require_profilable(db, table_name)
     snapshot = data_profiling_service.profile_table(db, table_name, source=source)
     if not snapshot:
         raise HTTPException(status_code=409, detail="Profiling already in progress or table not found")
@@ -1130,6 +1138,7 @@ def get_latest_profile(
     table_name: str, db: Session = Depends(get_db)
 ) -> ProfileSnapshotResponse:
     """Get the latest profile snapshot for a table."""
+    _require_profilable(db, table_name)
     snapshot = data_profiling_service.get_latest_profile(db, table_name)
     if not snapshot:
         raise HTTPException(status_code=404, detail=f"No profile found for {table_name}")
@@ -1143,6 +1152,7 @@ def get_profile_history(
     db: Session = Depends(get_db),
 ) -> List[ProfileSnapshotResponse]:
     """Get profile history for a table (last N snapshots)."""
+    _require_profilable(db, table_name)
     snapshots = data_profiling_service.get_profile_history(db, table_name, limit=limit)
     return [_snapshot_to_response(s) for s in snapshots]
 
@@ -1152,6 +1162,7 @@ def get_profile_columns(
     table_name: str, db: Session = Depends(get_db)
 ) -> List[ProfileColumnResponse]:
     """Get column-level stats for the latest profile of a table."""
+    _require_profilable(db, table_name)
     snapshot = data_profiling_service.get_latest_profile(db, table_name)
     if not snapshot:
         raise HTTPException(status_code=404, detail=f"No profile found for {table_name}")

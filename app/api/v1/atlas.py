@@ -20,6 +20,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.core.client_ip import client_ip
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.services.atlas import AtlasService
@@ -71,7 +72,7 @@ def atlas_quota(
         limit = settings.atlas_llm_runs_per_user
     else:
         subject_type = "atlas_ip"
-        subject_key = request.client.host if request.client else "unknown"
+        subject_key = client_ip(request)
         limit = settings.atlas_llm_runs_per_ip
 
     result = QuotaService(db).check_and_consume(subject_type, subject_key, limit)
@@ -122,7 +123,7 @@ class FeedbackBody(BaseModel):
 def explore(body: ExploreBody, request: Request, db: Session = Depends(get_db)):
     """Run an exploration. Public, anonymous-friendly. Returns the full
     exploration object (resolved entities, cards, connections, related)."""
-    anon_ip = request.client.host if request.client else None
+    anon_ip = client_ip(request)
     try:
         exploration = AtlasService(db).explore(
             query=body.query,

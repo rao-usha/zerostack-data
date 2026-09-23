@@ -23,11 +23,12 @@ from __future__ import annotations
 import importlib
 import json
 import logging
+import os
 import time
 from dataclasses import asdict
 from datetime import datetime
 from statistics import mean
-from typing import Optional
+from typing import Dict, Optional
 
 import httpx
 from sqlalchemy.orm import Session
@@ -38,6 +39,13 @@ from app.services.eval_scorer import CapturedOutput, EvalScorer, ScorerResult
 logger = logging.getLogger(__name__)
 
 _API_BASE = "http://localhost:8001"
+
+
+def _api_headers() -> Dict[str, str]:
+    """X-API-Key for the internal API (SPEC_127: every route needs an admin
+    principal). NEXDATA_API_KEY must be an admin-scope key."""
+    key = os.environ.get("NEXDATA_API_KEY")
+    return {"X-API-Key": key} if key else {}
 
 
 # ===========================================================================
@@ -128,7 +136,7 @@ class APIResponseCapture:
 
         start = time.monotonic()
         try:
-            with httpx.Client(timeout=30.0) as client:
+            with httpx.Client(timeout=30.0, headers=_api_headers()) as client:
                 if method == "POST":
                     resp = client.post(url, json=body or {})
                 else:
@@ -227,7 +235,7 @@ class ReportOutputCapture:
 
         start = time.monotonic()
         try:
-            with httpx.Client(timeout=60.0) as client:
+            with httpx.Client(timeout=60.0, headers=_api_headers()) as client:
                 resp = client.post(url, json=body)
             latency_ms = (time.monotonic() - start) * 1000
 

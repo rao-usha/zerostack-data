@@ -656,7 +656,7 @@ async def run(quick: bool = False):
     """Execute all phases."""
     t0 = time.time()
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(headers={"X-API-Key": os.environ["NEXDATA_API_KEY"]} if os.environ.get("NEXDATA_API_KEY") else {}) as client:
         # Phase 0
         if not await phase0_health(client):
             return

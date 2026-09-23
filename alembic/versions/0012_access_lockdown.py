@@ -14,9 +14,16 @@ lazy `CREATE TABLE` already has the new shape.
 - `refresh_tokens.audience` so a playground session can never be refreshed
   into a platform session. Existing rows are revoked: their `token_hash` was
   random and never matched a presented token, so none of them could work.
+- Data-profile snapshots store the top values of string columns, and the
+  profile endpoints used to profile any table on request (anonymously, before
+  this spec). Snapshots of tables the export policy denies (users, reset
+  tokens, API keys, ...) are deleted; the service now refuses to create them.
 """
 
 from alembic import op
+from sqlalchemy import text
+
+from app.core.export_policy import is_exportable
 
 revision = "0012_access_lockdown"
 down_revision = "0011_pe_people_sec"
@@ -109,9 +116,53 @@ DOWNGRADE_SQL = [
 ]
 
 
+def purge_denied_profiles(conn) -> int:
+    """Delete profile snapshots (and their column stats) of denied tables.
+
+    Returns the number of snapshots removed. No-op when the profiling tables
+    do not exist yet.
+    """
+    if conn.execute(text("SELECT to_regclass('public.data_profile_snapshots')")).scalar() is None:
+        return 0
+    tables = [r[0] for r in conn.execute(
+        text("SELECT DISTINCT table_name FROM data_profile_snapshots")
+    )]
+    denied = []
+    for table in tables:
+        columns = [r[0] for r in conn.execute(
+            text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema = 'public' AND table_name = :t"
+            ),
+            {"t": table},
+        )]
+        if not is_exportable(table, columns):
+            denied.append(table)
+    if not denied:
+        return 0
+    has_columns = conn.execute(
+        text("SELECT to_regclass('public.data_profile_columns')")
+    ).scalar() is not None
+    removed = 0
+    for table in denied:
+        if has_columns:
+            conn.execute(
+                text(
+                    "DELETE FROM data_profile_columns WHERE snapshot_id IN "
+                    "(SELECT id FROM data_profile_snapshots WHERE table_name = :t)"
+                ),
+                {"t": table},
+            )
+        removed += conn.execute(
+            text("DELETE FROM data_profile_snapshots WHERE table_name = :t"), {"t": table}
+        ).rowcount or 0
+    return removed
+
+
 def upgrade() -> None:
     for stmt in UPGRADE_SQL:
         op.execute(stmt)
+    purge_denied_profiles(op.get_bind())
 
 
 def downgrade() -> None:

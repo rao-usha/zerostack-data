@@ -477,14 +477,26 @@ class AuthService:
         self.db.commit()
 
     def _finalize_login(self, email: str) -> Dict[str, Any]:
-        """Mark the user verified, bump last_login_at, issue tokens."""
+        """Mark the user verified, bump last_login_at, issue tokens.
+
+        Proving control of the mailbox must not also vouch for a password
+        someone else set on an unverified row (pre-hijack: with
+        ALLOW_SIGNUP=true an attacker registers the victim's address, the
+        victim later signs in here, and the attacker's password would then log
+        into a verified — possibly ADMIN_EMAILS-promoted — account). A password
+        that predates verification is therefore discarded, and the role reset.
+        """
         self.db.execute(
             text("""
             UPDATE users
-            SET is_verified = TRUE, last_login_at = CURRENT_TIMESTAMP
+            SET password_hash = CASE
+                    WHEN is_verified IS TRUE THEN password_hash ELSE NULL END,
+                role = CASE
+                    WHEN is_verified IS TRUE THEN role ELSE :user_role END,
+                is_verified = TRUE, last_login_at = CURRENT_TIMESTAMP
             WHERE email = :email
         """),
-            {"email": email},
+            {"email": email, "user_role": ROLE_USER},
         )
         self.db.commit()
 

@@ -281,13 +281,29 @@ class TestDeployAndFrontend:
         public_pages = {"atlas.html", "playground.html", "diligence.html",
                         "diligence-sample.html", "resources.html"}
         missing = []
-        for page in (REPO / "frontend").glob("*.html"):
-            if page.name in public_pages:
+        # recursive: the console links to frontend/d3/*.html visualizations
+        for page in (REPO / "frontend").rglob("*.html"):
+            if page.parent == REPO / "frontend" and page.name in public_pages:
                 continue
             html = page.read_text(encoding="utf-8")
             if "fetch(" in html and 'src="/js/auth.js"' not in html:
-                missing.append(page.name)
+                missing.append(str(page.relative_to(REPO / "frontend")))
         assert not missing, missing
+
+    def test_no_plain_links_to_protected_api_on_8001(self):
+        """A navigation to http://localhost:8001/api/... cannot carry a token."""
+        offenders = []
+        pattern = r'href="http://(?:localhost|127\.0\.0\.1):8001(/api/[^"]*)"'
+        for page in (REPO / "frontend").rglob("*.html"):
+            html = page.read_text(encoding="utf-8")
+            for m in re.finditer(pattern, html):
+                offenders.append(f"{page.name}: {m.group(1)}")
+        assert not offenders, offenders
+
+    def test_playground_does_not_overwrite_console_token(self):
+        html = (REPO / "frontend" / "playground.html").read_text(encoding="utf-8")
+        assert 'const LS_TOKEN = "nexdata_token"' not in html
+        assert "nexdata_playground_token" in html
 
     def test_job_stream_uses_stream_token(self):
         html = (REPO / "frontend" / "index.html").read_text(encoding="utf-8")
@@ -725,3 +741,269 @@ class TestExportEndpoints:
         assert listed.status_code == 200
         names = {t["table_name"] for t in listed.json()}
         assert not names & {"users", "password_reset_tokens", "refresh_tokens", "login_codes"}
+
+
+# =============================================================================
+# Review fixes (spec-127-fix)
+# =============================================================================
+
+
+@pytest.mark.unit
+class TestSuiteRunsWithAuthOff:
+    def test_conftest_forces_require_auth_false(self):
+        # The api container sets REQUIRE_AUTH=true; `docker-compose exec api
+        # pytest` must still run route tests with auth off.
+        assert os.environ.get("REQUIRE_AUTH") == "false"
+
+
+def _request(peer, headers=None):
+    from starlette.requests import Request
+
+    raw = [(k.lower().encode(), v.encode()) for k, v in (headers or {}).items()]
+    scope = {"type": "http", "method": "GET", "path": "/", "headers": raw,
+             "client": (peer, 5555) if peer else None, "query_string": b""}
+    return Request(scope)
+
+
+@pytest.mark.unit
+class TestClientIp:
+    """Atlas/playground quotas key on the caller, not on the nginx container."""
+
+    def test_trusted_proxy_x_real_ip(self, env):
+        from app.core.client_ip import client_ip
+
+        req = _request("172.18.0.7", {"X-Real-IP": "203.0.113.9",
+                                      "X-Forwarded-For": "1.2.3.4, 203.0.113.9"})
+        assert client_ip(req) == "203.0.113.9"
+
+    def test_trusted_proxy_rightmost_forwarded_for(self, env):
+        from app.core.client_ip import client_ip
+
+        # the left entries are client-supplied; the proxy appended the last one
+        req = _request("10.0.0.2", {"X-Forwarded-For": "6.6.6.6, 198.51.100.4"})
+        assert client_ip(req) == "198.51.100.4"
+
+    def test_untrusted_peer_headers_ignored(self, env):
+        from app.core.client_ip import client_ip
+
+        req = _request("198.51.100.20", {"X-Real-IP": "6.6.6.6",
+                                         "X-Forwarded-For": "6.6.6.6"})
+        assert client_ip(req) == "198.51.100.20"
+
+    def test_garbage_header_falls_back(self, env):
+        from app.core.client_ip import client_ip
+
+        assert client_ip(_request("172.18.0.7", {"X-Real-IP": "not-an-ip"})) == "172.18.0.7"
+        assert client_ip(_request(None)) == "unknown"
+
+    def test_empty_trust_list_trusts_nobody(self, env):
+        from app.core.client_ip import client_ip
+        from app.core.config import reset_settings
+
+        env.setenv("TRUSTED_PROXY_CIDRS", "")
+        reset_settings()
+        assert client_ip(_request("172.18.0.7", {"X-Real-IP": "203.0.113.9"})) == "172.18.0.7"
+
+
+@pytest.mark.unit
+class TestReviewPolicy:
+    def test_lineage_impact_compute_is_not_user_level(self):
+        # it caches rows into impact_analysis, which is a write
+        from app.core.authz import USER_WRITE_ENDPOINTS
+
+        assert "app.api.v1.lineage.compute_impact_analysis" not in USER_WRITE_ENDPOINTS
+
+    @pytest.mark.parametrize("table,cols,ok", [
+        ("users", ["id", "email"], False),
+        ("password_reset_tokens", ["id"], False),
+        ("vendor_things", ["id", "api_key"], False),
+        ("fred_series", ["series_id", "value"], True),
+    ])
+    def test_profiling_uses_export_policy(self, monkeypatch, table, cols, ok):
+        from app.core import data_profiling_service as dps
+
+        monkeypatch.setattr(dps, "_get_schema_info",
+                            lambda db, t: [{"name": c} for c in cols])
+        assert dps.is_profilable(None, table) is ok
+
+
+def _profile_tables(engine):
+    from app.core.models import DataProfileColumn, DataProfileSnapshot
+
+    DataProfileColumn.__table__.drop(engine, checkfirst=True)
+    DataProfileSnapshot.__table__.drop(engine, checkfirst=True)
+    DataProfileSnapshot.__table__.create(engine)
+    DataProfileColumn.__table__.create(engine)
+
+
+def _add_snapshot(engine, table):
+    from sqlalchemy import text
+
+    with engine.begin() as c:
+        sid = c.execute(text(
+            "INSERT INTO data_profile_snapshots (table_name, row_count, column_count, "
+            "total_null_count, profiled_at) VALUES (:t, 1, 1, 0, now()) RETURNING id"),
+            {"t": table}).scalar()
+        c.execute(text(
+            "INSERT INTO data_profile_columns (snapshot_id, column_name, data_type, "
+            "null_count, stats) VALUES (:s, 'email', 'text', 0, CAST(:st AS json))"),
+            {"s": sid, "st": '{"top_values": [{"value": "boss@x.com", "count": 1}]}'})
+    return sid
+
+
+@pg
+class TestProfilesRespectExportPolicy:
+    def test_denied_table_profiles_are_404_and_not_created(self, client, pg_engine):
+        _profile_tables(pg_engine)
+        _make_user(pg_engine, "dq@x.com", admin=True)
+        _add_snapshot(pg_engine, "users")  # e.g. created before SPEC_127
+        h = {"Authorization": "Bearer " + _login(client, "dq@x.com")["access_token"]}
+        for path in ("/api/v1/data-quality/profiles/users",
+                     "/api/v1/data-quality/profiles/users/columns",
+                     "/api/v1/data-quality/profiles/users/history"):
+            assert client.get(path, headers=h).status_code == 404, path
+        assert client.post("/api/v1/data-quality/profile/users", headers=h).status_code == 404
+
+        from app.core import data_profiling_service as dps
+
+        db = _session(pg_engine)
+        try:
+            assert dps.profile_table(db, "users") is None
+        finally:
+            db.close()
+
+    def test_migration_purges_denied_snapshots(self, pg_engine):
+        from sqlalchemy import text
+
+        _profile_tables(pg_engine)
+        _make_user(pg_engine, "seed@x.com")  # creates users
+        with pg_engine.begin() as c:
+            c.execute(text("DROP TABLE IF EXISTS spec127_ok_tbl"))
+            c.execute(text("CREATE TABLE spec127_ok_tbl (id int, name text)"))
+        _add_snapshot(pg_engine, "users")
+        _add_snapshot(pg_engine, "password_reset_tokens")
+        keep = _add_snapshot(pg_engine, "spec127_ok_tbl")
+
+        mig = _load_migration()
+        with pg_engine.begin() as c:
+            assert mig.purge_denied_profiles(c) == 2
+        with pg_engine.connect() as c:
+            left = [r[0] for r in c.execute(text("SELECT id FROM data_profile_snapshots"))]
+            cols = c.execute(text("SELECT count(*) FROM data_profile_columns")).scalar()
+        assert left == [keep] and cols == 1
+        with pg_engine.begin() as c:
+            c.execute(text("DROP TABLE spec127_ok_tbl"))
+
+
+@pg
+class TestPreHijack:
+    def test_passwordless_verification_discards_pre_verification_password(
+        self, client, pg_engine, env
+    ):
+        from sqlalchemy import text
+        from app.core.config import reset_settings
+        from app.users.auth import AuthService
+
+        env.setenv("ALLOW_SIGNUP", "true")
+        env.setenv("ADMIN_EMAILS", "chief@x.com")
+        reset_settings()
+        # attacker registers the admin's address first
+        r = client.post("/api/v1/auth/register",
+                        json={"email": "chief@x.com", "password": "attacker-pw-1"})
+        assert r.status_code == 200, r.text
+
+        # the real owner later signs in to the playground with a code
+        db = _session(pg_engine)
+        try:
+            svc = AuthService(db)
+            code = svc.request_login_code("chief@x.com")["code"]
+            svc.verify_login_code("chief@x.com", code)
+        finally:
+            db.close()
+
+        # the attacker's password no longer works, and nobody got promoted
+        r = client.post("/api/v1/auth/login",
+                        json={"email": "chief@x.com", "password": "attacker-pw-1"})
+        assert r.status_code == 401
+        with pg_engine.connect() as c:
+            ph, role, verified = c.execute(text(
+                "SELECT password_hash, role, is_verified FROM users "
+                "WHERE email = 'chief@x.com'")).fetchone()
+        assert ph is None and role == "user" and verified is True
+
+    def test_verified_password_account_keeps_password(self, client, pg_engine):
+        from app.users.auth import AuthService
+
+        _make_user(pg_engine, "legit@x.com")  # create_user marks verified
+        db = _session(pg_engine)
+        try:
+            svc = AuthService(db)
+            code = svc.request_login_code("legit@x.com")["code"]
+            svc.verify_login_code("legit@x.com", code)
+        finally:
+            db.close()
+        assert _login(client, "legit@x.com")["access_token"]
+
+
+@pg
+class TestAdminApiKey:
+    def _key(self, pg_engine, scope):
+        from app.auth.api_keys import APIKeyCreate, APIKeyService
+
+        db = _session(pg_engine)
+        try:
+            return APIKeyService(db).create_key(
+                APIKeyCreate(name="cli", owner_email="ops@x.com", scope=scope)).key
+        finally:
+            db.close()
+
+    def test_admin_key_is_an_admin_principal(self, client, pg_engine):
+        h = {"X-API-Key": self._key(pg_engine, "admin")}
+        assert client.get("/api/v1/export/formats", headers=h).status_code == 200
+        assert client.get("/api/v1/sources", headers=h).status_code not in (401, 403)
+        assert client.post("/api/v1/fred/ingest", json={}, headers=h).status_code not in (401, 403)
+        assert client.get("/api/v1/job-queue/summary", headers=h).status_code not in (401, 403)
+
+    def test_read_and_write_keys_stay_on_public(self, client, pg_engine):
+        for scope in ("read", "write"):
+            h = {"X-API-Key": self._key(pg_engine, scope)}
+            assert client.get("/api/v1/sources", headers=h).status_code == 401
+            assert client.get("/api/v1/export/formats", headers=h).status_code == 401
+        bogus = {"X-API-Key": "nxd_bogus"}
+        assert client.get("/api/v1/sources", headers=bogus).status_code == 401
+
+    def test_create_api_key_script(self, pg_engine, capsys):
+        path = REPO / "scripts" / "create_api_key.py"
+        spec = importlib.util.spec_from_file_location("create_api_key_script", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        assert mod.main(["ops@x.com"]) == 0
+        out = capsys.readouterr().out
+        assert "scope=admin" in out
+        assert re.search(r"^nxd_\S+$", out, flags=re.M)
+
+
+@pg
+class TestAtlasQuotaPerCaller:
+    def test_browsers_behind_nginx_get_separate_buckets(self, main_app, pg_engine, env):
+        from fastapi.testclient import TestClient
+        from app.core.config import reset_settings
+
+        env.setenv("ATLAS_LLM_RUNS_PER_IP", "1")
+        reset_settings()
+
+        async def behind_nginx(scope, receive, send):
+            # every browser arrives from the nginx container's address
+            if scope["type"] == "http":
+                scope = dict(scope, client=("172.18.0.9", 40000))
+            await main_app(scope, receive, send)
+
+        proxy = TestClient(behind_nginx, raise_server_exceptions=False)
+
+        def call(ip):
+            return proxy.post("/api/v1/atlas/competition", json={},
+                              headers={"X-Real-IP": ip}).status_code
+
+        assert call("203.0.113.1") != 429
+        assert call("203.0.113.1") == 429          # same browser: over quota
+        assert call("203.0.113.2") != 429          # another browser: own bucket

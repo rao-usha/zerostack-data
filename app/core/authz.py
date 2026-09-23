@@ -30,7 +30,9 @@ SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 # POST endpoints on read/write routers that are pure computations (no
 # persistence, no LLM call at the router layer), so a user-level account may
-# call them. Keyed "<module>.<function>" — see endpoint_key().
+# call them. Keyed "<module>.<function>" — see endpoint_key(). Before adding
+# one, check the service does not write (lineage.compute_impact_analysis was
+# removed: it caches its result into impact_analysis rows).
 USER_WRITE_ENDPOINTS = frozenset(
     {
         "app.api.v1.compare.compare_portfolios",
@@ -40,7 +42,6 @@ USER_WRITE_ENDPOINTS = frozenset(
         "app.api.v1.site_intel_sites.score_site",
         "app.api.v1.site_intel_sites.unified_score",
         "app.api.v1.site_intel_sites.unified_compare",
-        "app.api.v1.lineage.compute_impact_analysis",
         "app.api.v1.deal_models.run_sensitivity",
         "app.api.v1.pe_macro.score_lbo_entry",
     }
@@ -102,9 +103,49 @@ def authenticate_bearer(authorization: Optional[str]) -> Dict[str, Any]:
         raise _unauthorized(str(e))
 
 
-def current_principal(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
+def authenticate_api_key(raw_key: str) -> Dict[str, Any]:
+    """An ``admin``-scope API key (``X-API-Key``) as an admin principal.
+
+    This is the non-interactive path for operator tooling — skills, curl,
+    ``scripts/nexdata_client.py``, eval runs — which cannot hold a 60-minute
+    browser JWT. ``read``/``write`` keys are for the ``/public`` API only and
+    are refused here, so handing a customer a read key never opens the
+    internal routers.
+    """
+    from app.auth.api_keys import APIKeyService, scope_allows
+
+    from app.core.database import get_db
+
+    db = next(get_db())
+    try:
+        info = APIKeyService(db).validate_key(raw_key)
+    finally:
+        db.close()
+    if not info:
+        raise _unauthorized("Invalid or expired API key")
+    if not scope_allows(info.get("scope"), "admin"):
+        raise _unauthorized(
+            "Only admin-scope API keys are accepted outside /api/v1/public; "
+            "use a bearer token"
+        )
+    return {
+        "user_id": None,
+        "email": info.get("owner_email"),
+        "name": f"api-key:{info.get('name')}",
+        "role": ROLE_ADMIN,
+        "aud": AUD_APP,
+        "api_key_id": info.get("id"),
+    }
+
+
+def current_principal(
+    authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+) -> Dict[str, Any]:
     if not auth_required():
         return dict(LOCAL_DEV_PRINCIPAL)
+    if not authorization and x_api_key:
+        return authenticate_api_key(x_api_key)
     return authenticate_bearer(authorization)
 
 
@@ -132,6 +173,7 @@ def require_admin_for_writes(
 
 def require_admin_or_stream_token(
     authorization: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
     stream_token: Optional[str] = Query(
         None, description="Short-lived token from POST /auth/stream-token (EventSource)"
     ),
@@ -140,6 +182,8 @@ def require_admin_or_stream_token(
         return dict(LOCAL_DEV_PRINCIPAL)
     if authorization:
         principal = authenticate_bearer(authorization)
+    elif x_api_key:
+        principal = authenticate_api_key(x_api_key)
     elif stream_token:
         try:
             principal = _with_auth_service(lambda svc: svc.verify_stream_token(stream_token))

@@ -10,7 +10,13 @@ Usage:
     client = NexdataClient()
     investors = client.search_investors("Sequoia")
     portfolio = client.get_portfolio(investors[0]["id"])
+
+Auth (SPEC_127): every internal route needs an admin principal. Set
+NEXDATA_API_KEY to an admin-scope key (scripts/create_api_key.py); it is sent
+as the X-API-Key header.
 """
+
+import os
 
 import httpx
 from typing import Any, Dict, List, Optional
@@ -41,10 +47,17 @@ class NexdataClient:
     - Data enrichment
     """
 
-    def __init__(self, base_url: str = DEFAULT_BASE_URL, timeout: float = DEFAULT_TIMEOUT):
+    def __init__(
+        self,
+        base_url: str = DEFAULT_BASE_URL,
+        timeout: float = DEFAULT_TIMEOUT,
+        api_key: Optional[str] = None,
+    ):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
-        self._client = httpx.Client(timeout=timeout)
+        api_key = api_key or os.environ.get("NEXDATA_API_KEY")
+        headers = {"X-API-Key": api_key} if api_key else {}
+        self._client = httpx.Client(timeout=timeout, headers=headers)
 
     def _get(self, path: str, params: Optional[Dict] = None) -> Dict[str, Any]:
         """Make GET request and return JSON."""
