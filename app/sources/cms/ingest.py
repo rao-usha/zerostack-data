@@ -621,10 +621,8 @@ async def _batch_insert_data(
     # Get column names from first record
     all_columns = list(column_defs.keys())
 
-    # Build INSERT statement with parameterized values
+    # Column list for the parameterized multi-row INSERT below
     columns_sql = ", ".join(all_columns)
-    placeholders = ", ".join([f":{col}" for col in all_columns])
-    insert_sql = f"INSERT INTO {table_name} ({columns_sql}) VALUES ({placeholders})"
 
     # Process in batches
     for i in range(0, len(records), batch_size):
@@ -643,8 +641,23 @@ async def _batch_insert_data(
 
             normalized_batch.append(normalized)
 
-        # Execute batch insert using parameterized query
-        db.execute(text(insert_sql), normalized_batch)
+        # One multi-row VALUES statement per chunk: executemany on text() is a
+        # round trip per row (~50 s per 1000-row page over the Cloud SQL proxy).
+        # Postgres caps bind parameters at 65535 per statement.
+        rows_per_stmt = max(1, min(len(normalized_batch), 60000 // len(all_columns)))
+        for j in range(0, len(normalized_batch), rows_per_stmt):
+            chunk = normalized_batch[j : j + rows_per_stmt]
+            values_sql = ", ".join(
+                "(" + ", ".join(f":{col}_{n}" for col in all_columns) + ")"
+                for n in range(len(chunk))
+            )
+            params = {
+                f"{col}_{n}": row[col] for n, row in enumerate(chunk) for col in all_columns
+            }
+            db.execute(
+                text(f"INSERT INTO {table_name} ({columns_sql}) VALUES {values_sql}"),
+                params,
+            )
         if commit:
             db.commit()
 

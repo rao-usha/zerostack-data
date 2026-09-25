@@ -313,3 +313,36 @@ def test_t9_rows_stream_before_last_page(pg_db):
 
     asyncio.run(run())
     assert seen_before_last["n"] == 30
+
+
+@pg
+def test_t10_insert_is_batched_not_row_by_row(pg_db):
+    """1000 rows must not be 1000 round trips: over the Cloud SQL proxy that
+    was ~50 s per page (measured live 2026-09-25)."""
+    from sqlalchemy import event
+
+    from app.sources.cms.ingest import ingest_medicare_utilization
+
+    data = {"NY": _rows("NY", 1000)}
+    inserts = []
+
+    def count(conn, cursor, statement, parameters, context, executemany):
+        if statement.lstrip().upper().startswith("INSERT INTO CMS_MEDICARE_UTILIZATION"):
+            inserts.append(executemany)
+
+    engine = pg_db.get_bind()
+    event.listen(engine, "before_cursor_execute", count)
+    try:
+        async def run():
+            c = _client(_dkan_handler(data))
+            try:
+                await ingest_medicare_utilization(
+                    db=pg_db, job_id=0, states=["NY"], client=c, page_size=1000)
+            finally:
+                await c.close()
+
+        asyncio.run(run())
+    finally:
+        event.remove(engine, "before_cursor_execute", count)
+    assert _counts(pg_db) == {"NY": 1000}
+    assert len(inserts) <= 10 and not any(inserts)  # multi-row VALUES, no executemany

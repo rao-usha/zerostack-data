@@ -61,3 +61,18 @@ it safe to put back.
 Re-adding cms to the nightly batch (separate decision after a live run);
 `cms:hospital_cost_reports` / `cms:drug_pricing` ingest logic beyond the shared
 client changes.
+
+## Follow-up: batched inserts (found in live verification)
+
+The first live WY run crawled: `_batch_insert_data` ran `text()` with a list of
+dicts, which psycopg2 executes as one round trip per row — ~50 s per 1000-row
+page over the Cloud SQL proxy (days for the national dataset). Inserts are now
+multi-row `VALUES` statements (≤ 60000 bind params each). T10 asserts no
+executemany and ≤ 10 statements for 1000 rows.
+
+## Live verification (2026-09-25, nexdata-worker-4, WORKER_MODE=1)
+
+- Worker held 3–4 established TCP connections during the run (was ~50).
+- WY: 18,816 rows in 26.6 s (19 pages ≈ 1.4 s/page at the 1 req/s limit).
+- Re-run: still 18,816 rows (per-state replace, no duplicates).
+- National estimate: ~10k pages ≈ 4 h, one connection.
