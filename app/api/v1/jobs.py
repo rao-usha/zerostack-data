@@ -204,7 +204,7 @@ SOURCE_DISPATCH: Dict[str, Tuple[str, str, List[str]]] = {
     "cms": (
         "app.sources.cms.ingest",
         "ingest_medicare_utilization",
-        ["year", "state", "limit"],
+        ["year", "state", "states", "limit"],  # states: job_splitter partitions (SPEC_140)
     ),
     "cms:hospital_cost_reports": (
         "app.sources.cms.ingest",

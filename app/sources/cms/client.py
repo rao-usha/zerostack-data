@@ -8,11 +8,36 @@ Handles HTTP communication with CMS data sources including:
 
 import asyncio
 import logging
+import os
 import random
-from typing import Dict, List, Optional, Any
+import time
+from typing import Any, AsyncIterator, Awaitable, Callable, Dict, List, Optional
+from urllib.parse import urlparse
+
 import httpx
 
 logger = logging.getLogger(__name__)
+
+USER_AGENT = "NexdataResearch/1.0 (research@nexdata.com; respectful research bot)"
+DEFAULT_REQUESTS_PER_SECOND = 1.0
+
+
+async def _shared_bucket_acquire(domain: str) -> bool:
+    """Take a token from the Postgres-backed per-domain bucket shared by all
+    workers (``rate_limit_bucket``; data.cms.gov = 1 req/s). Never blocks a
+    request on limiter failure."""
+    try:
+        from app.core.database import get_session_factory
+        from app.core.rate_limiter import acquire_distributed_token_with_wait
+
+        db = get_session_factory()()
+        try:
+            return await acquire_distributed_token_with_wait(db, domain, max_wait=60.0)
+        finally:
+            db.close()
+    except Exception as e:  # limiter unavailable: fall back to local pacing only
+        logger.debug(f"CMS distributed rate limit skipped for {domain}: {e}")
+        return True
 
 
 class CMSClient:
@@ -36,6 +61,9 @@ class CMSClient:
         max_concurrency: int = 4,
         max_retries: int = 3,
         backoff_factor: float = 2.0,
+        requests_per_second: Optional[float] = None,
+        transport: Optional[httpx.AsyncBaseTransport] = None,
+        distributed_acquire: Optional[Callable[[str], Awaitable[bool]]] = None,
     ):
         """
         Initialize CMS API client.
@@ -44,13 +72,33 @@ class CMSClient:
             max_concurrency: Maximum concurrent requests (bounded concurrency)
             max_retries: Maximum retry attempts for failed requests
             backoff_factor: Exponential backoff multiplier
+            requests_per_second: Local pacing for every request (default
+                CMS_REQUESTS_PER_SECOND env, else 1.0; 0 disables)
+            transport: httpx transport override (tests)
+            distributed_acquire: async ``(domain) -> bool`` token source; by
+                default the shared rate_limit_bucket when WORKER_MODE=1
         """
         self.max_concurrency = max_concurrency
         self.max_retries = max_retries
         self.backoff_factor = backoff_factor
+        if requests_per_second is None:
+            requests_per_second = float(
+                os.getenv("CMS_REQUESTS_PER_SECOND", DEFAULT_REQUESTS_PER_SECOND)
+            )
+        self.requests_per_second = requests_per_second
+        self._transport = transport
+        self._distributed_acquire = distributed_acquire
 
-        # Semaphore for bounded concurrency - MANDATORY per GLOBAL RULES
+        # Semaphore for bounded concurrency - MANDATORY per GLOBAL RULES.
+        # Every request (pages and bulk files) goes through it (SPEC_140).
         self.semaphore = asyncio.Semaphore(max_concurrency)
+        # One pooled client for the life of this CMSClient: a fresh
+        # AsyncClient per page meant a new TLS connection per ~75 KB page.
+        self._http: Optional[httpx.AsyncClient] = None
+        self._pace_lock = asyncio.Lock()
+        self._last_request_at: Optional[float] = None
+        self._now = time.monotonic
+        self._sleep = asyncio.sleep
 
         logger.info(
             f"Initialized CMSClient with max_concurrency={max_concurrency}, "
@@ -143,8 +191,7 @@ class CMSClient:
                 f"Fetching CMS Socrata data: offset={current_offset}, limit={current_limit}"
             )
 
-            async with self.semaphore:  # Bounded concurrency
-                records = await self._fetch_with_retry(url)
+            records = await self._fetch_with_retry(url)
 
             if not records:
                 # No more data
@@ -194,6 +241,50 @@ class CMSClient:
 
         return url + "?" + "&".join(params)
 
+    async def iter_dkan_pages(
+        self,
+        dataset_id: str,
+        size: int = 1000,
+        offset: int = 0,
+        filters: Optional[Dict[str, str]] = None,
+        max_records: Optional[int] = None,
+    ) -> AsyncIterator[List[Dict[str, Any]]]:
+        """
+        Yield DKAN pages one at a time, column names lower-cased to match our
+        DB schema (DKAN returns CamelCase). Callers can persist each page
+        before the next is fetched, so memory stays at one page (SPEC_140).
+        """
+        fetched = 0
+        current_offset = offset
+
+        while True:
+            if max_records and fetched >= max_records:
+                break
+
+            current_size = size
+            if max_records:
+                current_size = min(size, max_records - fetched)
+
+            url = self.build_dkan_url(
+                dataset_id=dataset_id,
+                size=current_size,
+                offset=current_offset,
+                filters=filters,
+            )
+            logger.info(
+                f"Fetching CMS DKAN data: offset={current_offset}, size={current_size}"
+            )
+            records = await self._fetch_with_retry(url)
+            if not records:
+                break
+
+            yield [{k.lower(): v for k, v in rec.items()} for rec in records]
+            fetched += len(records)
+
+            if len(records) < current_size:
+                break
+            current_offset += len(records)
+
     async def fetch_dkan_data(
         self,
         dataset_id: str,
@@ -203,10 +294,7 @@ class CMSClient:
         max_records: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """
-        Fetch data from CMS DKAN API.
-
-        Handles pagination automatically. Lowercases column names to match
-        our DB schema (DKAN returns CamelCase column names).
+        Fetch all DKAN pages into one list (see ``iter_dkan_pages`` to stream).
 
         Args:
             dataset_id: DKAN dataset UUID
@@ -218,48 +306,61 @@ class CMSClient:
         Returns:
             List of records with lowercased column names
         """
-        all_records = []
-        current_offset = offset
-
-        while True:
-            if max_records and len(all_records) >= max_records:
-                break
-
-            current_size = size
-            if max_records:
-                remaining = max_records - len(all_records)
-                current_size = min(size, remaining)
-
-            url = self.build_dkan_url(
-                dataset_id=dataset_id,
-                size=current_size,
-                offset=current_offset,
-                filters=filters,
-            )
-
-            logger.info(
-                f"Fetching CMS DKAN data: offset={current_offset}, size={current_size}"
-            )
-
-            async with self.semaphore:
-                records = await self._fetch_with_retry(url)
-
-            if not records:
-                break
-
-            # Lowercase all column names to match DB schema
-            lowered = [{k.lower(): v for k, v in rec.items()} for rec in records]
-            all_records.extend(lowered)
-
-            if len(records) < current_size:
-                break
-
-            current_offset += len(records)
-
+        all_records: List[Dict[str, Any]] = []
+        async for page in self.iter_dkan_pages(
+            dataset_id, size=size, offset=offset, filters=filters, max_records=max_records
+        ):
+            all_records.extend(page)
         logger.info(
             f"Fetched {len(all_records)} total records from DKAN dataset {dataset_id}"
         )
         return all_records
+
+    # -- transport + rate limiting (SPEC_140) ---------------------------------
+
+    def _client(self) -> httpx.AsyncClient:
+        if self._http is None or self._http.is_closed:
+            self._http = httpx.AsyncClient(
+                timeout=60.0,
+                headers={"User-Agent": USER_AGENT},
+                limits=httpx.Limits(
+                    max_connections=self.max_concurrency,
+                    max_keepalive_connections=self.max_concurrency,
+                ),
+                transport=self._transport,
+            )
+        return self._http
+
+    async def _throttle(self, url: str) -> None:
+        """Pace this request: local minimum interval, then the shared
+        per-domain bucket so the limit holds across every worker."""
+        if self.requests_per_second and self.requests_per_second > 0:
+            interval = 1.0 / self.requests_per_second
+            async with self._pace_lock:
+                now = self._now()
+                if self._last_request_at is not None:
+                    wait = self._last_request_at + interval - now
+                    if wait > 0:
+                        await self._sleep(wait)
+                self._last_request_at = self._now()
+
+        acquire = self._distributed_acquire
+        if acquire is None and os.getenv("WORKER_MODE", "0") == "1":
+            acquire = _shared_bucket_acquire
+        if acquire is not None:
+            domain = urlparse(url).netloc
+            if domain and not await acquire(domain):
+                logger.warning(f"CMS distributed rate limit wait timed out for {domain}")
+
+    async def _get(self, url: str, timeout: Optional[float] = None) -> httpx.Response:
+        async with self.semaphore:
+            await self._throttle(url)
+            if timeout is None:
+                response = await self._client().get(url)
+            else:
+                response = await self._client().get(url, timeout=timeout)
+            response.raise_for_status()
+            return response
 
     async def _fetch_with_retry(self, url: str) -> List[Dict[str, Any]]:
         """
@@ -276,10 +377,8 @@ class CMSClient:
         """
         for attempt in range(self.max_retries + 1):
             try:
-                async with httpx.AsyncClient(timeout=60.0) as client:
-                    response = await client.get(url)
-                    response.raise_for_status()
-                    return response.json()
+                response = await self._get(url)
+                return response.json()
 
             except httpx.HTTPStatusError as e:
                 if e.response.status_code == 429:  # Rate limited
@@ -296,7 +395,7 @@ class CMSClient:
                     logger.warning(
                         f"Rate limited, waiting {wait_time:.2f}s before retry"
                     )
-                    await asyncio.sleep(wait_time)
+                    await self._sleep(wait_time)
 
                     if attempt < self.max_retries:
                         continue
@@ -310,7 +409,7 @@ class CMSClient:
                     # Exponential backoff with jitter
                     wait_time = (self.backoff_factor**attempt) + random.uniform(0, 1)
                     logger.warning(f"Request failed, retrying in {wait_time:.2f}s: {e}")
-                    await asyncio.sleep(wait_time)
+                    await self._sleep(wait_time)
                     continue
 
                 logger.error(
@@ -335,50 +434,48 @@ class CMSClient:
         """
         logger.info(f"Fetching bulk file: {file_url}")
 
-        async with self.semaphore:  # Bounded concurrency
-            for attempt in range(self.max_retries + 1):
-                try:
-                    async with httpx.AsyncClient(
-                        timeout=300.0
-                    ) as client:  # Longer timeout for large files
-                        response = await client.get(file_url)
-                        response.raise_for_status()
-                        logger.info(f"Downloaded {len(response.content)} bytes")
-                        return response.content
+        # The semaphore and rate limit are taken per attempt in _get (SPEC_140),
+        # so a backoff sleep no longer holds a concurrency slot.
+        for attempt in range(self.max_retries + 1):
+            try:
+                # Longer timeout for large files
+                response = await self._get(file_url, timeout=300.0)
+                logger.info(f"Downloaded {len(response.content)} bytes")
+                return response.content
 
-                except httpx.HTTPStatusError as e:
-                    if e.response.status_code == 429:
-                        retry_after = e.response.headers.get("Retry-After")
-                        wait_time = (
-                            float(retry_after)
-                            if retry_after
-                            else (self.backoff_factor**attempt) + random.uniform(0, 1)
-                        )
-                        logger.warning(
-                            f"Rate limited, waiting {wait_time:.2f}s before retry"
-                        )
-                        await asyncio.sleep(wait_time)
-                        if attempt < self.max_retries:
-                            continue
-
-                    logger.error(f"HTTP error fetching bulk file: {e}")
-                    raise
-
-                except (httpx.RequestError, httpx.TimeoutException) as e:
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 429:
+                    retry_after = e.response.headers.get("Retry-After")
+                    wait_time = (
+                        float(retry_after)
+                        if retry_after
+                        else (self.backoff_factor**attempt) + random.uniform(0, 1)
+                    )
+                    logger.warning(
+                        f"Rate limited, waiting {wait_time:.2f}s before retry"
+                    )
+                    await self._sleep(wait_time)
                     if attempt < self.max_retries:
-                        wait_time = (self.backoff_factor**attempt) + random.uniform(
-                            0, 1
-                        )
-                        logger.warning(
-                            f"Request failed, retrying in {wait_time:.2f}s: {e}"
-                        )
-                        await asyncio.sleep(wait_time)
                         continue
 
-                    logger.error(
-                        f"Failed to fetch bulk file after {self.max_retries} retries: {e}"
+                logger.error(f"HTTP error fetching bulk file: {e}")
+                raise
+
+            except (httpx.RequestError, httpx.TimeoutException) as e:
+                if attempt < self.max_retries:
+                    wait_time = (self.backoff_factor**attempt) + random.uniform(
+                        0, 1
                     )
-                    raise
+                    logger.warning(
+                        f"Request failed, retrying in {wait_time:.2f}s: {e}"
+                    )
+                    await self._sleep(wait_time)
+                    continue
+
+                logger.error(
+                    f"Failed to fetch bulk file after {self.max_retries} retries: {e}"
+                )
+                raise
 
         raise Exception("Failed to fetch bulk file")
 
@@ -386,6 +483,7 @@ class CMSClient:
         """
         Clean up resources.
 
-        Currently no persistent resources to clean up (httpx clients are context-managed).
+        Closes the pooled HTTP client.
         """
-        pass
+        if self._http is not None and not self._http.is_closed:
+            await self._http.aclose()

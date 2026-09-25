@@ -21,6 +21,20 @@ from app.sources.cms import metadata
 
 logger = logging.getLogger(__name__)
 
+# DKAN filter column for the rendering provider's state (medicare utilization)
+UTILIZATION_STATE_FILTER = "Rndrng_Prvdr_State_Abrvtn"
+
+# Every state value the utilization dataset uses: 50 states, DC, territories,
+# and the military / foreign codes. A run with no state(s) walks all of them,
+# one state at a time, so no request ever asks for the whole nation (SPEC_140).
+ALL_UTILIZATION_STATES = (
+    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA", "HI", "ID",
+    "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO",
+    "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA",
+    "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
+    "PR", "VI", "GU", "AS", "MP", "AA", "AE", "AP", "XX", "ZZ",
+)
+
 
 async def ingest_medicare_utilization(
     db: Session,
@@ -28,6 +42,9 @@ async def ingest_medicare_utilization(
     year: Optional[int] = None,
     state: Optional[str] = None,
     limit: Optional[int] = None,
+    states: Optional[List[str]] = None,
+    client: Optional[CMSClient] = None,
+    page_size: int = 1000,
 ) -> Dict[str, Any]:
     """
     Ingest Medicare Provider Utilization and Payment Data.
@@ -41,6 +58,15 @@ async def ingest_medicare_utilization(
         year: Optional year filter (defaults to latest available)
         state: Optional state filter (two-letter abbreviation)
         limit: Optional limit on number of records (for testing)
+        states: State list (job_splitter partitions pass this); overrides
+            ``state``. Neither given = every state, one at a time.
+        client: CMSClient to use (tests); created and closed here otherwise
+        page_size: DKAN page size
+
+    DKAN runs are per state: that state's rows are deleted and the fresh pages
+    inserted as they arrive, committed once per state. Reruns replace rather
+    than duplicate, a failed state keeps its previous rows, and memory holds
+    one page, not the dataset (SPEC_140).
 
     Returns:
         Dictionary with ingestion results
@@ -91,27 +117,37 @@ async def ingest_medicare_utilization(
         _register_dataset(db, dataset_type, meta)
 
         # 4. Initialize CMS client
-        client = CMSClient(
-            max_concurrency=settings.max_concurrency,
-            max_retries=settings.max_retries,
-            backoff_factor=settings.retry_backoff_factor,
-        )
+        own_client = client is None
+        if own_client:
+            client = CMSClient(
+                max_concurrency=settings.max_concurrency,
+                max_retries=settings.max_retries,
+                backoff_factor=settings.retry_backoff_factor,
+            )
 
         try:
-            # 5. Fetch data via DKAN or Socrata
+            # 5. Fetch data via DKAN (per state, streamed) or Socrata
             if use_dkan:
-                # Build DKAN filter dict (CamelCase keys as DKAN expects)
-                dkan_filters = {}
-                if state:
-                    dkan_filters["Rndrng_Prvdr_State_Abrvtn"] = state.upper()
+                if states:
+                    state_list = [s.upper() for s in states]
+                elif state:
+                    state_list = [state.upper()]
+                else:
+                    state_list = list(ALL_UTILIZATION_STATES)
 
-                logger.info(f"Fetching data from DKAN dataset {dkan_dataset_id}")
-                records = await client.fetch_dkan_data(
-                    dataset_id=dkan_dataset_id,
-                    size=1000,
-                    filters=dkan_filters if dkan_filters else None,
-                    max_records=limit,
+                logger.info(
+                    f"Fetching DKAN dataset {dkan_dataset_id} for {len(state_list)} state(s)"
                 )
+                rows_inserted = 0
+                for st in state_list:
+                    remaining = None if limit is None else limit - rows_inserted
+                    if remaining is not None and remaining <= 0:
+                        break
+                    rows_inserted += await _replace_state_rows(
+                        db, client, dkan_dataset_id, table_name, meta["columns"],
+                        st, page_size, remaining,
+                    )
+                records = None
             else:
                 # Legacy Socrata path
                 where_clauses = []
@@ -127,14 +163,15 @@ async def ingest_medicare_utilization(
                     max_records=limit,
                 )
 
-            logger.info(f"Fetched {len(records)} records")
+            if records is not None:
+                logger.info(f"Fetched {len(records)} records")
 
-            # 7. Insert data
-            if records:
-                await _batch_insert_data(db, table_name, records, meta["columns"])
+                # 7. Insert data
+                if records:
+                    await _batch_insert_data(db, table_name, records, meta["columns"])
 
-            # 8. Calculate results
-            rows_inserted = len(records)
+                # 8. Calculate results
+                rows_inserted = len(records)
             duration = (datetime.utcnow() - start_time).total_seconds()
 
             # 9. Update job status
@@ -165,7 +202,8 @@ async def ingest_medicare_utilization(
             }
 
         finally:
-            await client.close()
+            if own_client:
+                await client.close()
 
     except Exception as e:
         logger.error(f"CMS Medicare utilization ingestion failed: {e}", exc_info=True)
@@ -525,12 +563,47 @@ def _unpivot_drug_spending_records(
     return long_records
 
 
+async def _replace_state_rows(
+    db: Session,
+    client: CMSClient,
+    dataset_id: str,
+    table_name: str,
+    column_defs: Dict[str, Dict[str, str]],
+    state: str,
+    page_size: int,
+    max_records: Optional[int],
+) -> int:
+    """Replace one state's utilization rows: delete, stream pages in, commit
+    once. Any failure rolls back to the state's previous rows."""
+    inserted = 0
+    try:
+        db.execute(
+            text(f"DELETE FROM {table_name} WHERE rndrng_prvdr_state_abrvtn = :st"),
+            {"st": state},
+        )
+        async for page in client.iter_dkan_pages(
+            dataset_id,
+            size=page_size,
+            filters={UTILIZATION_STATE_FILTER: state},
+            max_records=max_records,
+        ):
+            await _batch_insert_data(db, table_name, page, column_defs, commit=False)
+            inserted += len(page)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    logger.info(f"CMS utilization {state}: {inserted} rows")
+    return inserted
+
+
 async def _batch_insert_data(
     db: Session,
     table_name: str,
     records: list,
     column_defs: Dict[str, Dict[str, str]],
     batch_size: int = 1000,
+    commit: bool = True,
 ) -> None:
     """
     Batch insert data into Postgres using parameterized queries.
@@ -572,7 +645,8 @@ async def _batch_insert_data(
 
         # Execute batch insert using parameterized query
         db.execute(text(insert_sql), normalized_batch)
-        db.commit()
+        if commit:
+            db.commit()
 
         logger.debug(f"Inserted batch of {len(batch)} rows into {table_name}")
 
