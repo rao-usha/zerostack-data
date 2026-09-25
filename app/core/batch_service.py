@@ -95,7 +95,9 @@ TIER_3 = Tier(
         SourceDef("fdic", {"dataset": "financials", "incremental": True}),
         SourceDef("sec:formadv"),
         # form_d — no ingest function implemented yet
-        SourceDef("cms", {"dataset": "utilization", "incremental": True}),
+        # cms removed 2026-09-24: its utilization splits open ~50 parallel connections
+        # to data.cms.gov, which wedges Docker Desktop networking every night. Re-add
+        # once the CMS client honours the 1-2 req/s per-domain limit.
         SourceDef("fbi_crime", {"dataset": "ucr"}),
         SourceDef("irs_soi", {"dataset": "zip_income", "year": 2021, "incremental": True}),
         SourceDef("data_commons:us_states"),
@@ -208,7 +210,7 @@ DEFAULT_COLLECTION_GROUPS = [
     {"name": "economic", "description": "Weekly energy, trade, and weather data", "priority": 3, "max_concurrent": 3,
      "sources": ["eia", "cftc_cot", "noaa"]},
     {"name": "government", "description": "Monthly government releases and regulatory filings", "priority": 5, "max_concurrent": 4,
-     "sources": ["bea", "bls", "fema", "fdic", "sec:formadv", "cms", "fbi_crime", "irs_soi",
+     "sources": ["bea", "bls", "fema", "fdic", "sec:formadv", "fbi_crime", "irs_soi",
                   "data_commons:us_states", "fcc_broadband:all_states", "job_postings:all"]},
     {"name": "deep", "description": "Quarterly Census, SEC, trade, and slow-moving data", "priority": 8, "max_concurrent": 3,
      "sources": ["census", "uspto", "us_trade:summary", "bts", "international_econ:worldbank_countries",
