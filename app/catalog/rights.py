@@ -21,6 +21,13 @@ Rules applied:
   pages are someone else's content.
 - Nexdata-derived marts are ``internal_only`` until the commercial posture
   (PLAN_087 deferred SPEC_130) is decided.
+- The site_intel family default is ``internal_only`` (SPEC_141): a new
+  collector must declare its own ``COLLECTOR_RIGHTS`` entry before it can be
+  anything more permissive; it never silently inherits ``open``.
+
+SPEC_141 applied the verified PII corrections (PLAN_088 §1.6) and the cited
+tightenings (HIFLD, the site_intel default); loosenings stay proposals for
+SPEC_142.
 """
 
 from __future__ import annotations
@@ -143,9 +150,12 @@ SOURCE_RIGHTS: Dict[str, SourceRights] = {
     "synthetic": SourceRights("Nexdata synthetic data (generated)", "internal_only", "none", "synthetic",
                               notes="Never publish; written into real tables (job_postings, lp_fund)."),
     # ── site intelligence ───────────────────────────────────────────────
+    # Default for a collector with no COLLECTOR_RIGHTS entry: nothing leaves.
+    # Every existing collector is declared explicitly below (SPEC_141; the old
+    # default made 27 collectors, HIFLD included, silently 'open').
     "site_intel": SourceRights(
-        "Mixed: mostly US federal public domain; per-collector overrides for vendors and scraped sites",
-        "open", "none", "official"),
+        "Undeclared: add a COLLECTOR_RIGHTS entry for this collector", "internal_only", "none",
+        "official"),
     # ── Nexdata-derived ─────────────────────────────────────────────────
     "entity_master": SourceRights("Nexdata-derived from SEC EDGAR (public domain inputs)",
                                   "internal_only", "business_contact", "derived"),
@@ -160,7 +170,50 @@ def _r(license: str, redistribution: str, origin: str, pii: str = "none",
     return SourceRights(license, redistribution, pii, origin, attribution=attribution, notes=notes)
 
 
+def _si_usg(agency: str, notes: Optional[str] = None) -> SourceRights:
+    """A site-intel collector reading a US federal source (explicit, never a default)."""
+    return _usg(agency, "none", notes)
+
+
 COLLECTOR_RIGHTS: Dict[str, SourceRights] = {
+    # ── US federal sources (17 U.S.C. §105; unreviewed) ─────────────────
+    "bls": _si_usg("U.S. Bureau of Labor Statistics (LAUS, OEWS)"),
+    "bls_qcew": _si_usg("U.S. Bureau of Labor Statistics (QCEW)"),
+    "bts": _si_usg("Bureau of Transportation Statistics (NTAD)"),
+    "bts_cargo": _si_usg("Bureau of Transportation Statistics (T-100)"),
+    "bts_ntad": _si_usg("Bureau of Transportation Statistics (NTAD)"),
+    "cdfi_oz": _si_usg("U.S. HUD / CDFI Fund (Opportunity Zones)"),
+    "census_bps": _si_usg("U.S. Census Bureau, Building Permits Survey"),
+    "census_gov": _si_usg("U.S. Census Bureau, Census of Governments"),
+    "census_trade": _si_usg("U.S. Census Bureau, international trade"),
+    "eia": _si_usg("U.S. Energy Information Administration"),
+    "eia_gas": _si_usg("U.S. Energy Information Administration"),
+    "epa_acres": _si_usg("U.S. EPA ACRES (via FRS)"),
+    "epa_envirofacts": _si_usg("U.S. EPA Envirofacts (TRI)"),
+    "epa_sdwis": _si_usg("U.S. EPA SDWIS"),
+    "fcc": _si_usg("Federal Communications Commission"),
+    "fema": _si_usg("FEMA National Risk Index"),
+    "fema_nfhl": _si_usg("FEMA National Flood Hazard Layer"),
+    "fra": _si_usg("Federal Railroad Administration / BTS NTAD rail network"),
+    "ftz_board": _si_usg("Foreign-Trade Zones Board (U.S. Department of Commerce)",
+                         "The loaded rows are a hand-compiled seed list (datasets origin 'curated')."),
+    "nrel_resource": _r("NREL open data (DOE national laboratory, contractor-operated; free with credit)",
+                        "open", "official", attribution="Source: National Renewable Energy Laboratory",
+                        notes="NREL is a contractor-operated lab: not strictly 17 U.S.C. §105 (PLAN_088 §1.7)."),
+    "usace": _si_usg("U.S. Army Corps of Engineers, Waterborne Commerce Statistics"),
+    "usda_ams": _si_usg("USDA Agricultural Marketing Service"),
+    "usfws_nwi": _si_usg("U.S. Fish and Wildlife Service, National Wetlands Inventory"),
+    "usgs_3dep": _si_usg("U.S. Geological Survey (3DEP)"),
+    "usgs_earthquake": _si_usg("U.S. Geological Survey"),
+    "usgs_water": _si_usg("U.S. Geological Survey Water Services"),
+    # HIFLD: DHS withdrew substations from public release in 2022 and shut
+    # HIFLD Open on 2025-08-26; the collector reads a third-party (Rutgers)
+    # mirror (hifld_collector.py:51-52). Cited tightening, PLAN_088 §1.7.
+    "hifld": _r("HIFLD layers via a third-party mirror (HIFLD Open discontinued 2025-08-26)",
+                "restricted", "scraped",
+                notes="Citation: atcoordinates.info/2025/08/08/hifld-open-gis-portal-shuts-down-aug-26-2025. "
+                      "Substation layer withdrawn from public release in 2022."),
+    # ── vendors, scraped and derived ────────────────────────────────────
     "drewry": _r("Drewry WCI (proprietary index, scraped headline)", "restricted", "scraped"),
     "freightos": _r("Freightos FBX terms (proprietary index)", "restricted", "scraped"),
     "scfi": _r("Shanghai Shipping Exchange SCFI (proprietary index)", "restricted", "scraped"),
@@ -181,8 +234,11 @@ COLLECTOR_RIGHTS: Dict[str, SourceRights] = {
                            "business_contact"),
     "three_pl_sec": _r(USG, "internal_only", "derived", notes="SEC facts joined onto scraped 3PL list"),
     "three_pl_fmcsa": _r(USG, "internal_only", "derived", notes="FMCSA facts joined onto scraped 3PL list"),
-    "fmcsa": _r(USG, "open", "official", "business_contact",
-                attribution="Source: FMCSA", notes="Carrier registrations include contact details."),
+    # PII raised to personal (SPEC_141, PLAN_088 §1.6): the FMCSA census includes
+    # owner-operators, whose legal name, phone, email and address are a natural person's.
+    "fmcsa": _r(USG, "open", "official", "personal",
+                attribution="Source: FMCSA",
+                notes="Carrier registrations include sole proprietors (owner-operators): personal data."),
 }
 
 # Per-dataset overrides where one family mixes licences (key = dataset key).
@@ -199,7 +255,10 @@ DATASET_RIGHTS: Dict[str, SourceRights] = {
                         "Reporting owners are natural persons."),
     "sec_form_d": _usg("U.S. Securities and Exchange Commission (EDGAR)", "personal",
                        "Related persons are natural persons."),
-    "sec_13f": _usg("U.S. Securities and Exchange Commission (EDGAR)", "none"),
+    # SPEC_141: signature_name/title/phone/city name the natural person who signed.
+    "sec_13f": _usg("U.S. Securities and Exchange Commission (EDGAR)", "business_contact",
+                    "Filings carry the signatory's name, title, phone and city and the "
+                    "manager's street address."),
     "sec_companyfacts": _usg("U.S. Securities and Exchange Commission (EDGAR)", "none"),
     "sec_company_financials": _usg("U.S. Securities and Exchange Commission (EDGAR)", "none"),
     "entity_source_records": SourceRights(

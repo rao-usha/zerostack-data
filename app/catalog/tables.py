@@ -165,8 +165,27 @@ def pattern_generated_by(pattern: str, source_text: str) -> bool:
             continue
         if any(rx.match(c) for c in candidates):
             return True
+        # the template's own shape (f"acs5_tract_{year}_demand" -> acs5_tract_x_demand)
+        if pattern_matches(pattern, re.sub(r"\{[^{}]+\}", "x", template)):
+            return True
     # a literal table name in the package that the pattern covers
     return any(pattern_matches(pattern, lit) for lit in literals if len(lit) > len(prefix))
+
+
+def table_generated_by(table: str, source_text: str) -> bool:
+    """True when ``source_text`` (a producer's package) names ``table`` as a
+    literal or has an f-string table-name template with literal letters that
+    produces it (``f"fbi_crime_{kind}_{scope}"`` -> ``fbi_crime_leoka_national``).
+
+    Lets a spec list a generated table explicitly (fact table first) instead
+    of hiding it behind a pattern (SPEC_141)."""
+    if table in set(_LITERAL_RE.findall(source_text)):
+        return True
+    for template in _FSTRING_RE.findall(source_text):
+        rx, has_letters = _template_regex(template)
+        if has_letters and rx.match(table):
+            return True
+    return False
 
 
 def producer_module(producer: str) -> Optional[str]:
@@ -190,4 +209,12 @@ def producer_module(producer: str) -> Optional[str]:
         return cls.__module__ if cls else None
     if kind == "api":
         return f"app.api.v1.{name}"
+    if kind == "script":
+        # scripts/<name>.py: the app.sources module it drives does the writing
+        try:
+            text = (REPO_ROOT / "scripts" / f"{name}.py").read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            return None
+        m = re.search(r"^from (app\.sources\.[\w.]+) import", text, re.M)
+        return m.group(1) if m else None
     return None

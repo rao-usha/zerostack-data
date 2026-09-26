@@ -12,6 +12,13 @@ tables first, then pattern-expanded ones) and an overall ``LIVE_DEADLINE_S``;
 every table past either limit gets the planner estimate. Only one
 computation per dataset runs at a time — concurrent requests wait for it and
 share the result.
+
+Only base tables count (SPEC_141): a view such as ``fred_observations`` (a
+UNION of the ``fred_*`` tables) matched the ``fred_*`` pattern and doubled
+the row count. A dataset that owns only part of a shared table declares
+``row_filters``; its counts apply the predicate, and a filtered count that
+cannot run exactly reports ``rows: null`` rather than the whole table's
+estimate.
 """
 
 from __future__ import annotations
@@ -20,7 +27,7 @@ import logging
 import threading
 import time
 from datetime import date, datetime
-from typing import Any, Dict, Iterable, List, Optional, Set
+from typing import Any, Dict, FrozenSet, Iterable, List, Optional, Set
 
 from sqlalchemy import inspect, text
 from sqlalchemy.engine import Engine
@@ -37,6 +44,14 @@ COVERAGE_TIMEOUT_MS = 5000
 MAX_EXACT_COUNTS = 12
 LIVE_DEADLINE_S = 20.0
 
+# Views over catalog tables. Never pattern-expanded or counted as a dataset's
+# table, and the dataset_registry mirror does not attribute them to a dataset.
+KNOWN_VIEWS: FrozenSet[str] = frozenset({
+    "fred_observations",           # UNION of the fred_* category tables
+    "public_company_financials",   # over sec_financial_facts / sec_company_metadata
+    "lp_strategy_quarterly_view",  # over the public_lp_strategies tables
+})
+
 _cache: Dict[str, tuple] = {}
 _lock = threading.Lock()
 _key_locks: Dict[str, threading.Lock] = {}
@@ -48,21 +63,21 @@ def _is_pg(engine: Engine) -> bool:
 
 
 def existing_tables(engine: Engine, schemas: Iterable[str] = ("public",)) -> Set[str]:
-    """Normalised names of tables and views that exist now."""
+    """Normalised names of the base tables that exist now (PG: relkind r/p; no views)."""
     insp = inspect(engine)
     out: Set[str] = set()
     for schema in set(schemas) | {"public"}:
         if not _is_pg(engine):
             if schema != "public":
                 continue
-            names = insp.get_table_names() + insp.get_view_names()
+            names = insp.get_table_names()
         else:
             try:
-                names = insp.get_table_names(schema=schema) + insp.get_view_names(schema=schema)
+                names = insp.get_table_names(schema=schema)
             except Exception:
                 names = []
         out |= {normalize(schema, n) for n in names}
-    return out
+    return out - KNOWN_VIEWS
 
 
 def claimed_tables(specs: Iterable[DatasetSpec]) -> Dict[str, Set[str]]:
@@ -88,7 +103,7 @@ def resolve_tables(spec: DatasetSpec, existing: Set[str],
         claimed = claimed_tables(get_catalog())
     out = list(spec.tables)
     for t in expand(spec.table_patterns, existing):
-        if t in out or (claimed.get(t, set()) - {spec.key}):
+        if t in out or t in KNOWN_VIEWS or (claimed.get(t, set()) - {spec.key}):
             continue
         out.append(t)
     return out
@@ -117,23 +132,29 @@ def estimate_rows(engine: Engine, table: str) -> Optional[int]:
 
 
 def count_rows(engine: Engine, table: str, exists: bool, timeout_ms: int = COUNT_TIMEOUT_MS,
-               exact: bool = True) -> Dict[str, Any]:
+               exact: bool = True, where: Optional[str] = None) -> Dict[str, Any]:
+    """``where``: the dataset's row filter on a shared table (a validated,
+    read-only predicate from the catalog, never user input)."""
     stat: Dict[str, Any] = {"table": table, "exists": exists, "rows": None, "rows_exact": False}
+    if where:
+        stat["row_filter"] = where
     if not exists:
         return stat
     if exact:
         schema, name = split(table)
         fq = f"{qi(schema)}.{qi(name)}" if _is_pg(engine) else qi(name)
+        sql = f"SELECT count(*) FROM {fq}" + (f" WHERE ({where})" if where else "")
         try:
             with engine.connect() as conn:
                 with conn.begin():
                     _set_timeout(conn, engine, timeout_ms)
-                    stat["rows"] = int(conn.execute(text(f"SELECT count(*) FROM {fq}")).scalar() or 0)
+                    stat["rows"] = int(conn.execute(text(sql)).scalar() or 0)
                     stat["rows_exact"] = True
             return stat
         except Exception as e:  # statement timeout, permissions, dropped mid-flight
             logger.info(f"[catalog] exact count of {table} failed ({type(e).__name__}); using estimate")
-    stat["rows"] = estimate_rows(engine, table)
+    # the planner estimate is for the whole table: wrong for a filtered share
+    stat["rows"] = None if where else estimate_rows(engine, table)
     return stat
 
 
@@ -188,9 +209,10 @@ def dataset_live(engine: Engine, spec: DatasetSpec, refresh: bool = False,
         existing = existing_tables(engine, schemas)
         tables: List[Dict[str, Any]] = []
         exact_done = 0
+        filters = dict(spec.row_filters)
         for t in resolve_tables(spec, existing):
             exact = exact_done < max_exact and time.monotonic() - started < deadline_s
-            stat = count_rows(engine, t, t in existing, exact=exact)
+            stat = count_rows(engine, t, t in existing, exact=exact, where=filters.get(t))
             if exact and stat["exists"]:
                 exact_done += 1
             tables.append(stat)

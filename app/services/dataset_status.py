@@ -85,6 +85,7 @@ COVERAGE_ERROR_TTL_S = 60              # a failed/skipped coverage is retried so
 COVERAGE_TIMEOUT_MS = 1500             # the one combined coverage statement
 COVERAGE_FALLBACK_TIMEOUT_MS = 1000    # each statement run alone
 COVERAGE_FALLBACK_DEADLINE_S = 3.0     # after this, the rest are "deadline" until retried
+COVERAGE_CHUNK = 32                    # coverage queries per combined statement
 BACKGROUND_REFRESH = True              # stale coverage refreshed off the request path
 PARTIAL_PREFIX = "PARTIAL:"             # app.core.ingestion_job_sync.PARTIAL_PREFIX
 SUPERSEDED_PREFIX = "superseded:"       # app.ingest.bulk.retention.SUPERSEDED_PREFIX
@@ -677,6 +678,7 @@ def collect_facts(db: Session, pmap: ProducerMap, now: datetime) -> Facts:
 # 'error' | 'deadline' (not tried: the time budget ran out).
 _coverage_cache: Dict[str, Tuple[float, Any, Optional[str]]] = {}
 _coverage_suspect: set = set()      # failed/timed out last time: run alone
+_coverage_attempted: Dict[str, float] = {}  # last time each query actually ran
 _coverage_refreshing: set = set()   # a background refresh is in flight
 _coverage_lock = threading.Lock()
 
@@ -693,6 +695,14 @@ def clear_cache() -> None:
     with _coverage_lock:
         _coverage_cache.clear()
         _coverage_suspect.clear()
+        _coverage_attempted.clear()
+
+
+def _mark_attempted(specs: Sequence[DatasetSpec]) -> None:
+    now_mono = time.monotonic()
+    with _coverage_lock:
+        for s in specs:
+            _coverage_attempted[_coverage_key(s)] = now_mono
 
 
 def _coverage_key(spec: DatasetSpec) -> str:
@@ -711,33 +721,52 @@ def _local_timeout(conn, engine, timeout_ms: int) -> None:
 
 
 def _compute_coverage(engine, specs: Sequence[DatasetSpec]) -> Dict[str, Tuple[Any, Optional[str]]]:
-    """Compute and cache coverage for ``specs``: one combined statement for
-    those not known to be slow or broken; the rest (and all of them, if the
-    combined one fails) one by one, each under its own timeout, within
-    ``COVERAGE_FALLBACK_DEADLINE_S``."""
+    """Compute and cache coverage for ``specs``: combined statements of
+    ``COVERAGE_CHUNK`` queries for those not known to be slow or broken; the
+    rest (and every member of a chunk that failed) one by one, each under its
+    own timeout, within ``COVERAGE_FALLBACK_DEADLINE_S``. Both passes take
+    the least recently attempted queries first, and chunks not started
+    within the deadline wait for the next pass, so the work per call stays
+    bounded and every query is eventually run (SPEC_141 review)."""
     with _coverage_lock:
-        alone = [s for s in specs if _coverage_key(s) in _coverage_suspect]
-    combined = [s for s in specs if s not in alone]
+        # least recently attempted first (never attempted before all): a pass
+        # cut short by the deadline resumes where it stopped next time, so a
+        # slow query late in the list is eventually reached and isolated
+        order = sorted(specs, key=lambda s: _coverage_attempted.get(_coverage_key(s), 0.0))
+        alone = [s for s in order if _coverage_key(s) in _coverage_suspect]
+    combined = [s for s in order if s not in alone]
     values: Dict[str, Tuple[Any, Optional[str]]] = {}
-    if combined:
+    # chunks, each its own statement: one slow query only sends its own
+    # chunk to the one-by-one pass (SPEC_141 grew the batch to ~130 queries)
+    chunk_started = time.monotonic()
+    for start in range(0, len(combined), max(1, COVERAGE_CHUNK)):
+        chunk = combined[start:start + max(1, COVERAGE_CHUNK)]
+        if start and time.monotonic() - chunk_started > COVERAGE_FALLBACK_DEADLINE_S:
+            values.update({s.key: (None, "deadline") for s in chunk})
+            continue
         select = ", ".join(
-            f"({s.coverage_sql.strip().rstrip(';')}) AS c{i}" for i, s in enumerate(combined))
+            f"({s.coverage_sql.strip().rstrip(';')}) AS c{i}" for i, s in enumerate(chunk))
         try:
             with engine.connect() as conn:
                 with conn.begin():
                     _local_timeout(conn, engine, COVERAGE_TIMEOUT_MS)
                     row = conn.execute(text(f"SELECT {select}")).one()
-            values.update({s.key: (row[i], None) for i, s in enumerate(combined)})
+            values.update({s.key: (row[i], None) for i, s in enumerate(chunk)})
+            _mark_attempted(chunk)
         except Exception as e:
             logger.info(f"[dataset_status] combined coverage failed ({type(e).__name__}); one by one")
-            alone = combined + alone
+            alone = alone + chunk
     if alone:
+        # a chunk's members failed together: rotate across the whole list
+        alone.sort(key=lambda s: _coverage_attempted.get(_coverage_key(s), 0.0))
         started = time.monotonic()
         with engine.connect() as conn:
-            for s in alone:
-                if time.monotonic() - started > COVERAGE_FALLBACK_DEADLINE_S:
+            for n, s in enumerate(alone):
+                # at least one query per pass, so every pass makes progress
+                if n and time.monotonic() - started > COVERAGE_FALLBACK_DEADLINE_S:
                     values[s.key] = (None, "deadline")
                     continue
+                _mark_attempted([s])
                 try:
                     with conn.begin():
                         _local_timeout(conn, engine, COVERAGE_FALLBACK_TIMEOUT_MS)
@@ -1066,10 +1095,14 @@ def _tables(spec: DatasetSpec, ctx: Context, claimed) -> Tuple[List[Dict[str, An
                   for t in hit["tables"]]
         return tables, hit.get("coverage_through") if not hit.get("coverage_error") else None
     tables = []
+    filters = dict(spec.row_filters)
     for name in resolve_tables(spec, set(rels), claimed):
         stat = rels.get(name)
+        # the estimate is for the whole table: wrong for a dataset that owns
+        # only the rows its row_filter selects (SPEC_141), as in live.count_rows
+        rows = stat[0] if stat and name not in filters else None
         tables.append({"name": name, "exists": stat is not None,
-                       "rows": stat[0] if stat else None, "rows_exact": False,
+                       "rows": rows, "rows_exact": False,
                        "bytes": stat[1] if stat else None})
     return tables, None
 
@@ -1303,8 +1336,11 @@ def build_status(
     for spec in selected:
         tables, cached_cov = _tables(spec, ctx, claimed)
         prepared.append((spec, tables, cached_cov))
-        if spec.coverage_sql and cached_cov is None and spec.tables and \
-                all(t in facts.relations for t in spec.tables):
+        # declared tables must all exist; a pattern-only spec needs at least
+        # one resolved table (SPEC_141: 31 pattern-only specs have coverage_sql)
+        if spec.coverage_sql and cached_cov is None and \
+                all(t in facts.relations for t in spec.tables) and \
+                any(t["exists"] for t in tables):
             need_coverage.append(spec)
     coverage = coverage_for(db, need_coverage) if need_coverage else {}
     if facts.degraded:
@@ -1316,6 +1352,9 @@ def build_status(
         ev = facts.evidence.get(spec.key) or Evidence()
         existing = [t for t in tables if t["exists"]]
         rows_total = sum(t["rows"] or 0 for t in existing) if existing else None
+        # a filtered share with no count is unknown, not empty: never "never_run" on that
+        filtered = dict(spec.row_filters)
+        unknown_share = any(t["rows"] is None and t["name"] in filtered for t in existing)
         if cached_cov is not None:
             cov, cov_error = cached_cov, None
         elif spec in need_coverage:
@@ -1323,7 +1362,8 @@ def build_status(
         else:
             cov, cov_error = None, "missing_tables"
         st, reason, blockers, schedule, clocks = derive(
-            spec, ev, ctx, cov, has_rows=bool(rows_total), coverage_error=cov_error)
+            spec, ev, ctx, cov, has_rows=bool(rows_total) or unknown_share,
+            coverage_error=cov_error)
         if facts.degraded and st in ABSENCE_STATUSES:
             # these rest on evidence NOT being there; some of it could not be read
             reason = (f"evidence incomplete ({', '.join(facts.degraded)} unavailable); "
@@ -1340,6 +1380,10 @@ def build_status(
             "cadence": spec.cadence,
             "status_public": spec.status_public,
             "producer": spec.producer,
+            # declared honesty flags (SPEC_141): a seeded or fabricated
+            # dataset can be "current" and still must not be trusted
+            "data_state": spec.data_state,
+            "limitations": list(spec.limitations),
             "status": st,
             "status_reason": reason,
             "tables": tables,

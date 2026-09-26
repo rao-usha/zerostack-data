@@ -9,28 +9,52 @@ block that decides whether it may ever leave the building.
 
 The vocabularies are closed on purpose: a typo in ``redistribution`` must
 fail at import, not publish a restricted dataset.
+
+SPEC_141 (catalog truth pass) added the honesty fields: ``data_state`` and
+``limitations`` say what is really loaded, ``missing_tables`` names declared
+tables that do not exist, ``row_filters`` scope a dataset's rows inside a
+shared table, and ``coverage_basis`` says what ``coverage_sql`` measures.
 """
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import date
 from typing import Optional, Tuple
 
 KINDS = ("reference", "filings", "timeseries", "holdings", "derived_mart", "entity", "geo", "other")
 RERUN_POLICIES = ("idempotent", "append_only", "destructive", "currency_only")
 REDISTRIBUTION = ("internal_only", "attribution", "open", "restricted")
 PII_CLASSES = ("none", "business_contact", "personal")
-ORIGINS = ("official", "derived", "llm_extracted", "synthetic", "scraped")
+# curated: hand-compiled or seed lists (FTZ seed data, incentive programs ...)
+ORIGINS = ("official", "derived", "llm_extracted", "synthetic", "scraped", "curated")
 STATUS_PUBLIC = ("ga", "beta", "internal", "archival", "retired")
 # bulk:<BulkSource.name> | dispatch:<SOURCE_DISPATCH key> | collector:<SiteIntelSource>
 # | job:<QueueJobType>[#stage] | api:<app/api/v1 module> (in-process router work)
-PRODUCER_KINDS = ("bulk", "dispatch", "collector", "job", "api")
+# | script:<scripts/*.py name> (a checked-in script is the only writer)
+PRODUCER_KINDS = ("bulk", "dispatch", "collector", "job", "api", "script")
+# What coverage_sql measures: the end of the period covered, an as-of / load
+# date (snapshot data with no period column), a fixed vintage, or the end of a
+# rolling window (older rows are dropped).
+COVERAGE_BASES = ("period", "as_of", "fixed_vintage", "rolling")
+# What the last verification found in the tables: the worst finding, with the
+# detail in ``limitations``.
+DATA_STATES = ("ok", "stale", "empty", "missing_tables", "key_columns_null", "seeded",
+               "fabricated", "sample_mixed", "placeholder", "demo")
+KEYWORDS = ("pe", "entity", "filings", "macro", "energy", "real_estate", "labor", "health",
+            "trade", "geo_risk", "finance", "government", "logistics", "infrastructure",
+            "demographics", "markets", "company", "people", "synthetic")
 
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 _TABLE_RE = re.compile(r"^(?:[a-z_][a-z0-9_]*\.)?[a-z_][a-z0-9_]*$")
 _PATTERN_RE = re.compile(r"^[a-z_][a-z0-9_]*\*$")
-_PRODUCER_RE = re.compile(r"^(bulk|dispatch|collector|job|api):[a-z0-9_:.]+(#[a-z0-9_]+)?$")
+_PRODUCER_RE = re.compile(r"^(bulk|dispatch|collector|job|api|script):[a-z0-9_:.]+(#[a-z0-9_]+)?$")
+# ':name' is a bind parameter to SQLAlchemy text(); '::type' casts are fine
+_BIND_RE = re.compile(r"(?<![:\w]):[A-Za-z_]\w*")
+_SPATIAL_RE = re.compile(r"^(US|global)(:[A-Za-z_]+)*$")
+MIN_DESCRIPTION = 50
+MAX_SUBTITLE = 100
 _WRITE_SQL = re.compile(
     r"\b(insert|update|delete|drop|alter|create|truncate|grant|revoke|copy|vacuum|call|do|set)\b",
     re.I,
@@ -40,6 +64,18 @@ _WRITE_SQL = re.compile(
 def _check(cond: bool, key: str, msg: str) -> None:
     if not cond:
         raise ValueError(f"DatasetSpec {key!r}: {msg}")
+
+
+def _read_only_sql(sql: str) -> bool:
+    return ";" not in sql and not _WRITE_SQL.search(sql) and not _BIND_RE.search(sql)
+
+
+def _iso_date(value: str) -> bool:
+    try:
+        date.fromisoformat(value)
+    except (TypeError, ValueError):
+        return False
+    return len(value) == 10
 
 
 @dataclass(frozen=True)
@@ -72,13 +108,24 @@ class DatasetSpec:
     slo_lag_hours: Optional[int] = None    # max hours from upstream publish to loaded
     upstream_url: Optional[str] = None
     notes: Optional[str] = None
+    # -- SPEC_141 truth pass ------------------------------------------------
+    coverage_basis: Optional[str] = None   # COVERAGE_BASES; required with coverage_sql
+    subtitle: Optional[str] = None         # <= 100 chars
+    keywords: Tuple[str, ...] = ()         # closed KEYWORDS
+    spatial_coverage: Optional[str] = None  # "US:state", "US:county", "global:country"
+    limitations: Tuple[str, ...] = ()      # known defects / gaps, with bug ids
+    row_filters: Tuple[Tuple[str, str], ...] = ()  # (table, read-only predicate) in a shared table
+    data_state: Optional[str] = None       # DATA_STATES, as last verified
+    missing_tables: Tuple[str, ...] = ()   # declared tables / patterns verified absent
+    verified_at: Optional[str] = None      # ISO date of that verification
 
     def __post_init__(self) -> None:
         k = self.key
         _check(bool(_KEY_RE.match(k or "")), k, "key must be a lower-case slug")
         _check(bool(self.source) and bool(_KEY_RE.match(self.source)), k, "source must be a slug")
         _check(bool(self.display_name.strip()), k, "display_name is required")
-        _check(len(self.description.strip()) >= 20, k, "description must be customer-readable (>= 20 chars)")
+        _check(len(self.description.strip()) >= MIN_DESCRIPTION, k,
+               f"description must be customer-readable (>= {MIN_DESCRIPTION} chars)")
         _check(bool(self.grain.strip()), k, "grain is required")
         _check(self.kind in KINDS, k, f"kind {self.kind!r} not in {KINDS}")
         _check(self.rerun in RERUN_POLICIES, k, f"rerun {self.rerun!r} not in {RERUN_POLICIES}")
@@ -106,9 +153,47 @@ class DatasetSpec:
             _check(sql.lower().startswith(("select", "with")), k, "coverage_sql must be a SELECT")
             _check(";" not in sql, k, "coverage_sql must be a single statement")
             _check(not _WRITE_SQL.search(sql), k, "coverage_sql must be read-only")
+            _check(not _BIND_RE.search(sql), k, "coverage_sql must not contain :bind parameters")
+            _check(self.coverage_basis is not None, k, "coverage_sql needs a coverage_basis")
+        if self.coverage_basis is not None:
+            _check(self.coverage_basis in COVERAGE_BASES, k,
+                   f"coverage_basis {self.coverage_basis!r} not in {COVERAGE_BASES}")
+        if self.coverage_from is not None:
+            _check(_iso_date(self.coverage_from), k, "coverage_from must be an ISO date (YYYY-MM-DD)")
+        if self.verified_at is not None:
+            _check(_iso_date(self.verified_at), k, "verified_at must be an ISO date (YYYY-MM-DD)")
+        if self.subtitle is not None:
+            _check(0 < len(self.subtitle.strip()) <= MAX_SUBTITLE, k,
+                   f"subtitle must be 1-{MAX_SUBTITLE} chars")
+        for w in self.keywords:
+            _check(w in KEYWORDS, k, f"keyword {w!r} not in KEYWORDS")
+        _check(len(set(self.keywords)) == len(self.keywords), k, "duplicate keyword")
+        if self.spatial_coverage is not None:
+            _check(bool(_SPATIAL_RE.match(self.spatial_coverage)), k,
+                   f"spatial_coverage {self.spatial_coverage!r} must look like US:state")
+        for lim in self.limitations:
+            _check(isinstance(lim, str) and bool(lim.strip()), k, "empty limitation")
+        seen = set()
+        for rf in self.row_filters:
+            _check(isinstance(rf, tuple) and len(rf) == 2, k, "row_filter must be (table, predicate)")
+            table, pred = rf
+            _check(table in self.tables, k, f"row_filter table {table!r} is not a declared table")
+            _check(table not in seen, k, f"two row_filters for {table!r}")
+            seen.add(table)
+            _check(bool(pred.strip()) and _read_only_sql(pred), k,
+                   f"row_filter predicate for {table!r} must be read-only, one clause, no binds")
+        if self.data_state is not None:
+            _check(self.data_state in DATA_STATES, k,
+                   f"data_state {self.data_state!r} not in {DATA_STATES}")
+        for t in self.missing_tables:
+            _check(t in self.tables or t in self.table_patterns, k,
+                   f"missing_tables entry {t!r} is not a declared table or pattern")
+        _check(bool(self.missing_tables) == (self.data_state == "missing_tables"), k,
+               "missing_tables is set exactly when data_state is 'missing_tables'")
         if self.status_public in ("ga", "beta"):
             _check(self.reviewed, k, "a ga/beta dataset needs a reviewed rights block")
             _check(self.origin != "synthetic", k, "synthetic data is never published as ga/beta")
+            _check(self.data_state == "ok", k, "a ga/beta dataset needs data_state 'ok'")
         if self.slo_lag_hours is not None:
             _check(self.slo_lag_hours > 0, k, "slo_lag_hours must be positive")
 
@@ -159,4 +244,13 @@ class DatasetSpec:
             "status_public": self.status_public,
             "upstream_url": self.upstream_url,
             "notes": self.notes,
+            "subtitle": self.subtitle,
+            "keywords": list(self.keywords),
+            "spatial_coverage": self.spatial_coverage,
+            "coverage_basis": self.coverage_basis,
+            "data_state": self.data_state,
+            "limitations": list(self.limitations),
+            "missing_tables": list(self.missing_tables),
+            "row_filters": [{"table": t, "predicate": p} for t, p in self.row_filters],
+            "verified_at": self.verified_at,
         }
