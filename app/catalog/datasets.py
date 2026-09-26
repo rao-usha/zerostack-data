@@ -388,7 +388,9 @@ _DERIVED: List[DatasetSpec] = [
         "derived_mart", "one row per adviser firm (CRD); rows with a crd_number",
         "job:pe_mart_build#firms", "monthly",
         tables=("pe_firms",), primary_key=("crd_number",),
-        inputs=("sec_adv_roster", "sec_iapd_feed", "entity_master"),
+        # SPEC_143: the firms stage reads sec_adv_roster_snapshots and core.identifier
+        # (the SQL-reference test); IAPD reaches it only through the entity master.
+        inputs=("sec_adv_roster", "entity_master"),
         row_filters=_PE_SEC_ROWS,
         coverage_sql="SELECT max(updated_at)::date FROM pe_firms WHERE crd_number IS NOT NULL",
         coverage_basis="as_of",
@@ -402,7 +404,8 @@ _DERIVED: List[DatasetSpec] = [
         "derived_mart", "one row per fund issuer (CIK); rows with a cik",
         "job:pe_mart_build#funds", "monthly",
         tables=("pe_funds",), primary_key=("cik",),
-        inputs=("sec_form_d", "sec_adv_private_funds", "pe_firms_sec"),
+        inputs=("sec_form_d", "sec_adv_private_funds", "sec_adv_schedule_d", "sec_adv_roster",
+                "pe_firms_sec"),
         row_filters=(("pe_funds", "cik IS NOT NULL"),),
         coverage_sql=("SELECT max(first_close_date) FROM pe_funds WHERE cik IS NOT NULL AND "
                       "first_close_date <= current_date"),
@@ -418,7 +421,7 @@ _DERIVED: List[DatasetSpec] = [
         "one row per person (source_key; SEC-derived rows); links one row per firm per person",
         "job:pe_mart_build#people", "monthly",
         tables=("pe_people", "pe_firm_people"), primary_key=("source_key",),
-        inputs=("sec_form_d", "pe_firms_sec", "pe_funds_sec"),
+        inputs=("sec_form_d", "sec_adv_roster", "pe_firms_sec", "pe_funds_sec"),
         row_filters=(("pe_people", "source_key IS NOT NULL"),
                      ("pe_firm_people", "person_link_method IS NOT NULL")),
         coverage_sql=("SELECT max(last_seen) FROM pe_firm_people WHERE person_link_method IS "
@@ -445,7 +448,9 @@ _DERIVED: List[DatasetSpec] = [
         "job:entity_resolve#bridge", "monthly",
         tables=("core.cik_crd_bridge", "core.cik_crd_bridge_refused"),
         primary_key=("cik",),
-        inputs=("entity_source_records",),
+        # SPEC_143: the bridge reads the 13F cover pages / other managers, the ADV
+        # roster and sec_filers directly, not core.source_record.
+        inputs=("sec_13f", "sec_adv_roster", "sec_edgar_submissions"),
         coverage_sql="SELECT max(built_at)::date FROM core.cik_crd_bridge",
         coverage_basis="as_of"),
     _ds("entity_master", "entity_master", "Entity master",

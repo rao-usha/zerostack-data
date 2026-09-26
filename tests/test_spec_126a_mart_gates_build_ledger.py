@@ -208,7 +208,8 @@ class TestHelpers:
 
         assert inputs.sources_for(inputs.PE_MART_STAGE_INPUTS, ["firms"]) == ["sec_adv_roster"]
         both = inputs.sources_for(inputs.PE_MART_STAGE_INPUTS, ["firms", "funds", "people"])
-        assert both == ["sec_adv_roster", "sec_form_d"]
+        # SPEC_143: the funds stage reads sec_adv_filings (sec_adv_schedule_d) too
+        assert both == ["sec_adv_roster", "sec_adv_schedule_d", "sec_form_d"]
         ent = inputs.sources_for(inputs.ENTITY_STAGE_INPUTS, ["feeds", "bridge"])
         assert "sec_13f" in ent and len(ent) == len(set(ent))
         for src in ent + both + ["sec_adv_schedule_d"]:

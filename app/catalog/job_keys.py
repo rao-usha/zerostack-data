@@ -17,6 +17,19 @@ A dispatch key resolves the way ``jobs._run_dispatched_job`` resolves it:
 
 A ``job:<type>`` producer is the base of every stage producer
 (``job:pe_mart_build#firms``, ``#funds`` ...): one run rebuilds all of them.
+
+SPEC_143 aliases, for ``ingestion_jobs.source`` values that are neither a
+producer nor a dispatch key (the 322 rows SPEC_144's backfill left unresolved):
+
+- ``api:<source>``: a router that records its in-process run under its own
+  name (``form_d``, ``app_rankings``, ``census_cbp`` ...) is that producer;
+- ``JOB_SOURCE_DATASETS``: legacy or per-router source names whose rows land
+  in one dataset (``job_postings``, ``international_econ_oecd`` ...);
+- ``config["tables"]``: a backfilled row that names its tables resolves to the
+  one dataset that declares all of them (shared tables stay unresolved).
+
+A producer that maps to several datasets (``job:pe_mart_build``) stays
+unresolved: the aliases never override it.
 """
 
 from __future__ import annotations
@@ -29,6 +42,21 @@ from app.catalog.spec import DatasetSpec
 # core.mart_build.mart -> the worker job type that builds it (SPEC_126a MART names)
 MART_JOB_TYPES = {"pe_marts": "pe_mart_build", "entity_resolve": "entity_resolve"}
 
+# ingestion_jobs.source -> dataset key, for sources that name no producer (SPEC_143).
+JOB_SOURCE_DATASETS: Dict[str, str] = {
+    # /job-postings router runs (company / all / discover) record the bare source
+    "job_postings": "job_postings",
+    # the skills backfill rewrites requirements on existing job_postings rows
+    "job_postings_skills": "job_postings",
+    # /usda router runs without config.dataset (incremental / all)
+    "usda": "usda_nass",
+    # app.sources.international_econ records f"international_econ_{source}"
+    "international_econ_oecd": "intl_oecd",
+    "international_econ_worldbank": "intl_worldbank",
+    "international_econ_bis": "intl_bis",
+    "international_econ_imf": "intl_imf",
+}
+
 
 def base_producer(producer: str) -> str:
     """'job:pe_mart_build#firms' -> 'job:pe_mart_build'."""
@@ -39,8 +67,14 @@ class ProducerMap:
     """Producer strings -> dataset keys, for one set of specs."""
 
     def __init__(self, specs: Iterable[DatasetSpec]):
+        specs = tuple(specs)
         self.by_base: Dict[str, List[str]] = {}
         self.dispatch_keys = set()
+        self.keys = {s.key for s in specs}
+        self.table_owners: Dict[str, set] = {}
+        for spec in specs:
+            for t in spec.tables:
+                self.table_owners.setdefault(t, set()).add(spec.key)
         for spec in specs:
             for p in spec.producers:
                 keys = self.by_base.setdefault(base_producer(p), [])
@@ -72,7 +106,27 @@ class ProducerMap:
             return source
         dataset = config.get("dataset") if isinstance(config, dict) else None
         key = self.dispatch_key_for(source, dataset if isinstance(dataset, str) else None)
-        return f"dispatch:{key}" if key else None
+        if key:
+            return f"dispatch:{key}"
+        # a router's in-process run, recorded under the router's name (SPEC_143)
+        api = f"api:{self._base(source)}"
+        return api if api in self.by_base else None
+
+    @staticmethod
+    def _base(source: str) -> str:
+        return source.split(":split_")[0] if ":split_" in source else source
+
+    def dataset_for_tables(self, tables: Any) -> Optional[str]:
+        """The one dataset that declares every table in ``tables``."""
+        if not isinstance(tables, (list, tuple)) or not tables:
+            return None
+        owners = None
+        for t in tables:
+            if not isinstance(t, str):
+                return None
+            got = self.table_owners.get(t, set())
+            owners = set(got) if owners is None else owners & got
+        return next(iter(owners)) if owners and len(owners) == 1 else None
 
     def producers_for_queue(self, job_type: Optional[str], payload: Any) -> List[str]:
         payload = payload if isinstance(payload, dict) else {}
@@ -90,8 +144,19 @@ class ProducerMap:
         return []
 
     def dataset_key_for_job(self, source: Optional[str], config: Any) -> Optional[str]:
-        keys = self.datasets_for(self.producer_for_job(source, config))
-        return keys[0] if len(keys) == 1 else None
+        producer = self.producer_for_job(source, config)
+        keys = self.datasets_for(producer)
+        if producer and keys:
+            # several datasets (job:pe_mart_build): ambiguous, never aliased
+            return keys[0] if len(keys) == 1 else None
+        if not source:
+            return None
+        alias = JOB_SOURCE_DATASETS.get(self._base(source))
+        if alias in self.keys:
+            return alias
+        if isinstance(config, dict):
+            return self.dataset_for_tables(config.get("tables"))
+        return None
 
 
 @lru_cache(maxsize=1)

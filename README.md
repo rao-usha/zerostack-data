@@ -195,8 +195,8 @@ GET  /api/v1/export/{table}          - Export to CSV/JSON/Parquet
 
 ### Data Lineage
 ```
-GET  /api/v1/lineage/nodes           - Get lineage nodes
-GET  /api/v1/lineage/impact/{id}     - Impact analysis
+GET  /api/v1/catalog/lineage             - Computed lineage graph (datasets, producers, tables, views, drift)
+GET  /api/v1/catalog/{key}/lineage       - Upstream / downstream of one dataset (?direction=&depth=)
 ```
 
 ---

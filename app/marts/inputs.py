@@ -58,22 +58,19 @@ MAX_AGE_DAYS: Dict[str, float] = {
     "entity_resolve": 45,
 }
 
-# Which bulk sources each stage reads (see the SQL in app/marts, app/entities).
-PE_MART_STAGE_INPUTS: Dict[str, List[str]] = {
-    "firms": ["sec_adv_roster"],
-    "adv_private_funds": ["sec_adv_schedule_d"],
-    "funds": ["sec_form_d", "sec_adv_roster"],
-    "people": ["sec_form_d", "sec_adv_roster"],
-}
-ENTITY_STAGE_INPUTS: Dict[str, List[str]] = {
-    "feeds": ["sec_adv_roster", "sec_iapd_feed", "sec_13f", "sec_form_d",
-              "sec_edgar_submissions", "sec_insider"],
-    "bridge": ["sec_13f", "sec_adv_roster"],
-}
-# Which upstream marts (core.mart_build) each stage reads.
-PE_MART_STAGE_UPSTREAM: Dict[str, List[str]] = {
-    "firms": ["entity_resolve"],  # pe_firms_sec joins core.identifier for the CIK
-}
+# Which bulk sources and upstream marts (core.mart_build) each stage reads.
+# Derived from the catalog (SPEC_143): a stage's inputs are the DatasetSpec.inputs
+# of the spec its producer ``job:<type>#<stage>`` builds, and
+# tests/test_spec_143_catalog_lineage_graph.py checks those against the SQL each
+# stage runs. Edit the spec, never these maps.
+from app.catalog.lineage import stage_inputs as _stage_inputs  # noqa: E402
+
+PE_MART_STAGE_INPUTS: Dict[str, List[str]]
+PE_MART_STAGE_UPSTREAM: Dict[str, List[str]]
+ENTITY_STAGE_INPUTS: Dict[str, List[str]]
+ENTITY_STAGE_UPSTREAM: Dict[str, List[str]]
+PE_MART_STAGE_INPUTS, PE_MART_STAGE_UPSTREAM = _stage_inputs("pe_mart_build")
+ENTITY_STAGE_INPUTS, ENTITY_STAGE_UPSTREAM = _stage_inputs("entity_resolve")
 
 # Loaded release keys kept per input in the ledger (newest period first).
 LOADED_KEYS_KEPT = 100
