@@ -116,9 +116,14 @@ class TestDatasetSpec:
         assert DatasetSpec(**_base()).effective_redistribution == "internal_only"
         assert DatasetSpec(**_base(reviewed=True)).effective_redistribution == "open"
         d = DatasetSpec(**_base()).to_dict()
-        assert d["rights"] == {"license": "public domain", "redistribution": "open",
-                               "effective_redistribution": "internal_only",
-                               "attribution": None, "reviewed": False}
+        core = {k: d["rights"][k] for k in ("license", "redistribution", "effective_redistribution",
+                                              "attribution", "reviewed")}
+        assert core == {"license": "public domain", "redistribution": "open",
+                        "effective_redistribution": "internal_only",
+                        "attribution": None, "reviewed": False}
+        # SPEC_142 fields: not assessed, no citation, no proposal
+        assert d["rights"]["storage"] is None and d["rights"]["commercial_use"] is None
+        assert d["rights"]["proposed"] is None and len(d["rights"]["rights_hash"]) == 64
         assert "coverage_sql" not in d and d["has_coverage_sql"] is False
 
     def test_catalog_builds_and_is_unique(self):

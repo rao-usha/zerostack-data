@@ -44,7 +44,7 @@ from sqlalchemy.engine import Engine
 
 from app.catalog.live import KNOWN_VIEWS, claimed_tables, existing_tables, resolve_tables
 from app.catalog.registry import get_catalog
-from app.catalog.spec import DatasetSpec
+from app.catalog.spec import COMMERCIAL_USE_RANK, STORAGE_RANK, DatasetSpec, gate_reasons
 from app.catalog.tables import pattern_matches, split
 from app.core.models import CATALOG_ONLY_TS, DatasetRegistry
 
@@ -87,7 +87,32 @@ def merge_rights(specs: Sequence[DatasetSpec]) -> Dict[str, Any]:
         "pii_class": _most((s.pii_class for s in specs), PII_RANK),
         "origin": origins[0],
         "origins": origins,
+        **merge_terms(specs),
         **merge_flags(specs),
+    }
+
+
+def _strictest(values: Iterable[Optional[str]], rank: Sequence[str]) -> Optional[str]:
+    known = [v for v in values if v is not None]
+    return max(known, key=rank.index) if known else None
+
+
+def merge_terms(specs: Sequence[DatasetSpec]) -> Dict[str, Any]:
+    """SPEC_142: the strictest ``storage`` / ``commercial_use`` of the writers (None when no
+    writer was assessed), any ``share_alike``, and the union of their rights gates."""
+    storage = _strictest((getattr(s, "storage", None) for s in specs), STORAGE_RANK)
+    ages = [getattr(s, "storage_max_age_days", None) for s in specs if getattr(s, "storage", None) == "time_limited"]
+    gate: List[str] = []
+    for s in specs:
+        for g in gate_reasons(getattr(s, "storage", None), getattr(s, "commercial_use", None)):
+            if g not in gate:
+                gate.append(g)
+    return {
+        "storage": storage,
+        "storage_max_age_days": min(a for a in ages if a) if storage == "time_limited" and any(ages) else None,
+        "commercial_use": _strictest((getattr(s, "commercial_use", None) for s in specs), COMMERCIAL_USE_RANK),
+        "share_alike": any(bool(getattr(s, "share_alike", False)) for s in specs),
+        "rights_gate": gate,
     }
 
 

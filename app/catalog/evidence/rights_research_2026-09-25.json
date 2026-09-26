@@ -1,0 +1,907 @@
+{
+ "_comment": "PLAN_088 rights lens data, verbatim (docs/plans/PLAN_088_evidence.json lenses['lens:rights'].data). Read-only research 2026-09-25 of the official terms pages (some via search excerpt where the fetch failed; see quote/caveats). SPEC_142 applies the cited tightenings in app/catalog/rights.py and keeps loosenings as proposals.",
+ "researched_at": "2026-09-25",
+ "rows": [
+  {
+   "source": "sec (sec_13f, sec_companyfacts, sec_company_financials, sec_form_d, sec_insider, sec_edgar_submissions, adv*)",
+   "current": {
+    "license": "US Government work (17 U.S.C. §105), public domain",
+    "redistribution": "open",
+    "attribution": "Source: U.S. Securities and Exchange Commission (EDGAR)"
+   },
+   "proposed": {
+    "license": "US Government work, public domain (SEC dissemination policy)",
+    "redistribution": "open",
+    "attribution": "Source: U.S. Securities and Exchange Commission (EDGAR). Do not use the SEC seal or EDGAR marks."
+   },
+   "citation_url": "https://www.sec.gov/about/privacy-information",
+   "quote": "Information presented on sec.gov is considered public information and may be copied or further distributed by users of the web site without the SEC's permission.",
+   "confidence": "high",
+   "caveats": "Fair access: 10 req/s and a declared User-Agent. Personal-data datasets (insider, Form D related persons, submissions) are legal to redistribute but need the PII-policy decision. Candidates for reviewed=true: sec_13f, sec_companyfacts, sec_company_financials (rights.py:202-204)."
+  },
+  {
+   "source": "treasury",
+   "current": {
+    "license": "USG public domain",
+    "redistribution": "open",
+    "attribution": "Source: U.S. Department of the Treasury, Fiscal Data"
+   },
+   "proposed": {
+    "license": "USG public domain",
+    "redistribution": "open",
+    "attribution": "Source: U.S. Department of the Treasury, Fiscal Data"
+   },
+   "citation_url": "https://fiscaldata.treasury.gov/",
+   "quote": "(not fetched; federal work under 17 U.S.C. §105)",
+   "confidence": "medium-high",
+   "caveats": "Candidate for reviewed=true."
+  },
+  {
+   "source": "bls",
+   "current": {
+    "license": "USG public domain",
+    "redistribution": "open",
+    "attribution": "Source: U.S. Bureau of Labor Statistics"
+   },
+   "proposed": {
+    "license": "USG public domain",
+    "redistribution": "open",
+    "attribution": "Source: U.S. Bureau of Labor Statistics"
+   },
+   "citation_url": "https://www.bls.gov/opub/copyright-information.htm",
+   "quote": "everything that we publish, both in hard copy and electronically, is in the public domain, except for previously copyrighted photographs and illustrations ... we do ask that you cite the Bureau of Labor Statistics as the source.",
+   "confidence": "high",
+   "caveats": "Also covers site_intel bls and bls_qcew. Candidate for reviewed=true."
+  },
+  {
+   "source": "eia",
+   "current": {
+    "license": "USG public domain",
+    "redistribution": "open",
+    "attribution": "Source: U.S. Energy Information Administration"
+   },
+   "proposed": {
+    "license": "USG public domain (excluding licensed third-party items)",
+    "redistribution": "open",
+    "attribution": "Source: U.S. Energy Information Administration (<release date>)"
+   },
+   "citation_url": "https://www.eia.gov/about/copyrights_reuse.php",
+   "quote": "U.S. government publications are in the public domain and are not subject to copyright protection ... may contain ... information resources contributed or licensed by private individuals, companies, or organizations that may be protected",
+   "confidence": "high",
+   "caveats": "The petroleum, natural gas, electricity, retail gas and STEO series are EIA survey or model output. Candidate for reviewed=true."
+  },
+  {
+   "source": "bea",
+   "current": {
+    "license": "USG public domain",
+    "redistribution": "open",
+    "attribution": "Source: U.S. Bureau of Economic Analysis"
+   },
+   "proposed": {
+    "license": "USG public domain",
+    "redistribution": "open",
+    "attribution": "Source: U.S. Bureau of Economic Analysis"
+   },
+   "citation_url": "https://www.bea.gov/",
+   "quote": "(not fetched; federal statistical agency work)",
+   "confidence": "medium-high",
+   "caveats": "Candidate for reviewed=true."
+  },
+  {
+   "source": "census / us_trade",
+   "current": {
+    "license": "USG public domain",
+    "redistribution": "open",
+    "attribution": "Source: U.S. Census Bureau"
+   },
+   "proposed": {
+    "license": "USG public domain",
+    "redistribution": "open",
+    "attribution": "Source: U.S. Census Bureau, <dataset title, vintage>. This product uses the Census Bureau Data API but is not endorsed or certified by the Census Bureau."
+   },
+   "citation_url": "https://www.census.gov/about/policies/citation.html",
+   "quote": "Data users who create their own estimates using data from disseminated tables ... should cite the Census Bureau as the source of the original data only.",
+   "confidence": "high",
+   "caveats": "The API terms require the non-endorsement line. Candidate for reviewed=true."
+  },
+  {
+   "source": "fema",
+   "current": {
+    "license": "USG public domain",
+    "redistribution": "open",
+    "attribution": "Source: FEMA (OpenFEMA)"
+   },
+   "proposed": {
+    "license": "USG public domain, OpenFEMA Terms and Conditions",
+    "redistribution": "open",
+    "attribution": "Federal Emergency Management Agency (FEMA), OpenFEMA Dataset: <name> - v<n>. This product uses the FEMA OpenFEMA API, but is not endorsed by FEMA."
+   },
+   "citation_url": "https://www.fema.gov/about/openfema/terms-conditions",
+   "quote": "This product uses the Federal Emergency Management Agency's OpenFEMA API, but is not endorsed by FEMA. The Federal Government or FEMA cannot vouch for the data or analyses derived from these data...",
+   "confidence": "high",
+   "caveats": "The terms also bind users not to re-identify individuals. Covers site_intel fema and fema_nfhl. Candidate for reviewed=true."
+  },
+  {
+   "source": "fdic",
+   "current": {
+    "license": "USG public domain",
+    "redistribution": "open",
+    "attribution": "Source: Federal Deposit Insurance Corporation"
+   },
+   "proposed": {
+    "license": "USG public domain",
+    "redistribution": "open",
+    "attribution": "Source: Federal Deposit Insurance Corporation"
+   },
+   "citation_url": "https://www.fdic.gov/",
+   "quote": "(not fetched)",
+   "confidence": "medium",
+   "caveats": "The FDIC is a federal agency. Confirm the website policy page before sign-off."
+  },
+  {
+   "source": "cms (cms_medicare_utilization)",
+   "current": {
+    "license": "USG public domain",
+    "redistribution": "open",
+    "attribution": "Source: Centers for Medicare & Medicaid Services"
+   },
+   "proposed": {
+    "license": "CMS public use file; CPT codes and descriptions © American Medical Association",
+    "redistribution": "restricted",
+    "attribution": "Source: CMS. CPT © American Medical Association. All rights reserved."
+   },
+   "citation_url": "https://data.cms.gov/provider-summary-by-type-of-service/medicare-physician-other-practitioners/medicare-physician-other-practitioners-by-provider-and-service",
+   "quote": "CPT codes, descriptions and other data are copyright American Medical Association ... The complete CMS AMA CPT License agreement is presented to users when accessing the data.",
+   "confidence": "high",
+   "caveats": "The live DB has 21,260 rows, all with hcpcs_desc (e.g. 64642). rights.py:211. Alternative: drop Level I descriptors and publish only the NPI-level payments with HCPCS Level II."
+  },
+  {
+   "source": "cms (hospital cost reports, drug pricing)",
+   "current": {
+    "license": "USG public domain",
+    "redistribution": "open",
+    "attribution": "Source: Centers for Medicare & Medicaid Services"
+   },
+   "proposed": {
+    "license": "USG public domain",
+    "redistribution": "open",
+    "attribution": "Source: Centers for Medicare & Medicaid Services"
+   },
+   "citation_url": "https://www.cms.gov/Research-Statistics-Data-and-Systems/Downloadable-Public-Use-Files/Cost-Reports",
+   "quote": "(not fetched)",
+   "confidence": "medium",
+   "caveats": "No CPT content. Candidates for reviewed=true."
+  },
+  {
+   "source": "nppes",
+   "current": {
+    "license": "USG public domain",
+    "redistribution": "open",
+    "attribution": "Source: CMS NPPES NPI Registry"
+   },
+   "proposed": {
+    "license": "USG, FOIA-disclosable",
+    "redistribution": "open",
+    "attribution": "Source: CMS NPPES"
+   },
+   "citation_url": "https://www.cms.gov/medicare/regulations-guidance/administrative-simplification/data-dissemination",
+   "quote": "The information disclosed on the NPI Registry and in the downloadable files are FOIA-disclosable ... There is no charge to download the NPPES file",
+   "confidence": "high",
+   "caveats": "39,817 rows. pii=personal: gate on the PII policy, not on rights."
+  },
+  {
+   "source": "fda",
+   "current": {
+    "license": "USG public domain",
+    "redistribution": "open",
+    "attribution": "Source: U.S. Food and Drug Administration (openFDA)"
+   },
+   "proposed": {
+    "license": "CC0 1.0 (openFDA)",
+    "redistribution": "open",
+    "attribution": "Source: openFDA (courtesy)"
+   },
+   "citation_url": "https://open.fda.gov/license",
+   "quote": "public domain and made available with a Creative Commons CC0 1.0 Universal dedication ... even for commercial purposes, all without asking permission.",
+   "confidence": "high",
+   "caveats": "Private-party copyrighted submissions are excluded. Candidate for reviewed=true."
+  },
+  {
+   "source": "sam_gov",
+   "current": {
+    "license": "USG public domain",
+    "redistribution": "open",
+    "attribution": "Source: GSA SAM.gov"
+   },
+   "proposed": {
+    "license": "USG; SAM.gov Terms of Use (public-sensitivity data only)",
+    "redistribution": "open",
+    "attribution": "Source: GSA SAM.gov"
+   },
+   "citation_url": "https://open.gsa.gov/api/entity-api/",
+   "quote": "You may not use the Entity Management FOUO API to build out a public view of the data ... You are not allowed to display or disseminate outside the U.S. Government any values received in a sensitive API response.",
+   "confidence": "medium-high",
+   "caveats": "Open only if the key is a public-level key. pii=business_contact (POCs)."
+  },
+  {
+   "source": "usaspending, irs_soi, fbi_crime, bts, cftc_cot, osha, epa_echo, usda (NASS)",
+   "current": {
+    "license": "USG public domain",
+    "redistribution": "open",
+    "attribution": "Source: <agency>"
+   },
+   "proposed": {
+    "license": "USG public domain",
+    "redistribution": "open",
+    "attribution": "Source: <agency> (NASS API: add non-endorsement line)"
+   },
+   "citation_url": "https://resources.data.gov/open-licenses/",
+   "quote": "(federal works under 17 U.S.C. §105; agency pages not individually fetched)",
+   "confidence": "medium-high",
+   "caveats": "Candidates for reviewed=true."
+  },
+  {
+   "source": "fcc_broadband (and site_intel fcc)",
+   "current": {
+    "license": "USG public domain",
+    "redistribution": "open",
+    "attribution": "Source: Federal Communications Commission"
+   },
+   "proposed": {
+    "license": "USG public domain (aggregates); Location Fabric is CostQuest-licensed",
+    "redistribution": "open",
+    "attribution": "Source: Federal Communications Commission"
+   },
+   "citation_url": "https://help.bdc.fcc.gov/hc/en-us/articles/10419121200923-How-Entities-Can-Access-the-Location-Fabric",
+   "quote": "The Fabric is available ... through a licensing agreement ... with CostQuest",
+   "confidence": "medium-high",
+   "caveats": "The collector uses Socrata hicn-aujz block-level aggregates (fcc_broadband_collector.py:72), and the stored data has no Fabric location IDs. Never ingest the BSL Fabric."
+  },
+  {
+   "source": "afdc",
+   "current": {
+    "license": "USG public domain",
+    "redistribution": "open",
+    "attribution": "Source: U.S. DOE Alternative Fuels Data Center (NREL)"
+   },
+   "proposed": {
+    "license": "DOE/NREL open data (contractor-operated lab; free for any use with credit)",
+    "redistribution": "open",
+    "attribution": "Source: U.S. DOE Alternative Fuels Data Center (NREL)"
+   },
+   "citation_url": "https://developer.nrel.gov/terms/",
+   "quote": "(fetch failed: DNS; search excerpt: data 'can be used for any purpose whatsoever')",
+   "confidence": "medium",
+   "caveats": "§105 is technically inaccurate for NREL. Fix the license text; redistribution is fine."
+  },
+  {
+   "source": "noaa",
+   "current": {
+    "license": "USG public domain",
+    "redistribution": "open",
+    "attribution": "Source: NOAA NCEI"
+   },
+   "proposed": {
+    "license": "USG public domain (U.S. stations); WMO Res. 40 restrictions on some non-U.S. GHCN data",
+    "redistribution": "open",
+    "attribution": "Source: NOAA NCEI"
+   },
+   "citation_url": "https://www.nco.ncep.noaa.gov/pmb/docs/restricted_data/r40synop/",
+   "quote": "for non-U.S. locations data, the data or any derived product shall not be provided to other users or be used for the re-export of commercial services.",
+   "confidence": "high",
+   "caveats": "No noaa tables exist in the DB today. Restrict ingestion to U.S. locations (FIPS:), or tag non-U.S. stations as restricted."
+  },
+  {
+   "source": "uspto (PatentsView)",
+   "current": {
+    "license": "CC BY 4.0",
+    "redistribution": "attribution",
+    "attribution": "Source: USPTO PatentsView"
+   },
+   "proposed": {
+    "license": "CC BY 4.0",
+    "redistribution": "attribution",
+    "attribution": "Source: USPTO PatentsView (CC BY 4.0); indicate changes"
+   },
+   "citation_url": "https://search.patentsview.org/docs/",
+   "quote": "PatentsView's terms of use are under the Creative Commons Attribution 4.0 International License.",
+   "confidence": "high",
+   "caveats": "Inventor names are personal data. Candidate for reviewed=true once PII policy is set."
+  },
+  {
+   "source": "international_econ: World Bank",
+   "current": {
+    "license": "CC BY 4.0 (World Bank, OECD); IMF and BIS terms of use",
+    "redistribution": "attribution",
+    "attribution": "Sources: World Bank WDI, IMF, OECD, BIS"
+   },
+   "proposed": {
+    "license": "CC BY 4.0",
+    "redistribution": "attribution",
+    "attribution": "Source: World Bank, World Development Indicators (CC BY 4.0)"
+   },
+   "citation_url": "https://datacatalog.worldbank.org/public-licenses",
+   "quote": "allows users to copy, modify and distribute data in any format for any purpose, including commercial use ... only obligated to give appropriate credit",
+   "confidence": "high",
+   "caveats": "A few WDI series carry third-party licences, labelled per dataset. Give intl_worldbank its own DATASET_RIGHTS entry. Candidate for reviewed=true."
+  },
+  {
+   "source": "international_econ: OECD",
+   "current": {
+    "license": "CC BY 4.0 (World Bank, OECD); IMF and BIS terms of use",
+    "redistribution": "attribution",
+    "attribution": "Sources: World Bank WDI, IMF, OECD, BIS"
+   },
+   "proposed": {
+    "license": "CC BY 4.0 (OECD, from 1 July 2024)",
+    "redistribution": "attribution",
+    "attribution": "Source: OECD (CC BY 4.0). On transformation: 'This is an adaptation of an original work by the OECD.'"
+   },
+   "citation_url": "https://www.oecd.org/en/about/oecd-open-by-default-policy.html",
+   "quote": "From 1 July 2024, OECD content is generally available under CC licences, with the default licence being ... CC BY 4.0",
+   "confidence": "high",
+   "caveats": "Some OECD datasets carry third-party data (check each dataflow's licence). Candidate for reviewed=true."
+  },
+  {
+   "source": "international_econ: IMF (intl_imf)",
+   "current": {
+    "license": "IMF terms of use (reuse with attribution)",
+    "redistribution": "attribution",
+    "attribution": "Source: International Monetary Fund"
+   },
+   "proposed": {
+    "license": "IMF Copyright and Usage, special terms for Data",
+    "redistribution": "restricted",
+    "attribution": "Source: International Monetary Fund"
+   },
+   "citation_url": "https://www.imf.org/en/about/copyright-and-terms",
+   "quote": "For any potential commercial reuse of IMF Data, please email copyright@imf.org ... If IMF Data is sold by Users as a standalone product; sellers must inform purchasers that the Data is available free of charge from the IMF.",
+   "confidence": "medium",
+   "caveats": "Direct fetch returned 403; quote is from a search excerpt. intl_imf_ifs is empty. Could move to 'attribution' once copyright@imf.org confirms."
+  },
+  {
+   "source": "international_econ: BIS (intl_bis)",
+   "current": {
+    "license": "BIS terms of use (reuse with attribution)",
+    "redistribution": "attribution",
+    "attribution": "Source: Bank for International Settlements"
+   },
+   "proposed": {
+    "license": "Terms of permitted use of BIS statistics",
+    "redistribution": "attribution",
+    "attribution": "Source: BIS (link to original); no implied endorsement"
+   },
+   "citation_url": "https://www.bis.org/terms_statistics.htm",
+   "quote": "The use of BIS statistics is unrestricted, provided that the BIS must be cited ... if the statistics are used in a commercial publication or product, their inclusion ... will not result in any additional charge to subscribers",
+   "confidence": "medium",
+   "caveats": "Direct fetch returned 403; quote is from a search excerpt. BIS may not be priced as a separate add-on. The general bis.org terms (non-commercial only) apply to publications, not statistics. Tables are empty."
+  },
+  {
+   "source": "data_commons",
+   "current": {
+    "license": "CC BY 4.0 (Data Commons); underlying sources carry their own terms",
+    "redistribution": "attribution",
+    "attribution": "Source: Data Commons (datacommons.org)"
+   },
+   "proposed": {
+    "license": "CC BY 4.0 (compilation); per-variable provenance licence",
+    "redistribution": "attribution",
+    "attribution": "Source: Data Commons, and the original provenance source"
+   },
+   "citation_url": "https://datacommons.org/faq",
+   "quote": "The Data Commons knowledge graph and the compilation of the datasets is licensed under CC BY ... data provenance is provided for all the data",
+   "confidence": "medium",
+   "caveats": "Rights depend on the underlying variable: store the provenance column and derive rights per series. Leave reviewed=false until then."
+  },
+  {
+   "source": "courtlistener",
+   "current": {
+    "license": "Court records (public); CourtListener terms request attribution",
+    "redistribution": "attribution",
+    "attribution": "Source: CourtListener, Free Law Project"
+   },
+   "proposed": {
+    "license": "Court records public domain; CourtListener API ToS (commercial agreement for products)",
+    "redistribution": "restricted",
+    "attribution": "Source: CourtListener, Free Law Project; not endorsed by FLP"
+   },
+   "citation_url": "https://wiki.free.law/c/terms/courtlistener/courtlistenercom-terms-of-service-and-policies",
+   "quote": "If you need access for a product or a team, talk to us about a commercial agreement ... other court filings may contain third-party copyrighted works",
+   "confidence": "medium",
+   "caveats": "courtlistener_dockets looks empty (reltuples -1). pii=personal."
+  },
+  {
+   "source": "realestate (family default)",
+   "current": {
+    "license": "Mixed: FHFA/HUD public domain; Redfin and OSM terms",
+    "redistribution": "restricted",
+    "attribution": null
+   },
+   "proposed": {
+    "license": "(keep as fallback)",
+    "redistribution": "restricted",
+    "attribution": null
+   },
+   "citation_url": "n/a",
+   "quote": "n/a",
+   "confidence": "high",
+   "caveats": "All four datasets have DATASET_RIGHTS overrides (rights.py:190-194)."
+  },
+  {
+   "source": "realestate_fhfa_hpi / realestate_hud_permits",
+   "current": {
+    "license": "USG public domain",
+    "redistribution": "open",
+    "attribution": "Source: FHFA / HUD"
+   },
+   "proposed": {
+    "license": "USG public domain",
+    "redistribution": "open",
+    "attribution": "Source: Federal Housing Finance Agency / HUD SOCDS (Census Building Permits Survey)"
+   },
+   "citation_url": "https://www.fhfa.gov/DataTools/Downloads/Pages/House-Price-Index-Datasets.aspx",
+   "quote": "(not fetched; federal works)",
+   "confidence": "medium-high",
+   "caveats": "Candidates for reviewed=true."
+  },
+  {
+   "source": "realestate_redfin",
+   "current": {
+    "license": "Redfin Data Center terms (attribution, no resale)",
+    "redistribution": "restricted",
+    "attribution": null
+   },
+   "proposed": {
+    "license": "Redfin Data Center: free use with citation and link; no explicit redistribution grant",
+    "redistribution": "restricted",
+    "attribution": "Source: Redfin, a national real estate brokerage (link to redfin.com)"
+   },
+   "citation_url": "https://www.redfin.com/news/data-center/",
+   "quote": "You are welcome to use Redfin's data for your own purposes ... cite ... and link to Redfin for the first reference (search excerpt); page footer: '© 2026 Redfin. All rights reserved.'",
+   "confidence": "low-medium",
+   "caveats": "No explicit licence found. Ask Redfin for written permission before reselling. The table is empty."
+  },
+  {
+   "source": "realestate_osm_buildings",
+   "current": {
+    "license": "ODbL 1.0 (OpenStreetMap, share-alike)",
+    "redistribution": "restricted",
+    "attribution": "© OpenStreetMap contributors"
+   },
+   "proposed": {
+    "license": "ODbL 1.0",
+    "redistribution": "attribution (share_alike=true)",
+    "attribution": "© OpenStreetMap contributors, available under the Open Database License"
+   },
+   "citation_url": "https://www.openstreetmap.org/copyright",
+   "quote": "You are free to copy, distribute, transmit and adapt our data, as long as you credit OpenStreetMap ... If you alter or build upon our data, you may distribute the result only under the same license.",
+   "confidence": "high",
+   "caveats": "Commercial redistribution is allowed. Keep the layer separate so the share-alike obligation does not reach proprietary marts. Needs a share_alike field."
+  },
+  {
+   "source": "fred",
+   "current": {
+    "license": "FRED terms of use; many series are third-party copyrighted",
+    "redistribution": "restricted",
+    "attribution": "Source: Federal Reserve Bank of St. Louis (FRED)"
+   },
+   "proposed": {
+    "license": "FRED Terms of Use (no caching/archiving); per-series originator rights",
+    "redistribution": "restricted (as FRED-retrieved); re-source PD series from originators -> open; UMCSENT restricted",
+    "attribution": "This product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis. Source: <originating agency>"
+   },
+   "citation_url": "https://fred.stlouisfed.org/legal/",
+   "quote": "prohibited: 'caching, or archiving any portion of the FRED® Services' ... third-party copyrighted series restricted to non-commercial educational or personal use 'Without first obtaining the express written permission of the copyright holder'",
+   "confidence": "high",
+   "caveats": "The live DB has 24 series. 23 are PD at source (Fed H.15/H.6/G.17, BLS, BEA, Census, EIA); only UMCSENT is University of Michigan copyright. The FRED API terms also ban use for AI/LLM training."
+  },
+  {
+   "source": "yelp (+ medspa_discovery, vertical_discovery)",
+   "current": {
+    "license": "Yelp Fusion API terms (no storage / redistribution)",
+    "redistribution": "restricted",
+    "attribution": null
+   },
+   "proposed": {
+    "license": "Yelp API Terms of Use (2025-01-13)",
+    "redistribution": "restricted; storage forbidden beyond 24h",
+    "attribution": "Yelp display requirements"
+   },
+   "citation_url": "https://terms.yelp.com/developers/api_terms/20250113_en_us/",
+   "quote": "cache, record, pre-fetch, or otherwise store any portion of the Yelp Content for a period longer than twenty-four (24) hours ... use it to update or create your own database of business listing information",
+   "confidence": "high",
+   "caveats": "yelp_businesses holds about 400 rows, which already breaches the storage limit. Purge them or keep only business IDs."
+  },
+  {
+   "source": "kaggle (M5)",
+   "current": {
+    "license": "Kaggle competition rules (M5: non-commercial, competition use)",
+    "redistribution": "restricted",
+    "attribution": null
+   },
+   "proposed": {
+    "license": "M5 competition rules: non-commercial only",
+    "redistribution": "restricted; no commercial internal use",
+    "attribution": null
+   },
+   "citation_url": "https://www.kaggle.com/c/m5-forecasting-accuracy/rules",
+   "quote": "The competition data may be accessed and used for non-commercial purposes only, including for participating in the Competition ... and for academic research.",
+   "confidence": "high",
+   "caveats": "m5_items ~30,490 and m5_calendar 1,969 rows. If Nexdata is commercial, even internal use is out of scope."
+  },
+  {
+   "source": "foot_traffic (Google Places, Foursquare, SafeGraph, Placer)",
+   "current": {
+    "license": "Vendor terms",
+    "redistribution": "restricted",
+    "attribution": null
+   },
+   "proposed": {
+    "license": "Google Maps Platform Service Specific Terms + vendor contracts",
+    "redistribution": "restricted; storage limited (Google: place_id indefinitely, lat/lng 30 days)",
+    "attribution": "Google attribution requirements"
+   },
+   "citation_url": "https://developers.google.com/maps/documentation/places/web-service/policies",
+   "quote": "Place IDs are exempt from the caching restrictions ... latitude/longitude may be cached for up to 30 days",
+   "confidence": "high",
+   "caveats": "foot_traffic/__init__.py:11 notes 'Google Popular Times: Peak hours data (scraping, ToS risk)'. Scraping Google breaches its terms."
+  },
+  {
+   "source": "prediction_markets (Kalshi, Polymarket)",
+   "current": {
+    "license": "Kalshi / Polymarket API terms",
+    "redistribution": "restricted",
+    "attribution": null
+   },
+   "proposed": {
+    "license": "Kalshi Data Terms of Service; Polymarket ToS",
+    "redistribution": "restricted; no archived datasets, no AI training",
+    "attribution": null
+   },
+   "citation_url": "https://kalshi-public-docs.s3.amazonaws.com/kalshi-data-terms-of-service.pdf",
+   "quote": "personal use for non-commercial purposes only ... Non-commercial use does not include ... providing archived or cached data sets containing Kalshi Data to another person or entity (search excerpt)",
+   "confidence": "medium-high",
+   "caveats": "The PDF would not decode, so this comes from a search excerpt. 25 rows."
+  },
+  {
+   "source": "dunl",
+   "current": {
+    "license": "S&P Global DUNL licence terms",
+    "redistribution": "restricted",
+    "attribution": null
+   },
+   "proposed": {
+    "license": "DUNL open data (Creative Commons; exact variant unverified)",
+    "redistribution": "restricted until verified (possibly attribution)",
+    "attribution": "Source: S&P Global DUNL (dunl.org)"
+   },
+   "citation_url": "https://press.spglobal.com/2025-09-11-S-P-Global-ushers-new-era-of-open-data-access-Introduces-S-P-Capital-IQ-Identifiers-on-DUNL-org",
+   "quote": "transparent licensing with Creative Commons licensing enabling free internal organizational use (search excerpt)",
+   "confidence": "low",
+   "caveats": "The licence page did not render. If it is CC BY-NC it stays restricted; if CC BY, change to attribution. About 2.1k rows across dunl_* tables."
+  },
+  {
+   "source": "github",
+   "current": {
+    "license": "GitHub API terms of service",
+    "redistribution": "restricted",
+    "attribution": null
+   },
+   "proposed": {
+    "license": "GitHub Terms + Acceptable Use Policies §7-8",
+    "redistribution": "restricted",
+    "attribution": null
+   },
+   "citation_url": "https://docs.github.com/en/site-policy/acceptable-use-policies/github-acceptable-use-policies",
+   "quote": "Any person, entity, or service collecting data from the Service must comply with the GitHub Privacy Statement ... [no] selling GitHub users' personal information, such as to recruiters, headhunters, and job boards",
+   "confidence": "high",
+   "caveats": "Research use only if publications are open access. Contributors are personal data."
+  },
+  {
+   "source": "glassdoor / app_rankings",
+   "current": {
+    "license": "Glassdoor terms (scraped) / App store terms",
+    "redistribution": "restricted",
+    "attribution": null
+   },
+   "proposed": {
+    "license": "Site terms (scraping)",
+    "redistribution": "restricted",
+    "attribution": null
+   },
+   "citation_url": "n/a",
+   "quote": "(not fetched; both sites' terms forbid scraping)",
+   "confidence": "medium",
+   "caveats": "Archival. Consider deleting."
+  },
+  {
+   "source": "web_traffic (Tranco / SimilarWeb)",
+   "current": {
+    "license": "Tranco list terms / SimilarWeb terms",
+    "redistribution": "restricted",
+    "attribution": null
+   },
+   "proposed": {
+    "license": "Tranco (inputs include Cloudflare Radar CC BY-NC 4.0, CrUX CC BY-SA 4.0, Majestic CC BY 3.0); SimilarWeb paid licence",
+    "redistribution": "restricted",
+    "attribution": "Tranco: cite Le Pochat et al. (NDSS 2019)"
+   },
+   "citation_url": "https://tranco-list.eu/",
+   "quote": "Cloudflare Radar (available under a CC BY-NC 4.0 license) (search excerpt)",
+   "confidence": "medium",
+   "caveats": "The NC component taints commercial use. 3 rows."
+  },
+  {
+   "source": "opencorporates",
+   "current": {
+    "license": "OpenCorporates terms (ODbL share-alike + API ToS)",
+    "redistribution": "restricted",
+    "attribution": null
+   },
+   "proposed": {
+    "license": "ODbL (free share-alike key) or paid non-share-alike API terms",
+    "redistribution": "restricted (free key ⇒ share-alike only)",
+    "attribution": "from OpenCorporates (link to object URL)"
+   },
+   "citation_url": "https://opencorporates.com/legal/licence",
+   "quote": "if you combine the information with your own data, the resultant information must be published under the Attribution Share-Alike ODbL ... Paid-for API Accounts ... remove the OpenCorporates share-alike restrictions (search excerpt)",
+   "confidence": "high",
+   "caveats": "Officer names are personal data."
+  },
+  {
+   "source": "site_intel (family default)",
+   "current": {
+    "license": "Mixed: mostly US federal public domain; per-collector overrides",
+    "redistribution": "open",
+    "attribution": null
+   },
+   "proposed": {
+    "license": "(fallback) unknown",
+    "redistribution": "internal_only",
+    "attribution": null
+   },
+   "citation_url": "n/a",
+   "quote": "n/a",
+   "confidence": "high",
+   "caveats": "rights.py:146-148. 27 collectors inherit 'open' with no attribution. Add a _usg(agency) entry for each of bls, bls_qcew, bts, bts_cargo, bts_ntad, cdfi_oz, census_bps, census_gov, census_trade, eia, eia_gas, epa_acres, epa_envirofacts, epa_sdwis, fcc, fema, fema_nfhl, fra, ftz_board, usace, usda_ams, usfws_nwi, usgs_3dep, usgs_earthquake, usgs_water. Handle hifld and nrel_resource separately."
+  },
+  {
+   "source": "site_intel: hifld",
+   "current": {
+    "license": "Mixed (inherited)",
+    "redistribution": "open",
+    "attribution": null
+   },
+   "proposed": {
+    "license": "HIFLD (discontinued 2025-08-26); substations withdrawn from public release in 2022; third-party mirror",
+    "redistribution": "restricted",
+    "attribution": "Source: originating agency via HIFLD archive"
+   },
+   "citation_url": "https://atcoordinates.info/2025/08/08/hifld-open-gis-portal-shuts-down-aug-26-2025/",
+   "quote": "HIFLD Open was discontinued on August 26, 2025 ... The substation dataset from the US government's HIFLD dataset has been removed from the public since 2022 (search excerpts)",
+   "confidence": "medium-high",
+   "caveats": "hifld_collector.py:51-52 uses a Rutgers mirror. substation ~8,738 rows; transmission_line ~52,244."
+  },
+  {
+   "source": "site_intel: nrel_resource",
+   "current": {
+    "license": "Mixed (inherited)",
+    "redistribution": "open",
+    "attribution": null
+   },
+   "proposed": {
+    "license": "NREL Developer Network terms / NSRDB open data",
+    "redistribution": "attribution",
+    "attribution": "Source: National Renewable Energy Laboratory (NSRDB)"
+   },
+   "citation_url": "https://developer.nrel.gov/terms/",
+   "quote": "(fetch failed DNS; search excerpt: 'data and software code can be used for any purpose whatsoever')",
+   "confidence": "medium",
+   "caveats": "Contractor-operated lab. Credit is expected."
+  },
+  {
+   "source": "site_intel: drewry",
+   "current": {
+    "license": "Drewry WCI (proprietary index, scraped headline)",
+    "redistribution": "restricted",
+    "attribution": null
+   },
+   "proposed": {
+    "license": "Drewry proprietary",
+    "redistribution": "restricted",
+    "attribution": "Source: Drewry World Container Index"
+   },
+   "citation_url": "https://www.drewry.co.uk/supply-chain-advisors/supply-chain-expertise/world-container-index-assessed-by-drewry",
+   "quote": "(no public licence found)",
+   "confidence": "medium",
+   "caveats": "Shares container_freight_index (~982 rows) with Freightos and SCFI."
+  },
+  {
+   "source": "site_intel: freightos",
+   "current": {
+    "license": "Freightos FBX terms (proprietary index)",
+    "redistribution": "restricted",
+    "attribution": null
+   },
+   "proposed": {
+    "license": "Freightos Data Terms and Conditions",
+    "redistribution": "restricted",
+    "attribution": "Source: Freightos Baltic Index (FBX), terminal.freightos.com"
+   },
+   "citation_url": "https://www.freightos.com/freightos-data-terms-conditions/",
+   "quote": "may only be reproduced with full credit to Freightos and a link ... does not include the right to resell Freightos Data or use it in producing derived data such as derivative indexes ... will in no way be used to train any AI models/LLMs",
+   "confidence": "high",
+   "caveats": "Correct today."
+  },
+  {
+   "source": "site_intel: scfi",
+   "current": {
+    "license": "Shanghai Shipping Exchange SCFI (proprietary index)",
+    "redistribution": "restricted",
+    "attribution": null
+   },
+   "proposed": {
+    "license": "SSE proprietary",
+    "redistribution": "restricted",
+    "attribution": "Source: Shanghai Shipping Exchange"
+   },
+   "citation_url": "https://en.sse.net.cn/indices/introduction_scfi.jsp",
+   "quote": "(no public licence found)",
+   "confidence": "medium",
+   "caveats": "Correct today."
+  },
+  {
+   "source": "site_intel: loopnet",
+   "current": {
+    "license": "LoopNet / CoStar terms of use (listings)",
+    "redistribution": "restricted",
+    "attribution": null
+   },
+   "proposed": {
+    "license": "LoopNet Terms of Use: scraping and database creation prohibited",
+    "redistribution": "restricted; collection itself prohibited",
+    "attribution": null
+   },
+   "citation_url": "https://www.loopnet.com/solutions/LoopNetTerms-of-Use",
+   "quote": "prohibit users from scraping the Product without express written permission ... prohibit creating any database or product from the Platform (search excerpt)",
+   "confidence": "high",
+   "caveats": "warehouse_listing holds 60 rows. This conflicts with CLAUDE.md's rule to abort on protected content. Disable the collector and purge."
+  },
+  {
+   "source": "site_intel: good_jobs_first",
+   "current": {
+    "license": "Good Jobs First Subsidy Tracker terms",
+    "redistribution": "restricted",
+    "attribution": null
+   },
+   "proposed": {
+    "license": "GJF Subsidy Tracker (subscription); provenance of stored rows unknown",
+    "redistribution": "internal_only (quarantine)",
+    "attribution": "Source: Good Jobs First Subsidy Tracker"
+   },
+   "citation_url": "https://subsidytracker.goodjobsfirst.org/plans",
+   "quote": "(403; collector docstring: 'requires a subscription ($25/month) for bulk data access')",
+   "confidence": "low-medium",
+   "caveats": "incentive_deal has 48 rows with source='gjf_expanded', but the collector's data path is removed (goodjobs_collector.py:84-92). origin='scraped' is wrong."
+  },
+  {
+   "source": "site_intel: national_zoning_atlas",
+   "current": {
+    "license": "National Zoning Atlas terms",
+    "redistribution": "restricted",
+    "attribution": null
+   },
+   "proposed": {
+    "license": "NZA Terms of Use: no hosting, storing or commercial use without written permission",
+    "redistribution": "restricted; storage needs a licence",
+    "attribution": "National Zoning Atlas, online at zoningatlas.org"
+   },
+   "citation_url": "https://www.zoningatlas.org/terms",
+   "quote": "you may not use, host, store, reproduce, modify, license, create derivative works of ... or distribute any of the Website Content ... you must not commercially use (including sell)",
+   "confidence": "high",
+   "caveats": "Data comes from Mercatus ZIPs (nza_zoning_collector.py:9,37), and that page states no licence. zoning_district holds 3,695 rows. The NZA now has a licensing arm."
+  },
+  {
+   "source": "site_intel: peeringdb",
+   "current": {
+    "license": "PeeringDB acceptable use policy",
+    "redistribution": "restricted",
+    "attribution": null
+   },
+   "proposed": {
+    "license": "PeeringDB AUP",
+    "redistribution": "restricted; commercial internal use also prohibited",
+    "attribution": null
+   },
+   "citation_url": "https://www.peeringdb.com/aup",
+   "quote": "compiling marketing lists, demographic mapping, or any other commercial application ... The PeeringDB data may not be passed on in bulk to any other person or organization unless approved by PeeringDB",
+   "confidence": "high",
+   "caveats": "internet_exchange has 216 rows. Site-selection scoring is arguably a 'commercial application'."
+  },
+  {
+   "source": "site_intel: epoch_dc",
+   "current": {
+    "license": "CC BY 4.0",
+    "redistribution": "attribution",
+    "attribution": "Source: Epoch AI"
+   },
+   "proposed": {
+    "license": "CC BY 4.0",
+    "redistribution": "attribution",
+    "attribution": "Epoch AI, 'AI Data Centers'. Published online at epoch.ai (CC BY 4.0)"
+   },
+   "citation_url": "https://epoch.ai/data/data-centers",
+   "quote": "Epoch AI's data is free to use, distribute, and reproduce provided the source and authors are credited under the Creative Commons Attribution license.",
+   "confidence": "high",
+   "caveats": "data_center_facility has 1,389 rows. Candidate for reviewed=true."
+  },
+  {
+   "source": "site_intel: openei_urdb",
+   "current": {
+    "license": "OpenEI Utility Rate Database (CC0 / public)",
+    "redistribution": "open",
+    "attribution": "Source: OpenEI URDB (NREL)"
+   },
+   "proposed": {
+    "license": "CC0 1.0",
+    "redistribution": "open",
+    "attribution": "Source: OpenEI URDB (courtesy)"
+   },
+   "citation_url": "https://openei.org/wiki/Utility_Rate_Database",
+   "quote": "Content is available under Creative Commons Zero unless otherwise noted.",
+   "confidence": "high",
+   "caveats": "utility_rate has 8,456 rows. Candidate for reviewed=true."
+  },
+  {
+   "source": "site_intel: njdep_lulc",
+   "current": {
+    "license": "NJ DEP open data (public record)",
+    "redistribution": "attribution",
+    "attribution": "Source: New Jersey Department of Environmental Protection"
+   },
+   "proposed": {
+    "license": "NJDEP GIS data terms (not verified)",
+    "redistribution": "attribution",
+    "attribution": "Source: New Jersey Department of Environmental Protection"
+   },
+   "citation_url": "https://gisdata-njdep.opendata.arcgis.com/",
+   "quote": "(not fetched)",
+   "confidence": "low",
+   "caveats": "Verify NJGIN's terms before sign-off."
+  },
+  {
+   "source": "site_intel: fmcsa / three_pl_* / transport_topics / state_edo*",
+   "current": {
+    "license": "USG (fmcsa open); scraped or derived internal_only/restricted",
+    "redistribution": "open / internal_only / restricted",
+    "attribution": "Source: FMCSA (fmcsa only)"
+   },
+   "proposed": {
+    "license": "unchanged",
+    "redistribution": "unchanged",
+    "attribution": "unchanged"
+   },
+   "citation_url": "n/a",
+   "quote": "n/a",
+   "confidence": "medium",
+   "caveats": "The three_pl_sec and three_pl_fmcsa license strings say USG but the rows sit on a scraped Transport Topics list, so internal_only is right. Change their license text to 'derived; base list scraped'."
+  },
+  {
+   "source": "job_postings / public_lp_strategies / people_collection / pe_collection / lp_collection / family_office_collection / agentic_research / rollup_intel / synthetic / entity_master / pe_marts",
+   "current": {
+    "license": "scraped / llm_extracted / derived / synthetic",
+    "redistribution": "internal_only",
+    "attribution": null
+   },
+   "proposed": {
+    "license": "unchanged",
+    "redistribution": "internal_only",
+    "attribution": null
+   },
+   "citation_url": "n/a",
+   "quote": "n/a",
+   "confidence": "high",
+   "caveats": "No external licence can clear these. SEC-derived marts (pe_marts, entity_master) could become 'open' once the commercial posture and PII policy are settled, because their inputs are public domain."
+  }
+ ]
+}

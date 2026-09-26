@@ -19,7 +19,7 @@ from sqlalchemy.engine import Engine
 
 from app.catalog.columns import is_jsonish, mask_value, personal_safe
 from app.catalog.dictionary import coverage, dictionary_hash, merge_columns, packages_for
-from app.catalog.spec import DatasetSpec
+from app.catalog.spec import DatasetSpec, gate_reasons
 from app.catalog.tables import pattern_matches, split
 from app.core.export_policy import is_exportable, is_sensitive_column
 from app.core.safe_sql import qi
@@ -266,12 +266,22 @@ def effective_pii(col: Dict[str, Any], writers: Iterable[DatasetSpec], table: Op
 
 
 def storage_forbidden(writers: Iterable[DatasetSpec]) -> bool:
-    """A writer whose terms forbid storing or commercially using its data (PLAN_088 §3 item 5).
-
-    ``storage`` / ``commercial_use`` arrive with SPEC_142; until then this is always False.
-    Applies to every caller, admins included."""
+    """A writer whose terms forbid storing or commercially using its data (PLAN_088 §3 item 5,
+    SPEC_142 ``storage`` / ``commercial_use``). Profile examples are withheld from everyone."""
     return any(getattr(w, "storage", None) == "forbidden" or getattr(w, "commercial_use", None) == "forbidden"
                for w in writers)
+
+
+def rights_gate(writers: Iterable[DatasetSpec]) -> List[str]:
+    """Why a table's rows may not be served to non-admins at all (SPEC_142): a writer's terms
+    forbid storing it, forbid commercial use, or need an agreement first. Admins are served
+    and told (the gate travels in the body and a header)."""
+    reasons: List[str] = []
+    for w in writers:
+        for r in gate_reasons(getattr(w, "storage", None), getattr(w, "commercial_use", None)):
+            if r not in reasons:
+                reasons.append(r)
+    return reasons
 
 
 def restricted(writers: Iterable[DatasetSpec]) -> bool:
@@ -293,6 +303,9 @@ def dataset_flags(spec: DatasetSpec) -> Dict[str, Any]:
         "effective_redistribution": spec.effective_redistribution,
         "data_state": getattr(spec, "data_state", None),
         "limitations": list(getattr(spec, "limitations", ()) or ()),
+        "storage": getattr(spec, "storage", None),
+        "commercial_use": getattr(spec, "commercial_use", None),
+        "rights_gate": rights_gate([spec]),
     }
 
 
@@ -329,7 +342,8 @@ def dataset_schema(engine: Engine, spec: DatasetSpec, tables: Sequence[str], exi
         writers = table_writers(t, spec)
         live_names = [c["name"] for c in cols]
         examples_ok = not storage_forbidden(writers) and (
-            admin or not (restricted(writers) or not is_exportable(split(t)[1], live_names)))
+            admin or not (restricted(writers) or rights_gate(writers)
+                          or not is_exportable(split(t)[1], live_names)))
         for c in cols:
             p = prof.get("columns", {}).get(c["name"], {})
             c["null_pct"] = p.get("null_pct")
@@ -419,12 +433,14 @@ def build_sample(engine: Engine, spec: DatasetSpec, table: str, limit: int, admi
     if not is_exportable(split(table)[1], live_names):
         raise SampleForbidden("this table is excluded by the export policy")
     writers = table_writers(table, spec)
-    if storage_forbidden(writers):
-        raise SampleForbidden("the source's terms forbid storing or commercially using its data: no samples")
+    gate = rights_gate(writers)
+    if gate and not admin:
+        raise SampleForbidden("the source's terms forbid storing it, forbid commercial use or need an "
+                              f"agreement ({', '.join(gate)}): samples are admin-only")
     if not admin and restricted(writers):
         raise SampleForbidden("restricted dataset: samples are admin-only")
     rights = table_rights(table, spec, writers)
-    flags = dataset_flags(spec)
+    flags = {**dataset_flags(spec), "rights_gate": gate}
     row_filter = row_filter_of(spec, table)
 
     cols = merge_columns(table, facts["columns"], packages_for(spec), None, facts["comments"])
@@ -505,6 +521,6 @@ def clear_sample_cache() -> None:
 
 __all__ = [
     "SampleForbidden", "TableNotFound", "build_sample", "census_labels", "clear_sample_cache",
-    "dataset_flags", "dataset_schema", "effective_pii", "profile_stats", "restricted", "row_filter_of",
-    "storage_forbidden", "table_facts", "table_rights",
+    "dataset_flags", "dataset_schema", "effective_pii", "profile_stats", "restricted", "rights_gate",
+    "row_filter_of", "storage_forbidden", "table_facts", "table_rights",
 ]

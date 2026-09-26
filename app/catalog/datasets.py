@@ -33,6 +33,7 @@ from pathlib import Path
 from typing import Dict, FrozenSet, List, Optional, Sequence, Tuple
 
 from app.catalog.rights import rights_for
+from app.catalog.rights_reviewed import apply_review
 from app.catalog.spec import DatasetSpec
 
 # Date of the verification the entries reflect (PLAN_088 evidence).
@@ -198,7 +199,10 @@ def _ds(
     for field in ("limitations", "primary_key", "inputs", "missing_tables", "row_filters"):
         if field in kw:
             kw[field] = tuple(kw[field])
-    return DatasetSpec(
+    for field, value in r.spec_fields().items():  # SPEC_142 rights fields
+        kw.setdefault(field, value)
+    # reviewed only from a committed sign-off whose hash matches this block (SPEC_142)
+    return apply_review(DatasetSpec(
         key=key,
         source=source,
         display_name=display_name,
@@ -214,12 +218,12 @@ def _ds(
         license=r.license,
         redistribution=r.redistribution,
         attribution=r.attribution,
-        reviewed=r.reviewed,
+        reviewed=False,
         pii_class=pii or r.pii_class,
         origin=origin or r.origin,
         status_public=status,
         **kw,
-    )
+    ))
 
 
 def _dormant(*producers: str) -> str:

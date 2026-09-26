@@ -15,7 +15,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 from sqlalchemy import text, inspect
 
-from app.core.export_policy import is_exportable
+from app.core.export_policy import catalog_rights_gate, is_exportable
 from app.core.models import ExportJob, ExportFormat, ExportStatus
 
 logger = logging.getLogger(__name__)
@@ -100,6 +100,7 @@ class ExportService:
                     "table_name": table_name,
                     "row_count": row_counts.get(table_name, 0),
                     "columns": columns,
+                    "rights_gate": catalog_rights_gate(table_name),  # SPEC_142 flag
                 }
             )
 

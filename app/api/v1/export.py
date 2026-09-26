@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.models import ExportJob, ExportFormat, ExportStatus
-from app.core.export_policy import is_exportable
+from app.core.export_policy import catalog_rights_gate, is_exportable
 from app.core.export_service import ExportService
 
 logger = logging.getLogger(__name__)
@@ -249,6 +249,9 @@ def preview_table(
         "rows": rows,
         "limit": limit,
         "offset": offset,
+        # SPEC_142: set when the source's terms forbid storing it / commercial use or need an
+        # agreement (this router is admin-only; the flag tells the admin before anything leaves)
+        "rights_gate": catalog_rights_gate(table_name),
     }
 
 

@@ -14,14 +14,23 @@ SPEC_141 (catalog truth pass) added the honesty fields: ``data_state`` and
 ``limitations`` say what is really loaded, ``missing_tables`` names declared
 tables that do not exist, ``row_filters`` scope a dataset's rows inside a
 shared table, and ``coverage_basis`` says what ``coverage_sql`` measures.
+
+SPEC_142 (rights review) added the rights fields that ``redistribution`` cannot
+express: ``storage`` (may we hold it at all), ``commercial_use``,
+``share_alike``, the citation the block rests on, and ``proposed_rights`` (a
+cited candidate block that is shown, never applied). ``rights_hash`` names the
+exact block a human signs off; ``reviewed`` is True only when the committed
+``rights_reviewed.REVIEWED`` hash matches it.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from dataclasses import dataclass
 from datetime import date
-from typing import Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 KINDS = ("reference", "filings", "timeseries", "holdings", "derived_mart", "entity", "geo", "other")
 RERUN_POLICIES = ("idempotent", "append_only", "destructive", "currency_only")
@@ -46,7 +55,23 @@ KEYWORDS = ("pe", "entity", "filings", "macro", "energy", "real_estate", "labor"
             "trade", "geo_risk", "finance", "government", "logistics", "infrastructure",
             "demographics", "markets", "company", "people", "synthetic")
 
+# SPEC_142 rights vocabularies. None on a spec means "not assessed", never "allowed".
+STORAGE = ("allowed", "time_limited", "forbidden")
+COMMERCIAL_USE = ("allowed", "restricted", "agreement_required", "forbidden")
+RIGHTS_CONFIDENCE = ("high", "medium-high", "medium", "low-medium", "low")
+# loosen: less restrictive than today (never applied without review); tighten: stricter,
+# held back for a reason; restate: same strictness, different wording or source
+PROPOSAL_CHANGES = ("loosen", "tighten", "restate")
+# strictness order, least strict first (None = not assessed is not ranked)
+STORAGE_RANK = ("allowed", "time_limited", "forbidden")
+COMMERCIAL_USE_RANK = ("allowed", "restricted", "agreement_required", "forbidden")
+# the fields a reviewer signs: any change re-opens review (citations and notes document,
+# they do not decide, so they are not hashed)
+HASHED_RIGHTS_FIELDS = ("license", "license_url", "redistribution", "attribution", "storage",
+                        "storage_max_age_days", "commercial_use", "share_alike", "pii_class", "origin")
+
 _KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+_URL_RE = re.compile(r"^https?://\S+$")
 _TABLE_RE = re.compile(r"^(?:[a-z_][a-z0-9_]*\.)?[a-z_][a-z0-9_]*$")
 _PATTERN_RE = re.compile(r"^[a-z_][a-z0-9_]*\*$")
 _PRODUCER_RE = re.compile(r"^(bulk|dispatch|collector|job|api|script):[a-z0-9_:.]+(#[a-z0-9_]+)?$")
@@ -76,6 +101,104 @@ def _iso_date(value: str) -> bool:
     except (TypeError, ValueError):
         return False
     return len(value) == 10
+
+
+def check_rights_terms(where: str, *, storage: Optional[str], storage_max_age_days: Optional[int],
+                       commercial_use: Optional[str], license_url: Optional[str] = None,
+                       citation_url: Optional[str] = None, citation_quote: Optional[str] = None,
+                       confidence: Optional[str] = None, require_citation: bool = False) -> None:
+    """The SPEC_142 closed vocabularies, shared by SourceRights, DatasetSpec and RightsProposal.
+    Raises ValueError naming ``where`` (a typo must fail at import, not publish)."""
+
+    def need(cond: bool, msg: str) -> None:
+        if not cond:
+            raise ValueError(f"{where}: {msg}")
+
+    if storage is not None:
+        need(storage in STORAGE, f"storage {storage!r} not in {STORAGE}")
+    if storage == "time_limited":
+        need(isinstance(storage_max_age_days, int) and storage_max_age_days > 0,
+             "storage 'time_limited' needs a positive storage_max_age_days")
+    else:
+        need(storage_max_age_days is None, "storage_max_age_days is only for storage 'time_limited'")
+    if commercial_use is not None:
+        need(commercial_use in COMMERCIAL_USE, f"commercial_use {commercial_use!r} not in {COMMERCIAL_USE}")
+    for name, url in (("license_url", license_url), ("citation_url", citation_url)):
+        if url is not None:
+            need(bool(_URL_RE.match(url)), f"{name} must be an http(s) URL")
+    if confidence is not None:
+        need(confidence in RIGHTS_CONFIDENCE, f"rights confidence {confidence!r} not in {RIGHTS_CONFIDENCE}")
+    if citation_quote is not None:
+        need(bool(citation_quote.strip()), "empty citation_quote")
+    if citation_quote is not None or confidence is not None:
+        need(citation_url is not None, "a citation quote or confidence needs a citation_url")
+    if require_citation:
+        need(citation_url is not None and citation_quote is not None and confidence is not None,
+             "needs citation_url, citation_quote and confidence")
+
+
+@dataclass(frozen=True)
+class RightsProposal:
+    """A cited candidate rights block (SPEC_142). Shown in the review queue and the report;
+    never applied: a human accepts it, then ``rights.py`` is changed and re-reviewed.
+    Unset fields mean "unchanged from the current block"."""
+
+    change: str                        # PROPOSAL_CHANGES
+    reason: str
+    citation_url: str
+    citation_quote: str
+    confidence: str
+    license: Optional[str] = None
+    redistribution: Optional[str] = None
+    attribution: Optional[str] = None
+    storage: Optional[str] = None
+    storage_max_age_days: Optional[int] = None
+    commercial_use: Optional[str] = None
+    share_alike: Optional[bool] = None
+
+    def __post_init__(self) -> None:
+        where = "RightsProposal"
+        if self.change not in PROPOSAL_CHANGES:
+            raise ValueError(f"{where}: change {self.change!r} not in {PROPOSAL_CHANGES}")
+        if not (self.reason or "").strip():
+            raise ValueError(f"{where}: reason is required")
+        if self.redistribution is not None and self.redistribution not in REDISTRIBUTION:
+            raise ValueError(f"{where}: redistribution {self.redistribution!r} not in {REDISTRIBUTION}")
+        check_rights_terms(where, storage=self.storage, storage_max_age_days=self.storage_max_age_days,
+                           commercial_use=self.commercial_use, citation_url=self.citation_url,
+                           citation_quote=self.citation_quote, confidence=self.confidence,
+                           require_citation=True)
+
+    def changes(self) -> Dict[str, Any]:
+        """The rights fields this proposal sets (the hashed ones only)."""
+        return {f: getattr(self, f) for f in HASHED_RIGHTS_FIELDS
+                if hasattr(self, f) and getattr(self, f) is not None}
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "change": self.change, "reason": self.reason, "changes": self.changes(),
+            "citation_url": self.citation_url, "citation_quote": self.citation_quote,
+            "confidence": self.confidence,
+        }
+
+
+def gate_reasons(storage: Optional[str], commercial_use: Optional[str]) -> Tuple[str, ...]:
+    """Rights gate (SPEC_142): the source's terms forbid storing it, forbid commercial use, or
+    need an agreement first. Such rows are never served to non-admins."""
+    reasons = []
+    if storage == "forbidden":
+        reasons.append("storage_forbidden")
+    if commercial_use == "forbidden":
+        reasons.append("commercial_use_forbidden")
+    elif commercial_use == "agreement_required":
+        reasons.append("agreement_required")
+    return tuple(reasons)
+
+
+def rights_hash_of(block: Dict[str, Any]) -> str:
+    """sha256 of the canonical JSON of the hashed rights fields (missing ones are null)."""
+    canon = {f: block.get(f) for f in HASHED_RIGHTS_FIELDS}
+    return hashlib.sha256(json.dumps(canon, sort_keys=True, ensure_ascii=True).encode("ascii")).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -118,6 +241,17 @@ class DatasetSpec:
     data_state: Optional[str] = None       # DATA_STATES, as last verified
     missing_tables: Tuple[str, ...] = ()   # declared tables / patterns verified absent
     verified_at: Optional[str] = None      # ISO date of that verification
+    # -- SPEC_142 rights ----------------------------------------------------
+    storage: Optional[str] = None          # STORAGE; None = not assessed
+    storage_max_age_days: Optional[int] = None  # with storage 'time_limited'
+    commercial_use: Optional[str] = None   # COMMERCIAL_USE; None = not assessed
+    share_alike: bool = False
+    license_url: Optional[str] = None
+    citation_url: Optional[str] = None     # the terms page the rights block rests on
+    citation_quote: Optional[str] = None
+    rights_confidence: Optional[str] = None  # RIGHTS_CONFIDENCE
+    rights_notes: Optional[str] = None
+    proposed_rights: Optional[RightsProposal] = None
 
     def __post_init__(self) -> None:
         k = self.key
@@ -190,8 +324,20 @@ class DatasetSpec:
                    f"missing_tables entry {t!r} is not a declared table or pattern")
         _check(bool(self.missing_tables) == (self.data_state == "missing_tables"), k,
                "missing_tables is set exactly when data_state is 'missing_tables'")
+        check_rights_terms(f"DatasetSpec {k!r}", storage=self.storage,
+                           storage_max_age_days=self.storage_max_age_days,
+                           commercial_use=self.commercial_use, license_url=self.license_url,
+                           citation_url=self.citation_url, citation_quote=self.citation_quote,
+                           confidence=self.rights_confidence)
+        _check(isinstance(self.share_alike, bool), k, "share_alike must be a bool")
+        if self.proposed_rights is not None:
+            _check(isinstance(self.proposed_rights, RightsProposal), k,
+                   "proposed_rights must be a RightsProposal")
         if self.status_public in ("ga", "beta"):
             _check(self.reviewed, k, "a ga/beta dataset needs a reviewed rights block")
+            _check(self.storage != "forbidden", k, "the source's terms forbid storing it: never ga/beta")
+            _check(self.commercial_use not in ("forbidden", "agreement_required"), k,
+                   "commercial use is forbidden or needs an agreement: never ga/beta")
             _check(self.origin != "synthetic", k, "synthetic data is never published as ga/beta")
             _check(self.data_state == "ok", k, "a ga/beta dataset needs data_state 'ok'")
         if self.slo_lag_hours is not None:
@@ -211,6 +357,46 @@ class DatasetSpec:
     def effective_redistribution(self) -> str:
         """What export and the consumer API may do today: nothing leaves until reviewed."""
         return self.redistribution if self.reviewed else "internal_only"
+
+    def rights_block(self) -> Dict[str, Any]:
+        """The hashed rights fields: exactly what a reviewer signs."""
+        return {f: getattr(self, f) for f in HASHED_RIGHTS_FIELDS}
+
+    @property
+    def rights_hash(self) -> str:
+        return rights_hash_of(self.rights_block())
+
+    def proposed_block(self) -> Optional[Dict[str, Any]]:
+        """The current block with the proposal's fields applied (None without a proposal)."""
+        if self.proposed_rights is None:
+            return None
+        return {**self.rights_block(), **self.proposed_rights.changes()}
+
+    @property
+    def rights_gate(self) -> Tuple[str, ...]:
+        """Why this dataset's rows may not be served to non-admins at all (SPEC_142)."""
+        return gate_reasons(self.storage, self.commercial_use)
+
+    def rights_dict(self) -> Dict[str, Any]:
+        return {
+            "license": self.license,
+            "license_url": self.license_url,
+            "redistribution": self.redistribution,
+            "effective_redistribution": self.effective_redistribution,
+            "attribution": self.attribution,
+            "reviewed": self.reviewed,
+            "storage": self.storage,
+            "storage_max_age_days": self.storage_max_age_days,
+            "commercial_use": self.commercial_use,
+            "share_alike": self.share_alike,
+            "citation_url": self.citation_url,
+            "citation_quote": self.citation_quote,
+            "confidence": self.rights_confidence,
+            "notes": self.rights_notes,
+            "gate": list(self.rights_gate),
+            "rights_hash": self.rights_hash,
+            "proposed": self.proposed_rights.to_dict() if self.proposed_rights else None,
+        }
 
     def to_dict(self) -> dict:
         return {
@@ -232,13 +418,7 @@ class DatasetSpec:
             "rerun": self.rerun,
             "owner": self.owner,
             "slo_lag_hours": self.slo_lag_hours,
-            "rights": {
-                "license": self.license,
-                "redistribution": self.redistribution,
-                "effective_redistribution": self.effective_redistribution,
-                "attribution": self.attribution,
-                "reviewed": self.reviewed,
-            },
+            "rights": self.rights_dict(),
             "pii_class": self.pii_class,
             "origin": self.origin,
             "status_public": self.status_public,

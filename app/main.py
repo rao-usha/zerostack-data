@@ -54,6 +54,7 @@ from app.api.v1 import (
     prediction_markets,
     bulk,
     catalog,
+    catalog_rights,
     catalog_schema,
     dataset_status,
     entity_master,
@@ -1630,6 +1631,7 @@ app.include_router(foot_traffic.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(dunl.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(prediction_markets.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(bulk.router, prefix="/api/v1", dependencies=_admin)
+app.include_router(catalog_rights.router, prefix="/api/v1", dependencies=_auth)  # SPEC_142 (before catalog: /catalog/{key})
 app.include_router(catalog_schema.router, prefix="/api/v1", dependencies=_auth)  # SPEC_137 (before catalog: /catalog/{key})
 app.include_router(catalog.router, prefix="/api/v1", dependencies=_auth)  # SPEC_123
 app.include_router(dataset_status.router, prefix="/api/v1", dependencies=_auth)  # SPEC_124 (run: admin)
