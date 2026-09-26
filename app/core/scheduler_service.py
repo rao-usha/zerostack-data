@@ -1834,10 +1834,41 @@ def register_daily_quality_snapshots(hour: int = 2) -> bool:
         )
 
         logger.info(f"Registered daily quality snapshots at {hour}:00")
+        # SPEC_144: stale catalog tables are profiled an hour before the
+        # snapshots read the profiles (registered here so main.py is unchanged)
+        register_catalog_profiling(hour=(hour - 1) % 24)
         return True
 
     except Exception as e:
         logger.error(f"Failed to register daily quality snapshots: {e}")
+        return False
+
+
+def register_catalog_profiling(hour: int = 1) -> bool:
+    """
+    Register the scheduled catalog profiler (SPEC_144): profiles every catalog
+    table whose latest profile is older than its dataset's cadence, bounded
+    per run (``data_profiling_service.profile_stale_catalog_tables``).
+    """
+    scheduler = get_scheduler()
+    job_id = "system_catalog_profiling"
+
+    try:
+        from app.core.data_profiling_service import scheduled_catalog_profiling
+
+        scheduler.add_job(
+            scheduled_catalog_profiling,
+            trigger=CronTrigger(hour=hour, minute=0),
+            id=job_id,
+            name="Catalog Table Profiling",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+        logger.info(f"Registered catalog profiling at {hour}:00")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to register catalog profiling: {e}")
         return False
 
 

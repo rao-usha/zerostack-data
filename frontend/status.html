@@ -180,6 +180,11 @@
         .st-table th.c-rows { width: 5.5rem; text-align: right; }
         .st-table th.c-rights { width: 6.5rem; }
         .st-table td.c-rows { text-align: right; font-variant-numeric: tabular-nums; }
+        .spark { display: block; margin: 2px 0 0 auto; overflow: visible; }
+        .spark polyline { fill: none; stroke: #818cf8; stroke-width: 1.25; stroke-linejoin: round; stroke-linecap: round; }
+        .spark circle { fill: #818cf8; }
+        .spark.down polyline { stroke: #f87171; }
+        .spark.down circle { fill: #f87171; }
         .st-table td { overflow-wrap: anywhere; }
         .ds-row { cursor: pointer; }
         .ds-row:hover { background: rgba(99,102,241,0.08); }
@@ -492,6 +497,40 @@
             return base.indexOf('bulk:') === 0 ? base.slice('bulk:'.length) : null;
         }
 
+        // SPEC_144 row-count sparkline. points: [{date, rows}] oldest first
+        // (GET /catalog/row-trends). Returns 'x,y x,y ...' scaled into w x h,
+        // or '' when there are fewer than two numeric points. A flat series
+        // is drawn at mid-height.
+        function sparklinePoints(points, w, h) {
+            var vals = (points || []).map(function (p) { return p && p.rows; })
+                .filter(function (v) { return typeof v === 'number' && isFinite(v); });
+            if (vals.length < 2) return '';
+            var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+            var span = max - min;
+            var pad = 1;
+            return vals.map(function (v, i) {
+                var x = pad + (w - 2 * pad) * i / (vals.length - 1);
+                var y = span === 0 ? h / 2 : pad + (h - 2 * pad) * (1 - (v - min) / span);
+                return x.toFixed(1) + ',' + y.toFixed(1);
+            }).join(' ');
+        }
+
+        // Inline SVG built from numbers only; the tooltip text goes through esc().
+        function sparklineSvg(points, w, h) {
+            w = w || 64; h = h || 16;
+            var pts = sparklinePoints(points, w, h);
+            if (!pts) return '';
+            var clean = (points || []).filter(function (p) { return p && typeof p.rows === 'number' && isFinite(p.rows); });
+            var first = clean[0], last = clean[clean.length - 1];
+            var down = last.rows < first.rows;
+            var tip = 'rows ' + first.date + ': ' + first.rows + ' → ' + last.date + ': ' + last.rows;
+            var end = pts.split(' ').pop().split(',');
+            return '<svg class="spark' + (down ? ' down' : '') + '" width="' + w + '" height="' + h +
+                '" viewBox="0 0 ' + w + ' ' + h + '" role="img" aria-label="' + esc(tip) + '">' +
+                '<title>' + esc(tip) + '</title><polyline points="' + pts + '"/>' +
+                '<circle cx="' + end[0] + '" cy="' + end[1] + '" r="1.6"/></svg>';
+        }
+
         window.StatusCore = {
             STATUS_ORDER: STATUS_ORDER,
             ATTENTION: ATTENTION,
@@ -514,6 +553,8 @@
             pendingCoverage: pendingCoverage,
             martFor: martFor,
             bulkSourceFor: bulkSourceFor,
+            sparklinePoints: sparklinePoints,
+            sparklineSvg: sparklineSvg,
         };
     })();
     </script>
@@ -529,6 +570,7 @@
         const ENDPOINTS = {
             status: '/api/v1/datasets/status',
             catalog: '/api/v1/catalog',
+            rowTrends: '/api/v1/catalog/row-trends',   // SPEC_144 sparkline
             martBuilds: '/api/v1/pe/marts/builds',
             releases: '/api/v1/bulk/releases',   // admin
             jobs: '/api/v1/jobs',                // admin
@@ -567,6 +609,7 @@
             data: null,            // GET /datasets/status body
             byKey: new Map(),      // key -> dataset status
             catalog: new Map(),    // key -> catalog entry (rights, SLO, rerun)
+            trends: new Map(),     // key -> [{date, rows}] daily row counts (SPEC_144)
             view: 'operator',
             status: null,          // status filter from the banner
             kind: '',
@@ -820,8 +863,9 @@
             return `<span class="rights ${esc(eff)}" title="${esc(tip)}">${esc(eff.replace(/_/g, ' '))}</span>`;
         }
         function rowsCell(d) {
-            if (d.rows_total === null || d.rows_total === undefined) return '<span class="muted">&mdash;</span>';
-            return `<span title="${d.rows_exact ? 'exact count' : 'planner estimate'}">${d.rows_exact ? '' : '~'}${fmtNum(d.rows_total)}</span>`;
+            const spark = C.sparklineSvg(state.trends.get(d.key));
+            if (d.rows_total === null || d.rows_total === undefined) return '<span class="muted">&mdash;</span>' + spark;
+            return `<span title="${d.rows_exact ? 'exact count' : 'planner estimate'}">${d.rows_exact ? '' : '~'}${fmtNum(d.rows_total)}</span>${spark}`;
         }
 
         function rowHtml(d) {
@@ -1226,6 +1270,15 @@
             }
         }
 
+        // Row-count sparklines: optional, loaded after the table renders.
+        async function loadTrends() {
+            const res = await getJson(ENDPOINTS.rowTrends);
+            const ds = res.data && res.data.datasets;
+            if (!ds || typeof ds !== 'object') return;
+            state.trends = new Map(Object.keys(ds).map(k => [k, Array.isArray(ds[k]) ? ds[k] : []]));
+            if (state.data) renderTable();
+        }
+
         function fillKindFilter() {
             const sel = document.getElementById('f-kind');
             const kinds = Array.from(new Set(state.data.datasets.map(d => d.kind))).sort();
@@ -1386,6 +1439,7 @@
             live.plan = C.livePlan(data, isAdmin);
             applyStatus(data);
             connectStream();
+            loadTrends();
         }
 
         init();

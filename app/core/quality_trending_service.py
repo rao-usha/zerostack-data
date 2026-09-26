@@ -3,6 +3,12 @@ Quality Trending Service.
 
 Tracks quality scores over time, computes daily snapshots, checks SLA
 compliance, and detects sustained quality degradation.
+
+SPEC_144: daily snapshots cover every catalog table that exists (plus ingested
+registry tables the catalog does not cover); freshness comes from the SPEC_124
+dataset status, which knows the cadence and SLO; ``row_count`` is the live row
+estimate taken each day, so the snapshots double as the row-count history the
+catalog's row trend and the status page sparkline read.
 """
 
 import logging
@@ -23,7 +29,6 @@ from app.core.models import (
     AnomalyAlertType,
     AnomalyAlertStatus,
     RuleSeverity,
-    DatasetRegistry,
     IngestionJob,
     JobStatus,
 )
@@ -59,6 +64,9 @@ def _compute_freshness_score(db: Session, source: str) -> Optional[float]:
     Compute freshness score based on most recent successful job.
 
     100 = updated today, 90 = within 1 day, decays linearly.
+
+    Legacy fallback only (SPEC_144): catalog tables take the score of their
+    dataset's SPEC_124 status (``app.catalog.quality.FRESHNESS_BY_STATUS``).
     """
     job = (
         db.query(IngestionJob)
@@ -82,18 +90,28 @@ def _compute_validity_score(db: Session, source: str, table_name: str) -> Option
     """
     Compute validity score from recent rule evaluation results.
 
-    Based on pass rate of data quality rules.
+    Based on pass rate of data quality rules: the results for this table
+    (SPEC_144), else -- for tables with none -- the source's results.
     """
     # Get results from last 7 days
     cutoff = datetime.utcnow() - timedelta(days=7)
     results = (
-        db.query(DataQualityResult)
+        db.query(DataQualityResult.passed)
         .filter(
-            DataQualityResult.source == source,
+            DataQualityResult.dataset_name == table_name,
             DataQualityResult.evaluated_at >= cutoff,
         )
         .all()
     )
+    if not results:
+        results = (
+            db.query(DataQualityResult.passed)
+            .filter(
+                DataQualityResult.source == source,
+                DataQualityResult.evaluated_at >= cutoff,
+            )
+            .all()
+        )
 
     if not results:
         return None
@@ -148,18 +166,29 @@ def compute_daily_snapshots(db: Session) -> List[DQQualitySnapshot]:
     Compute daily quality scores for all sources/tables in dataset_registry.
 
     Composite score = 30% completeness + 20% freshness + 30% validity + 20% consistency.
+
+    SPEC_144: the tables are ``app.catalog.quality.dq_targets`` (catalog tables
+    that exist + ingested registry rows); a catalog table's freshness is its
+    dataset's status score; ``row_count`` is the live row estimate.
     """
+    from app.catalog.quality import dq_targets, freshness_by_dataset
+
     today = date.today()
-    registries = db.query(DatasetRegistry).filter(DatasetRegistry.ingested()).all()
+    targets = dq_targets(db)
+    verdict_freshness = freshness_by_dataset(db) if any(t["dataset_key"] for t in targets) else {}
     snapshots = []
 
-    for registry in registries:
+    for target in targets:
         try:
-            source = registry.source
-            table_name = registry.table_name
+            source = target["source"]
+            table_name = target["table"]
 
             completeness = _compute_completeness_score(db, table_name)
-            freshness = _compute_freshness_score(db, source)
+            key = target["dataset_key"]
+            if key and key in verdict_freshness:
+                freshness = verdict_freshness[key]
+            else:
+                freshness = _compute_freshness_score(db, source)
             validity = _compute_validity_score(db, source, table_name)
             consistency = _compute_consistency_score(db, source)
 
@@ -178,14 +207,19 @@ def compute_daily_snapshots(db: Session) -> List[DQQualitySnapshot]:
             if validity is not None:
                 rule_pass_rate = validity
 
-            # Row count from latest profile
-            latest_profile = (
-                db.query(DataProfileSnapshot)
-                .filter(DataProfileSnapshot.table_name == table_name)
-                .order_by(DataProfileSnapshot.profiled_at.desc())
-                .first()
-            )
-            row_count = latest_profile.row_count if latest_profile else None
+            # Row count: the live estimate (daily history for the row trend),
+            # else the latest profile's
+            row_count = target.get("rows_estimate")
+            if row_count is None:
+                latest_profile = (
+                    db.query(DataProfileSnapshot)
+                    .filter(DataProfileSnapshot.table_name == table_name)
+                    .order_by(DataProfileSnapshot.profiled_at.desc())
+                    .first()
+                )
+                row_count = latest_profile.row_count if latest_profile else None
+            if row_count is not None:
+                row_count = min(int(row_count), 2_147_483_647)
 
             # Composite score (use available components)
             components = []
@@ -234,7 +268,7 @@ def compute_daily_snapshots(db: Session) -> List[DQQualitySnapshot]:
                     snapshot_date=today,
                     source=source,
                     table_name=table_name,
-                    domain=getattr(registry, "domain", None),
+                    domain=target.get("domain"),
                     quality_score=quality_score,
                     completeness_score=completeness,
                     freshness_score=freshness,
@@ -246,10 +280,13 @@ def compute_daily_snapshots(db: Session) -> List[DQQualitySnapshot]:
                 )
                 db.add(snapshot)
 
+            # one commit per table: a failure below cannot roll back the others
+            db.commit()
             snapshots.append(snapshot)
 
         except Exception as e:
-            logger.error(f"Error computing snapshot for {registry.table_name}: {e}")
+            db.rollback()
+            logger.error(f"Error computing snapshot for {target['table']}: {e}")
             continue
 
     db.commit()

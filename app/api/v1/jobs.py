@@ -14,7 +14,6 @@ from app.core.database import get_db
 from app.core.models import IngestionJob, IngestionSchedule, JobStatus, BatchTierConfig
 from app.core.schemas import JobCreate, JobResponse, BackfillRequest
 from app.core.config import get_settings, MissingCensusAPIKeyError
-from app.core.safe_sql import qi
 
 logger = logging.getLogger(__name__)
 
@@ -608,6 +607,119 @@ SOURCE_DISPATCH: Dict[str, Tuple[str, str, List[str]]] = {
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
+# SPEC_144: at most this many of a dataset's tables are gated per job
+GATE_MAX_TABLES = 6
+GATE_COUNT_TIMEOUT_MS = 30000
+
+# Date gap check for tables with known date columns
+DATE_COLUMN_MAP = {
+    "fred_": "date",
+    "bls_": "date",
+    "treasury_": "record_date",
+    "eia_": "period",
+}
+
+
+def _quality_gate_tables(db, job) -> List[str]:
+    """SPEC_144: the job's dataset (``job.dataset_key``, else resolved from
+    source + config) -> its catalog tables that exist. Falls back to the
+    latest ingested registry row for the source (legacy tables)."""
+    try:
+        from app.catalog.quality import dataset_tables_for_job
+
+        tables = dataset_tables_for_job(db, job)
+        if tables:
+            return tables[:GATE_MAX_TABLES]
+    except Exception as e:
+        logger.debug(f"Quality gate: catalog resolution failed for job {job.id}: {e}")
+        db.rollback()
+
+    from app.core.models import DatasetRegistry
+
+    registry = (
+        db.query(DatasetRegistry)
+        .filter(DatasetRegistry.source == job.source, DatasetRegistry.ingested())
+        .order_by(DatasetRegistry.last_updated_at.desc())
+        .first()
+    )
+    return [registry.table_name] if registry else []
+
+
+def _gate_table(db, job, table_name: str) -> None:
+    from app.core.data_quality_service import (
+        check_date_gaps,
+        check_row_count_delta,
+        evaluate_rules_for_job,
+        previous_profile_count,
+        qt,
+    )
+
+    # Read the baseline BEFORE profiling writes a new snapshot (SPEC_144)
+    try:
+        previous_count = previous_profile_count(db, table_name)
+    except Exception as be:
+        db.rollback()
+        previous_count = None
+        logger.debug(f"Quality gate: no profile baseline for {table_name}: {be}")
+
+    report = evaluate_rules_for_job(db, job, table_name)
+    if report.overall_status == "passed":
+        logger.info(f"Quality gate passed for job {job.id} ({job.source}, {table_name})")
+    else:
+        logger.warning(
+            f"Quality gate {report.overall_status} for job {job.id} ({job.source}, {table_name}): "
+            f"{getattr(report, 'errors', 0)} errors, {getattr(report, 'warnings', 0)} warnings"
+        )
+
+    # Phase 1: Auto-profile table after ingestion
+    snapshot = None
+    try:
+        from app.core.data_profiling_service import profile_table
+        snapshot = profile_table(db, table_name, job_id=job.id, source=job.source)
+        if snapshot:
+            logger.info(f"Quality gate: profiled {table_name} ({snapshot.row_count} rows)")
+
+            # Phase 2: Run anomaly detection against the new profile
+            try:
+                from app.core.anomaly_detection_service import detect_anomalies
+                anomalies = detect_anomalies(db, snapshot, table_name)
+                if anomalies:
+                    logger.warning(
+                        f"Quality gate: {len(anomalies)} anomalies for {table_name}"
+                    )
+            except Exception as ae:
+                logger.warning(f"Anomaly detection error for job {job.id}: {ae}")
+    except Exception as pe:
+        logger.warning(f"Profiling error for job {job.id}: {pe}")
+
+    # Phase 3: Data continuity checks, against the count from before this job's profile
+    try:
+        from sqlalchemy import text as sa_text
+
+        if snapshot is not None:
+            current_count = snapshot.row_count
+        else:
+            if db.get_bind().dialect.name == "postgresql":
+                db.execute(sa_text(f"SET LOCAL statement_timeout = {GATE_COUNT_TIMEOUT_MS}"))
+            current_count = db.execute(sa_text(f"SELECT COUNT(*) FROM {qt(table_name)}")).scalar()
+        check_row_count_delta(db, job, table_name, current_count, previous_count=previous_count)
+    except Exception as ce:
+        db.rollback()
+        logger.debug(f"Row count delta check skipped for job {job.id}: {ce}")
+
+    # Phase 3b: Date gap check for tables with known date columns
+    try:
+        date_col = None
+        for prefix, col in DATE_COLUMN_MAP.items():
+            if table_name.startswith(prefix):
+                date_col = col
+                break
+        if date_col:
+            check_date_gaps(db, table_name, date_col, job.id)
+    except Exception as de:
+        logger.debug(f"Date gap check skipped for job {job.id}: {de}")
+
+
 async def _run_quality_gate(db, job: IngestionJob):
     """
     Run data quality rules against a successfully completed job.
@@ -615,84 +727,22 @@ async def _run_quality_gate(db, job: IngestionJob):
     Advisory only — logs results but never changes job status.
     Errors in the quality gate itself are swallowed so they never
     cause the ingestion job to appear failed.
+
+    SPEC_144: the tables are the job's catalog dataset tables (up to
+    ``GATE_MAX_TABLES``), each gated on its own; the registry row for the
+    source is only the fallback.
     """
     try:
-        from app.core.data_quality_service import evaluate_rules_for_job
-        from app.core.models import DatasetRegistry
-
-        # Find the most recent dataset registry entry for this source
-        registry = (
-            db.query(DatasetRegistry)
-            .filter(DatasetRegistry.source == job.source, DatasetRegistry.ingested())
-            .order_by(DatasetRegistry.last_updated_at.desc())
-            .first()
-        )
-        if not registry:
-            logger.debug(
-                f"Quality gate: no dataset registry entry for {job.source}, skipping"
-            )
+        tables = _quality_gate_tables(db, job)
+        if not tables:
+            logger.debug(f"Quality gate: no tables for {job.source}, skipping")
             return
-
-        report = evaluate_rules_for_job(db, job, registry.table_name)
-        if report.overall_status == "passed":
-            logger.info(f"Quality gate passed for job {job.id} ({job.source})")
-        else:
-            logger.warning(
-                f"Quality gate {report.overall_status} for job {job.id} ({job.source}): "
-                f"{report.errors_count} errors, {report.warnings_count} warnings"
-            )
-
-        # Phase 1: Auto-profile table after ingestion
-        try:
-            from app.core.data_profiling_service import profile_table
-            snapshot = profile_table(db, registry.table_name, job_id=job.id, source=job.source)
-            if snapshot:
-                logger.info(f"Quality gate: profiled {registry.table_name} ({snapshot.row_count} rows)")
-
-                # Phase 2: Run anomaly detection against the new profile
-                try:
-                    from app.core.anomaly_detection_service import detect_anomalies
-                    anomalies = detect_anomalies(db, snapshot, registry.table_name)
-                    if anomalies:
-                        logger.warning(
-                            f"Quality gate: {len(anomalies)} anomalies for {registry.table_name}"
-                        )
-                except Exception as ae:
-                    logger.warning(f"Anomaly detection error for job {job.id}: {ae}")
-        except Exception as pe:
-            logger.warning(f"Profiling error for job {job.id}: {pe}")
-
-        # Phase 3: Data continuity checks
-        try:
-            from app.core.data_quality_service import check_row_count_delta
-            from sqlalchemy import text as sa_text
-
-            count_result = db.execute(sa_text(f'SELECT COUNT(*) FROM {qi(registry.table_name)}'))
-            current_count = count_result.scalar()
-            check_row_count_delta(db, job, registry.table_name, current_count)
-        except Exception as ce:
-            logger.debug(f"Row count delta check skipped for job {job.id}: {ce}")
-
-        # Phase 3b: Date gap check for tables with known date columns
-        DATE_COLUMN_MAP = {
-            "fred_": "date",
-            "bls_": "date",
-            "treasury_": "record_date",
-            "eia_": "period",
-        }
-        try:
-            from app.core.data_quality_service import check_date_gaps
-
-            date_col = None
-            for prefix, col in DATE_COLUMN_MAP.items():
-                if registry.table_name.startswith(prefix):
-                    date_col = col
-                    break
-            if date_col:
-                check_date_gaps(db, registry.table_name, date_col, job.id)
-        except Exception as de:
-            logger.debug(f"Date gap check skipped for job {job.id}: {de}")
-
+        for table_name in tables:
+            try:
+                _gate_table(db, job, table_name)
+            except Exception as te:
+                db.rollback()
+                logger.warning(f"Quality gate error for job {job.id} on {table_name}: {te}")
     except Exception as e:
         logger.warning(f"Quality gate error for job {job.id}: {e}")
 

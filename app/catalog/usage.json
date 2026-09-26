@@ -1,0 +1,6166 @@
+{
+ "generated_by": "python -m app.catalog.usage_build",
+ "scanned": [
+  "app/api/v1",
+  "app/services",
+  "app/graphql",
+  "app/reports",
+  "app/marts",
+  "app/entities"
+ ],
+ "tables": {
+  "acquisition_target_scores": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/acquisition_targets.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/capital_deployment_ranker.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "afdc_ev_stations": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/investor_intelligence.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/_ic_report_base.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "agentic_collection_jobs": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/agentic_research.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "air_cargo_stats": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_logistics.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "airport": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_sites.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_transport.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/atlas/layers.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "app_store_apps": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/app_rankings.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "app_store_rankings": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/app_rankings.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "app_store_rating_history": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/app_rankings.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "atlas_explorations": [
+   {
+    "kind": "service",
+    "path": "app/services/atlas/telemetry.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "batch_source_tier_overrides": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/jobs.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "batch_tier_config": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/jobs.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "bls_cpi": [
+   {
+    "kind": "report",
+    "path": "app/reports/templates/medspa_market.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "bls_cps_labor_force": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/econ_dq.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/deal_environment_scorer.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/econ_dq_service.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "bls_jolts": [
+   {
+    "kind": "report",
+    "path": "app/reports/templates/medspa_market.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/deal_environment_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "board_interlocks": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/board_interlocks.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/board_interlock_service.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "board_seats": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/board_interlocks.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/board_interlock_service.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "broadband_availability": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_telecom.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/unified_site_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "brownfield_site": [
+   {
+    "kind": "report",
+    "path": "app/reports/templates/datacenter_site.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/atlas/layers.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "building_permit": [
+   {
+    "kind": "service",
+    "path": "app/services/atlas/layers.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "carrier_safety": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_logistics.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "cascade_results": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/macro_cascade.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/macro_cascade_engine.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "cascade_scenarios": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/macro_cascade.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/cascade_intelligence.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "causal_edges": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/macro_cascade.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/cascade_company_manager.py",
+    "via": [
+     "orm",
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/macro_cascade_engine.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/macro_node_seeder.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "census_bfs": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/census_bfs.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/deal_radar.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "census_business_patterns": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/census_cbp.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/deal_radar.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/market_intelligence_pack.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/atlas/layers.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "census_cbp": [
+   {
+    "kind": "report",
+    "path": "app/reports/templates/market_intelligence_pack.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "census_cbp_county_yearly": [
+   {
+    "kind": "service",
+    "path": "app/services/atlas/competition.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/atlas/layers.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/atlas/series.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "census_variable_metadata": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/metadata.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "climate_data": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_risk.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "cms_hospitals": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/cms_hospitals.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/deal_radar.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "cms_medicare_utilization": [
+   {
+    "kind": "report",
+    "path": "app/reports/templates/medspa_market.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "co_investments": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/agentic_research.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "graphql",
+    "path": "app/graphql/dataloaders.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "graphql",
+    "path": "app/graphql/resolvers.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "collection_groups": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/jobs.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "commute_flow": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_labor.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "company_app_portfolios": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/app_rankings.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "company_ats_config": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/job_postings.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "company_health_scores": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/health_scores.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "company_macro_linkages": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/macro_cascade.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "company_people": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/board_interlocks.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/companies_leadership.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/peer_sets.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people_analytics.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people_data_quality.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people_portfolios.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people_watchlists.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/analytics_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/bio_parser_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/data_quality_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/dedup_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/eval_runner.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/eval_scorer.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pedigree_scorer.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/people_dq_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/people_qa_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/report_service.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "container_freight_index": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_logistics.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "convergence_clusters": [
+   {
+    "kind": "service",
+    "path": "app/services/convergence_engine.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "convergence_regions": [
+   {
+    "kind": "service",
+    "path": "app/services/capital_deployment_ranker.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/convergence_engine.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/deal_radar_memo.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/deal_radar_nlq.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_signal_computers.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "convergence_signals": [
+   {
+    "kind": "service",
+    "path": "app/services/convergence_engine.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "core.alias": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/entity_master.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "core.cik_crd_bridge": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/entity_master.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "entity",
+    "path": "app/entities/cik_crd_bridge.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "entity",
+    "path": "app/entities/resolve.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "core.cik_crd_bridge_refused": [
+   {
+    "kind": "entity",
+    "path": "app/entities/cik_crd_bridge.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "core.entity": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/entity_master.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "entity",
+    "path": "app/entities/resolve.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "core.identifier": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/entity_master.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "entity",
+    "path": "app/entities/resolve.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "mart",
+    "path": "app/marts/pe_firms_sec.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "core.key_veto": [
+   {
+    "kind": "entity",
+    "path": "app/entities/resolve.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "core.mart_build": [
+   {
+    "kind": "mart",
+    "path": "app/marts/build_ledger.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "mart",
+    "path": "app/marts/inputs.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/data_watchdog.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/dataset_status.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "core.membership": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/entity_master.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "entity",
+    "path": "app/entities/resolve.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "core.resolve_run": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/entity_master.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "core.source_record": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/entity_master.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "entity",
+    "path": "app/entities/resolve.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "county_elevation": [
+   {
+    "kind": "report",
+    "path": "app/reports/templates/datacenter_site.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "county_regulatory_scores": [
+   {
+    "kind": "report",
+    "path": "app/reports/templates/datacenter_site.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "courtlistener_dockets": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/courtlistener.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/company_diligence_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "data_center_facility": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_sites.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_telecom.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/datacenter_site.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/atlas/layers.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/unified_site_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "data_profile_columns": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/data_quality.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/data_quality_deep.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "data_profile_snapshots": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/data_quality.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/data_quality_deep.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "data_quality_reports": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/data_quality.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/econ_dq.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "data_quality_results": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/data_quality.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/data_quality_deep.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "data_quality_rules": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/data_quality.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/data_quality_deep.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "datacenter_site_pipeline": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/datacenter_sites.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "datacenter_site_scores": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/datacenter_sites.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/datacenter_site.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "dataset_registry": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/jobs.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/data_quality_deep.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "dataset_versions": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/lineage.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "diligence_orders": [
+   {
+    "kind": "service",
+    "path": "app/services/diligence/orders.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "dot_infra_grants": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/deal_radar.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/dot_grants.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "dq_anomaly_alerts": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/data_quality.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/sources.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/data_quality_deep.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "dq_anomaly_thresholds": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/data_quality.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/data_quality_deep.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "dq_cross_source_results": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/data_quality.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/data_quality_deep.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "dq_cross_source_validations": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/data_quality.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/data_quality_deep.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "dq_quality_snapshots": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/data_quality.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/sources.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/data_quality_deep.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "dq_recommendations": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/dq_review.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/sources.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "dq_sla_targets": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/data_quality.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/data_quality_deep.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "dunl_calendars": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/dunl.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "dunl_currencies": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/dunl.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "dunl_ports": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/dunl.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "dunl_uom": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/dunl.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "dunl_uom_conversions": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/dunl.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "econ_data_revisions": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/econ_dq.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "educational_attainment": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_labor.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/medspa_market.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "electricity_price": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_power.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/datacenter_site.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/unified_site_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "environmental_facility": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_risk.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "epa_echo_facilities": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/epa_echo.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/market_intelligence_pack.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/atlas/layers.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/company_diligence_scorer.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/convergence_engine.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/deal_radar_memo.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/location_diligence.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "epa_ghg_emissions": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/deal_radar.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/epa_ghg.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "epoch_datacenter": [
+   {
+    "kind": "report",
+    "path": "app/reports/templates/datacenter_site.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "eval_cases": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/evals.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/eval_runner.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "eval_results": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/evals.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/eval_runner.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "eval_runs": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/evals.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/eval_runner.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "eval_suites": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/evals.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/eval_runner.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "exit_readiness_scores": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/exit_readiness.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "export_jobs": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/export.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "family_office_contacts": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/family_office_contacts.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/family_offices.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/fo_collection.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "family_offices": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/agentic_research.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/alerts.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/family_office_contacts.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/family_offices.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/fo_collection.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "graphql",
+    "path": "app/graphql/resolvers.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/investor_profile.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/portfolio_detail.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "fault_line": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_risk.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "fda_device_registrations": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/fda.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "fdic_summary_deposits": [
+   {
+    "kind": "report",
+    "path": "app/reports/templates/medspa_market.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "ferc_energy_filings": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/ferc_energy.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "ffiec_bank_calls": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/deal_radar.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/ffiec_banks.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "flood_zone": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_risk.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/datacenter_site.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/unified_site_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "foot_traffic_collection_jobs": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/foot_traffic.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "foot_traffic_observations": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/foot_traffic.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "foreign_trade_zone": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_incentives.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/unified_site_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "form_d_filings": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/form_d.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "mart",
+    "path": "app/marts/pe_people_sec.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_signal_computers.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_universe.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "form_d_issuers": [
+   {
+    "kind": "entity",
+    "path": "app/entities/feeds.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "mart",
+    "path": "app/marts/pe_funds_sec.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "mart",
+    "path": "app/marts/pe_people_sec.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "form_d_offerings": [
+   {
+    "kind": "mart",
+    "path": "app/marts/pe_funds_sec.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "form_d_related_persons": [
+   {
+    "kind": "mart",
+    "path": "app/marts/pe_funds_sec.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "mart",
+    "path": "app/marts/pe_people_sec.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "fred_economic_indicators": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/econ_dq.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/deal_environment_scorer.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/econ_dq_service.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "fred_observations": [
+   {
+    "kind": "service",
+    "path": "app/services/synthetic/macro_scenarios.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/synthetic/training/diffusion_ts_trainer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "freight_corridor": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_transport.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "freight_rate_index": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_logistics.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "geojson_boundaries": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/geojson.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/atlas/boundaries.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "glassdoor_companies": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/glassdoor.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "google_places_cache": [
+   {
+    "kind": "service",
+    "path": "app/services/atlas/ratings.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "google_trends": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/google_trends.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "heavy_haul_route": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_transport.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "hiring_velocity_scores": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/job_postings_velocity.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "incentive_deal": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_incentives.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/datacenter_site.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/location_diligence.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "incentive_program": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_incentives.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/datacenter_site.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/unified_site_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "industrial_companies": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/board_interlocks.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/collection_jobs.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/companies_leadership.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/evals.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/health_scores.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/investor_intelligence.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/job_postings.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/job_postings_velocity.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/peer_sets.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people_analytics.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people_data_quality.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people_jobs.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people_portfolios.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people_watchlists.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/sec.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/analytics_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/bio_parser_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/cascade_company_manager.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/company_diligence_scorer.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/data_quality_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/exec_signal_scorer.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/people_dq_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/people_qa_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_universe.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/report_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/synthetic/job_postings.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "industrial_site": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_incentives.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/datacenter_site.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "industry_employment": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_labor.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/datacenter_site.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "ingestion_jobs": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/app_stores.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/census_batch.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/census_bfs.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/census_cbp.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/chains.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/cms_hospitals.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/data_quality.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/dot_grants.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/epa_echo.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/epa_ghg.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/fbi_crime.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/ferc_energy.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/ffiec_banks.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/fred.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/freshness.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/google_trends.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/job_postings.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/job_stream.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/jobs.py",
+    "via": [
+     "orm",
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/metro_profiles.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/opencorporates.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/sec.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/sources.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/treasury.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/usaspending.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/data_quality.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/data_quality_deep.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/jobs_monitor.py",
+    "via": [
+     "orm",
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/data_watchdog.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/dataset_status.py",
+    "via": [
+     "orm",
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/provenance.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/synthetic/job_postings.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/synthetic/lp_gp_universe.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "ingestion_schedules": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/bulk.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/freshness.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/jobs.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/schedules.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/sources.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/data_watchdog.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/dataset_status.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "ingestion_templates": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/templates.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "insider_transactions": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_signal_computers.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "interconnection_queue": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_power.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "intermodal_terminal": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_sites.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_transport.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "internet_exchange": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_sites.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_telecom.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/datacenter_site.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/unified_site_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "investor_themes": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/agentic_research.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "irs_soi_business_income": [
+   {
+    "kind": "report",
+    "path": "app/reports/templates/medspa_market.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "irs_soi_county_income": [
+   {
+    "kind": "report",
+    "path": "app/reports/templates/market_intelligence_pack.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/atlas/layers.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/location_diligence.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "irs_soi_migration": [
+   {
+    "kind": "report",
+    "path": "app/reports/templates/market_intelligence_pack.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/medspa_market.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/atlas/layers.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/atlas/series.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/convergence_engine.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/deal_radar_memo.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "irs_soi_zip_income": [
+   {
+    "kind": "report",
+    "path": "app/reports/templates/medspa_market.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/convergence_engine.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/deal_radar_memo.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "job_chain_executions": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/chains.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "job_chains": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/chains.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "job_events": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/job_stream.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "job_posting_alerts": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/job_postings.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "job_posting_snapshots": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/job_postings.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/company_diligence_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "job_postings": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/investor_intelligence.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/job_postings.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/company_diligence_scorer.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/exec_signal_scorer.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_signal_computers.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "job_queue": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/job_stream.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/jobs.py",
+    "via": [
+     "orm",
+     "sql"
+    ]
+   },
+   {
+    "kind": "mart",
+    "path": "app/marts/build_ledger.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/jobs_monitor.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/data_watchdog.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/dataset_status.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "labor_market_area": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_labor.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/unified_site_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "land_use_parcel": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/realestate.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "leadership_changes": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/companies_leadership.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/peer_sets.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people_portfolios.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people_watchlists.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/analytics_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_signal_computers.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/report_service.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "leads": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/playground_admin.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/leads/lead_service.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "lineage_edges": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/lineage.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "lineage_events": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/lineage.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "lineage_nodes": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/lineage.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "llm_usage": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/job_stream.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/llm_costs.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "location_metadata": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/foot_traffic.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "locations": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/foot_traffic.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "lp_asset_class_target_allocation": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/lp_collection.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "lp_board_meeting": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/lp_collection.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "lp_collection_jobs": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/lp_collection.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "lp_collection_runs": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/lp_collection.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "lp_collection_schedules": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/lp_collection.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "lp_fund": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/agentic_research.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/alerts.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/lp_collection.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_conviction.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/public.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/search.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "graphql",
+    "path": "app/graphql/resolvers.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/investor_profile.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/portfolio_detail.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/gp_pipeline_scorer.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/lp_gp_graph.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "lp_governance_member": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/lp_collection.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "lp_gp_commitments": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_conviction.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "lp_gp_relationships": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_conviction.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/gp_pipeline_scorer.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/lp_gp_graph.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "lp_key_contact": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/lp_collection.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "lp_manager_or_vehicle_exposure": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/lp_collection.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "lp_performance_return": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/lp_collection.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "lp_strategy_snapshot": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/lp_collection.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "macro_chat_messages": [
+   {
+    "kind": "service",
+    "path": "app/services/cascade_intelligence.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "macro_nodes": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/macro_cascade.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/cascade_company_manager.py",
+    "via": [
+     "orm",
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/cascade_intelligence.py",
+    "via": [
+     "orm",
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/macro_cascade_engine.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/macro_node_seeder.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "market_alerts": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/prediction_markets.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "market_observations": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/prediction_markets.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "market_signals": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/market.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "medspa_prospects": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/medspa_discovery.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/medspa_market.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/medspa_opportunity_map.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/deal_engine.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/healthcare_practice_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "metro_profiles": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/metro_profiles.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "metro_reference": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/metro_profiles.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "motor_carrier": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_logistics.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "national_risk_index": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_risk.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/datacenter_site.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/market_intelligence_pack.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/atlas/layers.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/location_diligence.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/unified_site_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "natural_gas_pipeline": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_water_utilities.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "natural_gas_storage": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_water_utilities.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "nppes_providers": [
+   {
+    "kind": "service",
+    "path": "app/services/location_diligence.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "occupational_wage": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_labor.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/labor_arbitrage.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/location_diligence.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/unified_site_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "opportunity_zone": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_incentives.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/medspa_market.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/unified_site_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "org_chart_snapshots": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/evals.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people_analytics.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/eval_runner.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/eval_scorer.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/people_qa_service.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "osha_inspections": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/osha.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/company_diligence_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "osha_violations": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/osha.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "pe_alert_subscriptions": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_benchmarks.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "pe_alerts": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_benchmarks.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "pe_cash_flows": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_benchmarks.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/pe_fund_tearsheet.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pe_ecosystem_seed.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "pe_company_financials": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_benchmarks.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_companies.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/medspa_market.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/pe_deal_memo.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/pe_portfolio_report.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/capital_deployment_ranker.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/exit_decision_engine.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pe_ecosystem_seed.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/portfolio_operations_engine.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/portfolio_stress_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "pe_company_leadership": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_benchmarks.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_companies.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/pe_deal_memo.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pe_ecosystem_seed.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/portfolio_operations_engine.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "pe_company_news": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_benchmarks.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_companies.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "pe_company_valuations": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_companies.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "pe_competitor_mappings": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_benchmarks.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_companies.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/pe_deal_memo.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "pe_deal_advisors": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_deals.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "pe_deal_participants": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_benchmarks.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_deals.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pe_ecosystem_seed.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "pe_deal_person_involvement": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_deals.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_people.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "pe_deals": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_benchmarks.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_deals.py",
+    "via": [
+     "orm",
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_people.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/medspa_market.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/pe_market_brief.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/deal_radar_memo.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/eval_runner.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/eval_scorer.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/exit_decision_engine.py",
+    "via": [
+     "orm",
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pe_dq_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pe_ecosystem_seed.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_narrative.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_outcome_tracker.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_signal_computers.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "pe_firm_news": [
+   {
+    "kind": "service",
+    "path": "app/services/pe_dq_service.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "pe_firm_org_snapshots": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_firms.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pe_org_snapshot.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "pe_firm_people": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_benchmarks.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_firms.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_people.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "mart",
+    "path": "app/marts/gates.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/investor_profile.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pe_org_classifier.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pe_org_snapshot.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "pe_firms": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/evals.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_benchmarks.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_companies.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_conviction.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_deals.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_firms.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_marts.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_people.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "mart",
+    "path": "app/marts/pe_firms_sec.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "mart",
+    "path": "app/marts/pe_funds_sec.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "mart",
+    "path": "app/marts/pe_people_sec.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/investor_profile.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/pe_deal_memo.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/pe_fund_tearsheet.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/pe_portfolio_report.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/exit_decision_engine.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/gp_pipeline_scorer.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pe_dq_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pe_ecosystem_seed.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/portfolio_operations_engine.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/portfolio_stress_scorer.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/synthetic/lp_gp_universe.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "pe_fund_conviction_scores": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_conviction.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/capital_deployment_ranker.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "pe_fund_investments": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_benchmarks.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_companies.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_firms.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/investor_profile.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/pe_deal_memo.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/pe_fund_tearsheet.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/pe_market_brief.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/pe_portfolio_report.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/capital_deployment_ranker.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/exit_decision_engine.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pe_dq_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pe_ecosystem_seed.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/portfolio_operations_engine.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/portfolio_stress_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "pe_fund_performance": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_benchmarks.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/pe_fund_tearsheet.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/exit_decision_engine.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pe_ecosystem_seed.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/portfolio_operations_engine.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "pe_funds": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_benchmarks.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_companies.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_conviction.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_firms.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_marts.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "mart",
+    "path": "app/marts/pe_funds_sec.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "mart",
+    "path": "app/marts/pe_people_sec.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/investor_profile.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/pe_deal_memo.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/pe_fund_tearsheet.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/pe_portfolio_report.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/exit_decision_engine.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pe_dq_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pe_ecosystem_seed.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/portfolio_operations_engine.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/portfolio_stress_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "pe_investment_committees": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_firms.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pe_org_classifier.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pe_org_snapshot.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "pe_market_signals": [
+   {
+    "kind": "service",
+    "path": "app/services/capital_deployment_ranker.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/exit_decision_engine.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pe_ecosystem_seed.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_engine.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_signal_computers.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "pe_people": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_benchmarks.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_companies.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_deals.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_firms.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_people.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "mart",
+    "path": "app/marts/pe_people_sec.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/investor_profile.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/pe_deal_memo.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pe_ecosystem_seed.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pe_org_classifier.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pe_org_snapshot.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "pe_person_education": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_people.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/investor_profile.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "pe_person_experience": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_people.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/investor_profile.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "pe_portfolio_companies": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/acquisition_targets.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/exit_readiness.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_benchmarks.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_companies.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_deals.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_firms.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_people.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/investor_profile.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/medspa_market.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/pe_deal_memo.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/pe_fund_tearsheet.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/pe_market_brief.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/pe_portfolio_report.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/capital_deployment_ranker.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/cascade_company_manager.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/deal_radar_memo.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/eval_runner.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/exec_signal_scorer.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/exit_decision_engine.py",
+    "via": [
+     "orm",
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pe_dq_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pe_ecosystem_seed.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/portfolio_operations_engine.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/portfolio_stress_scorer.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_narrative.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_outcome_tracker.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_signal_computers.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_universe.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "pe_portfolio_snapshots": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_benchmarks.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/exit_decision_engine.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pe_ecosystem_seed.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/portfolio_operations_engine.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "people": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/board_interlocks.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/companies_leadership.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people_analytics.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people_data_quality.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people_watchlists.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/bio_parser_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/board_interlock_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/data_quality_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/dedup_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/eval_scorer.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pedigree_scorer.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/people_dq_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/report_service.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "people_collection_jobs": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/collection_jobs.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/companies_leadership.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people_jobs.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "people_education": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/bio_parser_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/data_quality_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/dedup_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pedigree_scorer.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/people_dq_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/report_service.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "people_experience": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people_analytics.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/bio_parser_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/data_quality_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/dedup_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pedigree_scorer.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/people_dq_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/report_service.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "people_merge_candidates": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people_analytics.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/dedup_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/people_qa_service.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "people_peer_set_members": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/peer_sets.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/report_service.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "people_peer_sets": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/peer_sets.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "people_portfolio_companies": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people_portfolios.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/analytics_service.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "people_portfolios": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people_portfolios.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/analytics_service.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "people_watchlist_people": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people_watchlists.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "people_watchlists": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people_watchlists.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "person_pedigree_scores": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/people_analytics.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/pedigree_scorer.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "playground_quota_buckets": [
+   {
+    "kind": "service",
+    "path": "app/services/quota/quota_service.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "playground_runs": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/playground_admin.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "port": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_sites.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_transport.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "port_throughput": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_transport.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "port_throughput_monthly": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_logistics.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "portfolio_companies": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/agentic_research.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/lp_collection.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/public.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "graphql",
+    "path": "app/graphql/dataloaders.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "graphql",
+    "path": "app/graphql/resolvers.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/investor_profile.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/portfolio_detail.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "power_plant": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_power.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/datacenter_site.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/atlas/layers.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/unified_site_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "prediction_market_jobs": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/prediction_markets.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "prediction_markets": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/prediction_markets.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "public": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_conviction.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/pptx_renderer.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/les_schwab_av.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/medspa_market.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/pe_deal_memo.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/pe_market_brief.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "public_company_financials": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/investor_intelligence.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/synthetic/private_company_financials.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/synthetic/training/tabddpm_trainer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "public_water_system": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_water_utilities.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/convergence_engine.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/deal_radar_memo.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "rail_line": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_transport.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/atlas/layers.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "raw.source_release": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/bulk.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "mart",
+    "path": "app/marts/inputs.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/data_watchdog.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/dataset_status.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "realestate_fhfa_hpi": [
+   {
+    "kind": "report",
+    "path": "app/reports/templates/medspa_market.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "realestate_hud_permits": [
+   {
+    "kind": "report",
+    "path": "app/reports/templates/medspa_market.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "realestate_redfin": [
+   {
+    "kind": "report",
+    "path": "app/reports/templates/medspa_market.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "renewable_resource": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_power.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "reports": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/pe_macro.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/playground.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/builder.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "sam_gov_entities": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/sam_gov.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "search_index": [
+   {
+    "kind": "graphql",
+    "path": "app/graphql/resolvers.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "sec_13f_filings": [
+   {
+    "kind": "entity",
+    "path": "app/entities/cik_crd_bridge.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "entity",
+    "path": "app/entities/feeds.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "sec_13f_other_managers": [
+   {
+    "kind": "entity",
+    "path": "app/entities/cik_crd_bridge.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "sec_8k_index": [
+   {
+    "kind": "entity",
+    "path": "app/entities/feeds.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "sec_adv_feed_firm_state": [
+   {
+    "kind": "entity",
+    "path": "app/entities/feeds.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "sec_adv_filings": [
+   {
+    "kind": "mart",
+    "path": "app/marts/pe_funds_sec.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "sec_adv_roster_snapshots": [
+   {
+    "kind": "entity",
+    "path": "app/entities/cik_crd_bridge.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "entity",
+    "path": "app/entities/feeds.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "mart",
+    "path": "app/marts/pe_firms_sec.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "mart",
+    "path": "app/marts/pe_funds_sec.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "mart",
+    "path": "app/marts/pe_people_sec.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "sec_company_metadata": [
+   {
+    "kind": "report",
+    "path": "app/reports/templates/market_intelligence_pack.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/atlas/layers.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/atlas/series.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "sec_filers": [
+   {
+    "kind": "entity",
+    "path": "app/entities/cik_crd_bridge.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "entity",
+    "path": "app/entities/feeds.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "sec_form_adv": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/sec.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "sec_form_adv_personnel": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/sec.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "sec_insider_filings": [
+   {
+    "kind": "entity",
+    "path": "app/entities/feeds.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "sec_insider_owners": [
+   {
+    "kind": "entity",
+    "path": "app/entities/feeds.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "seismic_hazard": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_risk.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/unified_site_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "site_intel_collection_job": [
+   {
+    "kind": "service",
+    "path": "app/services/dataset_status.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/site_intel_dq_service.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "source_api_keys": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/settings.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "source_configs": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/jobs.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "source_freshness_sla": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/freshness.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/data_watchdog.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "source_rate_limits": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/rate_limits.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "submarine_cable_landing": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_telecom.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "substation": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_power.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_sites.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/atlas/layers.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/unified_site_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "template_executions": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/templates.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "three_pl_company": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/evals.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_logistics.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/eval_runner.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/eval_scorer.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/three_pl_dq_service.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "trade_gateway_stats": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_logistics.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "transmission_line": [
+   {
+    "kind": "report",
+    "path": "app/reports/templates/datacenter_site.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "trucking_lane_rate": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_logistics.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "txn_prob_alerts": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/transaction_probability.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_alerts.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "txn_prob_companies": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/transaction_probability.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_convergence.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_engine.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_narrative.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_nlq.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_outcome_tracker.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_signal_computers.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_universe.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "txn_prob_outcomes": [
+   {
+    "kind": "service",
+    "path": "app/services/probability_outcome_tracker.py",
+    "via": [
+     "orm",
+     "sql"
+    ]
+   }
+  ],
+  "txn_prob_scores": [
+   {
+    "kind": "service",
+    "path": "app/services/capital_deployment_ranker.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/exit_decision_engine.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_alerts.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_convergence.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_engine.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_narrative.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_nlq.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_outcome_tracker.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "txn_prob_signals": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/transaction_probability.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_alerts.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_engine.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "usaspending_awards": [
+   {
+    "kind": "report",
+    "path": "app/reports/templates/market_intelligence_pack.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/company_diligence_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "usaspending_county_fy_totals": [
+   {
+    "kind": "service",
+    "path": "app/services/atlas/layers.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "usda_truck_rate": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_logistics.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "users": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/playground.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "uspto_assignees": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/uspto.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/company_diligence_scorer.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/probability_signal_computers.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "uspto_inventors": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/uspto.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "uspto_patents": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/uspto.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "utility_rate": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_water_utilities.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/location_diligence.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/unified_site_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "utility_territory": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_power.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "warehouse_facility": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_logistics.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "warehouse_listing": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_logistics.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "watchdog_alerts": [
+   {
+    "kind": "service",
+    "path": "app/services/data_watchdog.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "water_monitoring_site": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_water_utilities.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/atlas/layers.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "water_system_violation": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_water_utilities.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/convergence_engine.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "webhooks": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/webhooks.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "wetland": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_risk.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/datacenter_site.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "worker_heartbeats": [
+   {
+    "kind": "service",
+    "path": "app/services/data_watchdog.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/dataset_status.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "zip_medspa_scores": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/zip_scores.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/medspa_market.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "zoning_district": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/realestate.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/site_intel_incentives.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ]
+ }
+}
