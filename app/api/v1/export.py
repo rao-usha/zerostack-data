@@ -16,7 +16,8 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.models import ExportJob, ExportFormat, ExportStatus
-from app.core.export_policy import catalog_rights_gate, is_exportable
+from app.core.authz import ROLE_ADMIN, current_principal
+from app.core.export_policy import catalog_rights_gate, export_allowed, is_exportable
 from app.core.export_service import ExportService
 
 logger = logging.getLogger(__name__)
@@ -65,6 +66,9 @@ class ExportJobResponse(BaseModel):
     started_at: Optional[str]
     completed_at: Optional[str]
     expires_at: Optional[str]
+    # SPEC_142: set when the table's source terms forbid storing it / commercial use or need
+    # an agreement. Admins may export it (flag only, PLAN_088 decision 3); this is the flag.
+    rights_gate: Optional[Dict[str, Any]] = None
 
 
 class TableInfo(BaseModel):
@@ -73,6 +77,7 @@ class TableInfo(BaseModel):
     table_name: str
     row_count: int
     columns: List[str]
+    rights_gate: Optional[Dict[str, Any]] = None  # SPEC_142 flag (see ExportJobResponse)
 
 
 class FormatInfo(BaseModel):
@@ -107,6 +112,7 @@ def job_to_response(job: ExportJob) -> ExportJobResponse:
         started_at=job.started_at.isoformat() if job.started_at else None,
         completed_at=job.completed_at.isoformat() if job.completed_at else None,
         expires_at=job.expires_at.isoformat() if job.expires_at else None,
+        rights_gate=catalog_rights_gate(job.table_name),
     )
 
 
@@ -260,14 +266,31 @@ def create_export_job(
     request: ExportJobCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
+    principal: Dict[str, Any] = Depends(current_principal),
 ):
     """
     Create a new export job.
 
     The job runs in the background. Check status with GET /export/jobs/{id}.
     Download the file when status is 'completed'.
+
+    SPEC_142: a table whose source terms forbid storing it, forbid commercial use or need an
+    agreement is refused for non-admins (403) and exported for admins with ``rights_gate``
+    set on the job (flag only).
     """
     service = ExportService(db)
+
+    admin = principal.get("role") == ROLE_ADMIN
+    gate = catalog_rights_gate(request.table_name)
+    cols = request.columns or ()
+    # a denied table / sensitive column keeps the service's 400; the rights gate is a 403
+    if is_exportable(request.table_name, cols) and not export_allowed(request.table_name, cols, admin=admin):
+        raise HTTPException(
+            status_code=403,
+            detail={"error": "not_exportable", "table": request.table_name, "rights_gate": gate},
+        )
+    if gate:
+        logger.warning(f"[export] admin export of rights-gated table {request.table_name}: {gate}")
 
     # Validate format
     try:

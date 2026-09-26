@@ -268,7 +268,12 @@ SOURCE_RIGHTS: Dict[str, SourceRights] = {
             license="Originating agencies (Federal Reserve Board, BLS, BEA, Census, EIA): US Government work",
             redistribution="open", storage="allowed", commercial_use="allowed",
             attribution="Source: the originating agency (Federal Reserve Board, BLS, BEA, U.S. Census Bureau, EIA)",
-            **{k: v for k, v in _FRED.items()}),
+            # the FRED legal page restricts; it cannot justify loosening. The loosening rests on
+            # the originating agencies' works being US Government works (17 U.S.C. §105); the
+            # agency pages were not fetched, so a reviewer must check each one (SPEC_142 fix).
+            citation_url="https://resources.data.gov/open-licenses/",
+            citation_quote="(federal works under 17 U.S.C. §105; agency pages not individually fetched)",
+            confidence="medium"),
         **_FRED),
     # Tightened (SPEC_142): no storage beyond 24 h, no database of listings.
     "yelp": SourceRights("Yelp API Terms of Use (2025-01-13): no storage beyond 24 h, no listings database",
@@ -369,6 +374,12 @@ SOURCE_RIGHTS: Dict[str, SourceRights] = {
                                              "personal", "scraped"),
     "agentic_research": SourceRights("Web research by LLM agents (mixed public pages)", "internal_only",
                                      "none", "llm_extracted"),
+    # SPEC_142 fix: the ZIP med-spa score is built from IRS SOI ZIP income only (no Yelp
+    # content: app/ml/zip_medspa_metadata.py), so the Yelp storage limit does not reach it.
+    "zip_scores": SourceRights("Derived from IRS SOI ZIP income (public domain input)",
+                               "internal_only", "none", "derived",
+                               notes="Nexdata score over IRS SOI ZIP-level aggregates; no Yelp or "
+                                     "other vendor content."),
     "rollup_intel": SourceRights("Derived from Census CBP and IRS SOI (public domain inputs)",
                                  "internal_only", "none", "derived"),
     "synthetic": SourceRights("Nexdata synthetic data (generated)", "internal_only", "none", "synthetic",

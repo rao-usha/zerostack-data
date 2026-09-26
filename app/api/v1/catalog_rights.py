@@ -3,16 +3,18 @@ Catalog rights review endpoints (SPEC_142).
 
     GET  /api/v1/catalog/rights/review        the review queue (admin)
     POST /api/v1/catalog/rights/{key}/review  record a sign-off decision (admin)
-    GET  /api/v1/catalog/rights/report       rights report, json or markdown
+    GET  /api/v1/catalog/rights/report       rights report, json or markdown (admin)
     GET  /api/v1/catalog/rights/{key}         one dataset's rights block, hash, proposal, history
+                                              (reviewer identity and notes: admins only)
 
 A recorded decision is an audit row (``catalog_rights_review``); it never
 makes a dataset reviewed. ``reviewed`` comes only from the committed
 ``app/catalog/rights_reviewed.py`` hash (see ``app.catalog.rights_review``).
 
 Mounted with ``require_admin_for_writes`` and included **before** the
-``catalog_schema`` / ``catalog`` routers in ``app/main.py``; the review routes
-also require the admin role for GET.
+``catalog_schema`` / ``catalog`` routers in ``app/main.py``; the review queue and
+the report (live counts of holdings the terms forbid) also require the admin role
+for GET.
 """
 
 import logging
@@ -24,7 +26,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.catalog import get_spec
-from app.core.authz import require_admin
+from app.core.authz import ROLE_ADMIN, current_principal, require_admin
 from app.core.database import get_db
 
 logger = logging.getLogger(__name__)
@@ -36,6 +38,12 @@ class ReviewRequest(BaseModel):
     decision: str = Field(..., description="confirm_current | accept_proposal | reject")
     rights_hash: str = Field(..., description="rights_hash of the block you reviewed (from the queue)")
     note: str = Field(..., description="what was checked (terms page, date, caveats); >= 10 characters")
+
+
+# review-row fields any signed-in user may see; reviewer, reviewer_user_id, api_key_id and
+# note stay with admins
+PUBLIC_REVIEW_FIELDS = frozenset({"id", "dataset_key", "decision", "rights_hash", "proposal_hash",
+                                  "rights_snapshot", "proposal_snapshot", "reviewed_at"})
 
 
 def _spec_or_404(key: str):
@@ -89,9 +97,11 @@ def rights_report(
     format: str = Query("json", pattern="^(json|md)$"),
     live: bool = Query(True, description="live row counts of storage-limited holdings"),
     db: Session = Depends(get_db),
+    _admin: Dict[str, Any] = Depends(require_admin),
 ):
     """Per source: current vs proposed rights with citations; storage-forbidden holdings with
-    live row counts; the gating effect on samples and export."""
+    live row counts; the gating effect on samples, source APIs and export (admin: it lists
+    holdings the source terms forbid, with live counts)."""
     from app.catalog.rights_review import build_report, render_markdown
 
     report = build_report(_engine(db), live=live)
@@ -105,8 +115,10 @@ def dataset_rights(
     key: str,
     history: int = Query(20, ge=0, le=200, description="review rows to include, newest first"),
     db: Session = Depends(get_db),
+    principal: Dict[str, Any] = Depends(current_principal),
 ):
-    """The dataset's rights block with its hash, proposal, gate and review history."""
+    """The dataset's rights block with its hash, proposal, gate and review history. Non-admins
+    see each decision, its hash and time, not who made it or the note."""
     from app.catalog.rights_review import (latest_reviews, proposal_hash, review_history, review_state,
                                            rights_diff)
 
@@ -120,6 +132,10 @@ def dataset_rights(
             latest = latest_reviews(engine).get(key)
         except Exception as e:
             logger.info(f"[rights] history of {key} unavailable: {type(e).__name__}")
+    if principal.get("role") != ROLE_ADMIN:
+        rows = [{k: v for k, v in r.items() if k in PUBLIC_REVIEW_FIELDS} for r in rows]
+        if latest is not None:
+            latest = {k: v for k, v in latest.items() if k in PUBLIC_REVIEW_FIELDS}
     return {
         "dataset": key,
         "rights": spec.rights_dict(),

@@ -311,7 +311,9 @@ def clear_holdings_cache() -> None:
         _holdings_cache.clear()
 
 
-def _gate_effect(spec: DatasetSpec) -> Dict[str, str]:
+def _gate_effect(spec: DatasetSpec) -> Dict[str, Any]:
+    from app.core.rights_guard import ENFORCED_PATHS
+
     gated = bool(spec.rights_gate)
     return {
         "sample_non_admin": "refused (403)" if gated or spec.redistribution == "restricted" else "served, masked",
@@ -319,8 +321,27 @@ def _gate_effect(spec: DatasetSpec) -> Dict[str, str]:
         "schema_examples": ("withheld from everyone" if "storage_forbidden" in spec.rights_gate
                             or "commercial_use_forbidden" in spec.rights_gate
                             else "withheld from non-admins" if gated else "per redistribution"),
-        "export": "refused for non-admins; admin export flagged" if gated else "admin-only (unchanged)",
+        "export": ("admin-only router; export_allowed refuses non-admins; admin jobs and the table "
+                   "list / preview carry rights_gate") if gated else "admin-only (unchanged)",
+        "source_api": ("non-admins refused (403), admins flagged (X-Dataset-Rights-Gate) on: "
+                       + ", ".join(ENFORCED_PATHS[spec.key])) if gated and spec.key in ENFORCED_PATHS
+        else ("no source read API guarded; see serving_paths.unenforced" if gated else "unchanged"),
+        "time_limited": (f"rows may be held {spec.storage_max_age_days} days; age of held rows is not "
+                         "measured and nothing expires them (flag only)")
+        if spec.storage == "time_limited" else None,
         "effective_redistribution": spec.effective_redistribution,
+    }
+
+
+def _serving_paths() -> Dict[str, Any]:
+    """Where the rights gate is enforced, and the known paths where it is not."""
+    from app.core.rights_guard import ENFORCED_PATHS, UNENFORCED_PATHS
+
+    return {
+        "enforced": {"catalog": ["/api/v1/catalog/{key}/sample", "/api/v1/catalog/{key}/schema (examples)",
+                                 "/api/v1/export/* (admin-only, flagged)"],
+                     **ENFORCED_PATHS},
+        "unenforced": UNENFORCED_PATHS,
     }
 
 
@@ -458,6 +479,7 @@ def build_report(engine: Optional[Engine], live: bool = True,
             "review_states": dict(Counter(review_state(s, latest.get(s.key)) for s in specs)),
         },
         "tightenings": TIGHTENINGS,
+        "serving_paths": _serving_paths(),
         "storage_holdings": holdings_rows,
         "families": families,
     }
@@ -507,6 +529,13 @@ def render_markdown(report: Dict[str, Any]) -> str:
                    f"{_md_cell(', '.join(h['gate']) or '-')} | {rows} | "
                    f"sample: {_md_cell(eff['sample_non_admin'])} / admin {_md_cell(eff['sample_admin'])}; "
                    f"export: {_md_cell(eff['export'])} | {_md_cell(h['citation_url'])} |")
+    sp = report.get("serving_paths") or {}
+    out += ["", "## Where the gate is enforced", ""]
+    for k, paths in (sp.get("enforced") or {}).items():
+        out.append(f"- `{k}`: {_md_cell(', '.join(paths))}")
+    out += ["", "Known paths that still read gated tables for any signed-in user (not guarded):", ""]
+    for u in sp.get("unenforced") or []:
+        out.append(f"- {_md_cell(u['paths'])}: {_md_cell(u['reads'])}")
     out += ["", "## Proposals (not applied)", ""]
     for fam, rows in report["families"].items():
         for r in rows:

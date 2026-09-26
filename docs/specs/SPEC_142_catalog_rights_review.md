@@ -119,9 +119,10 @@ no `storage` / `commercial_use` is looser than before, and `LOOSENED_WITH_REVIEW
   `REVIEWED`), `stale` (a confirmation whose hash no longer matches). Each item carries the
   latest DB decision.
 - **`GET /api/v1/catalog/rights/{key}`** (users): the dataset's current block, hash, proposal,
-  gate and review history.
+  gate and review history. Non-admins see each decision, hash and time only: reviewer,
+  reviewer_user_id, api_key_id and note are admin-only (fix round).
 
-### 5. Report — `GET /api/v1/catalog/rights/report?format=json|md&live=true|false` (users)
+### 5. Report — `GET /api/v1/catalog/rights/report?format=json|md&live=true|false` (admin)
 
 Counts by redistribution / storage / commercial_use / effective; per source family, each
 dataset's current vs proposed block with citations; storage-forbidden holdings with live row
@@ -142,6 +143,21 @@ for admins, profile examples withheld, export flagged). `format=md` returns `tex
 - `export_policy.catalog_rights_gate(table)` / `export_allowed(table, columns, admin)`: export
   of a gated table is refused for non-admins; the admin-only `/export` preview and table list
   carry `rights_gate` so the admin sees the flag.
+- **Source read APIs** (fix round): `app/core/rights_guard.require_rights_clear(*tables)` is a
+  dependency that refuses non-admins (403 `rights_gated`) and flags admins (`X-Dataset-Rights-Gate`).
+  Wired on `/prediction-markets/*`, `/medspa-discovery/*`, `/vertical-discovery/*` (whole routers),
+  `/courtlistener/search|stats`, `/site-intel/telecom/ix[/nearby]`, `/site-intel/telecom/data-centers[/nearby]`,
+  `/site-intel/logistics/warehouse-listings[/market-summary]`, `/realestate/zoning/districts|summary|dc-eligible`.
+  **Known unenforced** (listed in `rights_guard.UNENFORCED_PATHS` and the report's `serving_paths`):
+  FRED-backed `/econ-snapshot/*` and `/macro/*`, `/datacenter-sites/*` and the site / atlas scorers
+  (PeeringDB, NZA), the med-spa / healthcare / deal scorers and report templates (Yelp), CMS-backed
+  scorers (CPT), `/international/*` (IMF, 0 rows). Gating derived dashboards is a product decision.
+- **Export** (fix round): `TableInfo` and `ExportJobResponse` carry `rights_gate`, so `/export/tables`
+  and every job response show the flag; `POST /export/jobs` uses `export_allowed` (403 for a
+  non-admin on a gated table; the router is admin-only, so this is defence in depth) and logs admin
+  exports of gated tables. No acknowledge flag: flag-only for admins per the task decision.
+- **time_limited** (Google Places, 30 d) is flagged, not gated: serving within the window is
+  allowed. The age of held rows is not measured and nothing expires them (report says so).
 - `mirror.merge_rights` carries the strictest `storage` / `commercial_use` and `share_alike`
   of a table's writers.
 
@@ -173,7 +189,7 @@ Exact `count(*)` of the gated holdings (flagged, nothing deleted):
 | Dataset | Tables → rows |
 |---|---|
 | `yelp_businesses` | yelp_businesses 400 |
-| `medspa_prospects` | medspa_prospects 5,396; zip_medspa_scores 27,604; medspa_prospect_snapshots 0 |
+| `medspa_prospects` | medspa_prospects 5,396; medspa_prospect_snapshots 0 (fix round: `zip_medspa_scores`, 27,604 IRS-SOI-only rows, is its own ungated dataset and no longer counted here) |
 | `fred_series` | 6 base tables, 132,302 (interest_rates 105,283; commodities 17,516; …) |
 | `kaggle_m5` | m5_items 30,490; m5_calendar 1,969 (m5_sales / m5_prices absent) |
 | `prediction_markets` | prediction_markets 37; market_observations 87 |
@@ -204,6 +220,22 @@ The report endpoint recomputes these live (cached 5 min, 30 s overall deadline).
 - **`afdc` / `nrel_resource` open → attribution**: "free with credit" is attribution; a tightening.
 - **Candidates** exclude personal-PII datasets (`pii_blocked`) and anything gated; the list
   is `CANDIDATE_KEYS` / `CANDIDATE_SOURCES` / `CANDIDATE_COLLECTORS` in `rights_review.py`.
+
+## Fix round (review findings, 2026-09-26)
+
+- F1 `_ds` built `reviewed=False` then applied the review, so `status='ga'` raised even with a
+  matching committed hash. Now `_ds` builds as `internal`, applies the review, then
+  `replace(status_public=status)` (re-runs the ga/beta checks). Tests: ga/beta via `_ds` with a
+  matching hash; refused without or with a stale hash.
+- F2 `zip_medspa_scores` (IRS SOI only) was in `medspa_prospects` and so gated and counted as Yelp
+  holdings. Split into dataset `zip_medspa_scores` (source `zip_scores`, derived, internal_only,
+  producer `api:zip_scores`, inputs `irs_soi`, verified 27,604 rows / one score date 2026-02-24).
+  Not added to `medspa_prospects.inputs` (SPEC_143 owns inputs).
+- F3/F5 export gate: see Enforcement above.
+- F4 source routers: see Enforcement above.
+- F6 `/report` is admin-only; `/{key}` redacts reviewer identity and notes for non-admins.
+- FRED loosening proposal now cites resources.data.gov (17 U.S.C. §105, agency pages not
+  fetched, confidence medium) instead of the FRED legal page, which restricts.
 
 ## Out of scope
 

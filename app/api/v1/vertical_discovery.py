@@ -13,12 +13,17 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.rights_guard import require_rights_clear
 from app.sources.vertical_discovery.configs import (
     VERTICAL_REGISTRY,
     GRADE_THRESHOLDS,
 )
 
-router = APIRouter(prefix="/vertical-discovery", tags=["Vertical Discovery"])
+router = APIRouter(
+    prefix="/vertical-discovery", tags=["Vertical Discovery"],
+    # SPEC_142: rows carry Yelp content the Yelp terms forbid storing: non-admins 403, admins flagged
+    dependencies=[Depends(require_rights_clear("dental_prospects"))],
+)
 
 
 def _get_config(slug: str):

@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from app.core.database import get_db
+from app.core.rights_guard import require_rights_clear
 from app.core.job_helpers import create_and_dispatch_job
 
 logger = logging.getLogger(__name__)
@@ -128,7 +129,7 @@ async def ingest_courtlistener_dockets(
 # =============================================================================
 
 
-@router.get("/search")
+@router.get("/search", dependencies=[Depends(require_rights_clear("courtlistener_dockets"))])
 async def search_courtlistener_dockets(
     case_name: Optional[str] = Query(
         default=None, description="Search by case name (partial match)"
@@ -233,7 +234,7 @@ async def list_bankruptcy_courts():
     }
 
 
-@router.get("/stats")
+@router.get("/stats", dependencies=[Depends(require_rights_clear("courtlistener_dockets"))])
 async def get_courtlistener_stats(db: Session = Depends(get_db)):
     """
     Get summary statistics for ingested CourtListener dockets.

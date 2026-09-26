@@ -28,6 +28,7 @@ proposed field are in ``app/catalog/evidence/verification_2026-09-25.json``
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from functools import lru_cache
 from pathlib import Path
 from typing import Dict, FrozenSet, List, Optional, Sequence, Tuple
@@ -131,6 +132,7 @@ _KEYWORDS: Dict[str, Tuple[str, ...]] = {
     "medspa_discovery": ("pe", "health"),
     "vertical_discovery": ("pe",),
     "rollup_intel": ("pe",),
+    "zip_scores": ("pe", "health", "demographics"),
     "epa_echo": ("geo_risk", "government"),
     "synthetic": ("synthetic",),
 }
@@ -201,8 +203,11 @@ def _ds(
             kw[field] = tuple(kw[field])
     for field, value in r.spec_fields().items():  # SPEC_142 rights fields
         kw.setdefault(field, value)
-    # reviewed only from a committed sign-off whose hash matches this block (SPEC_142)
-    return apply_review(DatasetSpec(
+    # reviewed only from a committed sign-off whose hash matches this block (SPEC_142).
+    # Build as 'internal' first: DatasetSpec refuses ga/beta without reviewed, and reviewed
+    # is only known once apply_review has compared the hash; then set the real status
+    # (replace() re-runs every check, ga/beta ones included).
+    spec = apply_review(DatasetSpec(
         key=key,
         source=source,
         display_name=display_name,
@@ -221,9 +226,10 @@ def _ds(
         reviewed=False,
         pii_class=pii or r.pii_class,
         origin=origin or r.origin,
-        status_public=status,
+        status_public="internal",
         **kw,
     ))
+    return spec if status == "internal" else replace(spec, status_public=status)
 
 
 def _dormant(*producers: str) -> str:
@@ -2087,10 +2093,9 @@ _API: List[DatasetSpec] = [
         "Med-spa businesses from Yelp scored for acquisition with IRS SOI ZIP affluence, "
         "enriched from NPPES (physician oversight, medical director) and websites, with "
         "revenue estimates.",
-        "derived_mart", "one row per prospect business (Yelp id); ZIP scores one row per ZIP "
-        "per score date",
+        "derived_mart", "one row per prospect business (Yelp id)",
         "api:medspa_discovery", "ad_hoc",
-        tables=("medspa_prospects", "medspa_prospect_snapshots", "zip_medspa_scores"),
+        tables=("medspa_prospects", "medspa_prospect_snapshots"),
         pii="personal",
         inputs=("irs_soi", "yelp_businesses", "nppes_providers"), status="archival",
         primary_key=("yelp_id",),
@@ -2099,6 +2104,19 @@ _API: List[DatasetSpec] = [
         coverage_from="2026-02-24",
         limitations=("Persists Yelp content that Yelp terms forbid storing; flagged, not purged.",
                      "medspa_prospect_snapshots is empty.")),
+    # SPEC_142 fix: split out of medspa_prospects. IRS SOI only, so the Yelp storage flag on
+    # medspa_discovery does not apply (27,604 rows, one score date, verified 2026-09-26).
+    _ds("zip_medspa_scores", "zip_scores", "ZIP med-spa revenue potential scores",
+        "Percentile-ranked med-spa revenue potential for every US ZIP code from IRS SOI "
+        "affluence, wealth, market size and professional density metrics.",
+        "derived_mart", "one row per ZIP per score date", "api:zip_scores", "ad_hoc",
+        tables=("zip_medspa_scores",), inputs=("irs_soi",), status="archival",
+        primary_key=("zip_code", "score_date"),
+        coverage_sql="SELECT max(score_date) FROM zip_medspa_scores",
+        coverage_basis="as_of",
+        coverage_from="2026-02-24",
+        data_state="ok", verified_at="2026-09-26",
+        limitations=("A single score date (2026-02-24, model v1.0); not rescored since.",)),
     _ds("vertical_prospects", "vertical_discovery", "Vertical roll-up prospects",
         "Dental, veterinary, HVAC, car wash and physical therapy prospects scored for roll-up "
         "strategies; nothing has been loaded yet.",

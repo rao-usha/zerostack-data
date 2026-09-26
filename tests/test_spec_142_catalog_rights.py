@@ -27,6 +27,9 @@ PLAN_EVIDENCE = REPO / "docs" / "plans" / "PLAN_088_evidence.json"
 # keys whose declared redistribution may be looser than the pre-SPEC_142 baseline, each
 # with a recorded human review. Empty: SPEC_142 applies tightenings only.
 LOOSENED_WITH_REVIEW: set = set()
+# datasets added after the baseline snapshot (each split out of a baseline dataset; the
+# fix-round tests pin their rights)
+ADDED_AFTER_BASELINE = {"zip_medspa_scores"}
 
 STORAGE_FLAGGED = {"yelp_businesses", "fred_series", "kaggle_m5", "prediction_markets", "si_zoning_districts",
                    "si_internet_exchanges", "si_warehouse_listings", "medspa_prospects"}
@@ -246,7 +249,7 @@ class TestMonotonicity:
 
     def test_baseline_covers_the_catalog(self):
         base = json.loads(BASELINE.read_text(encoding="utf-8"))["datasets"]
-        assert {s.key for s in _catalog()} <= set(base)
+        assert {s.key for s in _catalog()} <= set(base) | ADDED_AFTER_BASELINE
 
 
 # ---------------------------------------------------------------------------
@@ -657,3 +660,290 @@ class TestReviewWorkflowPg:
                                       "note": "Checked the BLS copyright page."})
         assert r.status_code == 503
         assert _client(pg142).get("/api/v1/catalog/rights/bls_series").json()["reviews"] == []
+
+    def test_history_hides_reviewer_from_users_live(self, pg142):
+        s = _spec("bls_series")
+        _client(pg142).post("/api/v1/catalog/rights/bls_series/review",
+                            json={"decision": "reject", "rights_hash": s.rights_hash,
+                                  "note": "Internal note about the terms."})
+        u = _client(pg142, dict(USER)).get("/api/v1/catalog/rights/bls_series").json()
+        assert u["reviews"] and u["review_state"] == "rejected"
+        assert not {"reviewer", "reviewer_user_id", "api_key_id", "note"} & set(u["reviews"][0])
+
+
+# ---------------------------------------------------------------------------
+# Fix round (review findings)
+# ---------------------------------------------------------------------------
+
+ADMIN = {"role": "admin", "email": "a@x"}
+USER = {"role": "user", "email": "u@x"}
+
+
+def _bls_ds(status, data_state="ok"):
+    from app.catalog import datasets
+
+    s = _spec("bls_series")
+    return datasets._ds("bls_series", s.source, s.display_name, s.description, s.kind, s.grain,
+                        s.producer, s.cadence, tables=s.tables, verified_at=s.verified_at,
+                        data_state=data_state, status=status)
+
+
+@pytest.mark.unit
+class TestFixSignOffCanPromote:
+    """F1: _ds built reviewed=False before apply_review, so a signed-off dataset could never be ga/beta."""
+
+    def test_committed_hash_allows_ga_through_ds(self, monkeypatch):
+        from app.catalog import rights_reviewed
+
+        monkeypatch.setitem(rights_reviewed.REVIEWED, "bls_series", (_spec("bls_series").rights_hash, 7))
+        for status in ("ga", "beta"):
+            spec = _bls_ds(status)
+            assert spec.reviewed and spec.status_public == status
+            assert spec.effective_redistribution == spec.redistribution
+
+    def test_without_hash_ga_is_still_refused(self):
+        with pytest.raises(ValueError, match="reviewed rights block"):
+            _bls_ds("ga")
+
+    def test_stale_hash_ga_is_refused(self, monkeypatch):
+        from app.catalog import rights_reviewed
+
+        monkeypatch.setitem(rights_reviewed.REVIEWED, "bls_series", ("0" * 64, 7))
+        with pytest.raises(ValueError, match="reviewed rights block"):
+            _bls_ds("ga")
+
+    def test_other_statuses_keep_their_status(self):
+        assert _bls_ds("archival").status_public == "archival"
+        assert _bls_ds("internal").status_public == "internal"
+        assert all(not s.reviewed and s.status_public not in ("ga", "beta") for s in _catalog())
+
+
+@pytest.mark.unit
+class TestFixZipMedspaScoresSplit:
+    """F2: zip_medspa_scores (IRS SOI only) was gated and counted as Yelp storage-forbidden."""
+
+    def test_split_and_ungated(self):
+        from app.core.export_policy import catalog_rights_gate
+
+        z = _spec("zip_medspa_scores")
+        assert z.tables == ("zip_medspa_scores",) and z.source == "zip_scores"
+        assert z.storage is None and z.commercial_use is None and not z.rights_gate
+        assert z.inputs == ("irs_soi",) and z.pii_class == "none" and z.origin == "derived"
+        assert z.redistribution == "internal_only"
+        assert catalog_rights_gate("zip_medspa_scores") is None
+        m = _spec("medspa_prospects")
+        assert "zip_medspa_scores" not in m.tables and m.storage == "forbidden"
+        assert catalog_rights_gate("medspa_prospects")["datasets"] == ["medspa_prospects"]
+
+    def test_fred_loosening_does_not_cite_the_fred_restrictions(self):
+        s = _spec("fred_series")
+        p = s.proposed_rights
+        assert p.change == "loosen" and p.citation_url != s.citation_url
+        assert "fred.stlouisfed.org" not in p.citation_url and "105" in p.citation_quote
+
+    def test_not_in_storage_flags(self):
+        from app.catalog.rights_review import build_report
+
+        rep = build_report(None, live=False)
+        tables = {t for h in rep["storage_holdings"] for t in _spec(h["key"]).tables}
+        assert "zip_medspa_scores" not in tables
+
+
+class _FakeJob:
+    def __init__(self, table):
+        from datetime import datetime
+
+        from app.core.models import ExportFormat, ExportStatus
+
+        self.id, self.table_name = 1, table
+        self.format, self.status = ExportFormat("csv"), ExportStatus("pending")
+        self.columns = self.row_limit = self.filters = self.file_name = None
+        self.file_size_bytes = self.row_count = self.error_message = None
+        self.compress = False
+        self.created_at = datetime(2026, 9, 26)
+        self.started_at = self.completed_at = self.expires_at = None
+
+
+def _export_client(monkeypatch, principal):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from app.api.v1 import export
+    from app.core.authz import current_principal
+    from app.core.database import get_db
+
+    monkeypatch.setattr(export, "run_export_job", lambda job_id: None)
+    monkeypatch.setattr(export.ExportService, "create_export_job",
+                        lambda self, table_name, **kw: _FakeJob(table_name))
+    monkeypatch.setattr(export.ExportService, "list_tables", lambda self: [
+        {"table_name": "m5_items", "row_count": 3, "columns": ["id"],
+         "rights_gate": {"reasons": ["storage_forbidden"], "datasets": ["kaggle_m5"]}},
+        {"table_name": "sec_13f_holdings", "row_count": 3, "columns": ["cik"], "rights_gate": None}])
+    app = FastAPI()
+    app.include_router(export.router, prefix="/api/v1")
+    app.dependency_overrides[get_db] = lambda: object()
+    app.dependency_overrides[current_principal] = lambda: principal
+    return TestClient(app)
+
+
+@pytest.mark.unit
+class TestFixExportCarriesGate:
+    """F3/F5: TableInfo dropped rights_gate; export jobs were unflagged; export_allowed was dead code."""
+
+    def test_table_list_http_response_keeps_gate(self, monkeypatch):
+        body = _export_client(monkeypatch, ADMIN).get("/api/v1/export/tables").json()
+        by = {t["table_name"]: t for t in body}
+        assert by["m5_items"]["rights_gate"]["reasons"] == ["storage_forbidden"]
+        assert by["sec_13f_holdings"]["rights_gate"] is None
+
+    def test_admin_export_job_of_gated_table_is_flagged(self, monkeypatch):
+        r = _export_client(monkeypatch, ADMIN).post("/api/v1/export/jobs",
+                                                    json={"table_name": "m5_items", "format": "csv"})
+        assert r.status_code == 201, r.text
+        assert r.json()["rights_gate"]["reasons"] == ["storage_forbidden", "commercial_use_forbidden"]
+
+    def test_non_admin_export_of_gated_table_refused(self, monkeypatch):
+        c = _export_client(monkeypatch, USER)
+        r = c.post("/api/v1/export/jobs", json={"table_name": "yelp_businesses", "format": "csv"})
+        assert r.status_code == 403 and r.json()["detail"]["rights_gate"]["datasets"] == ["yelp_businesses"]
+        ok = c.post("/api/v1/export/jobs", json={"table_name": "sec_13f_holdings", "format": "csv"})
+        assert ok.status_code == 201 and ok.json()["rights_gate"] is None
+
+    def test_export_allowed_is_used(self):
+        src = (REPO / "app" / "api" / "v1" / "export.py").read_text(encoding="utf-8")
+        assert "export_allowed(" in src
+
+
+def _guard_client(principal, *tables):
+    from fastapi import APIRouter, Depends, FastAPI
+    from fastapi.testclient import TestClient
+
+    from app.core.authz import current_principal
+    from app.core.rights_guard import require_rights_clear
+
+    router = APIRouter()
+
+    @router.get("/rows", dependencies=[Depends(require_rights_clear(*tables))])
+    def rows():
+        return [{"id": 1}]
+
+    app = FastAPI()
+    app.include_router(router)
+    app.dependency_overrides[current_principal] = lambda: principal
+    return TestClient(app)
+
+
+@pytest.mark.unit
+class TestFixSourceRoutersGated:
+    """F4: source routers served storage-forbidden / agreement-required rows to any signed-in user."""
+
+    def test_guard_refuses_users_and_flags_admins(self):
+        r = _guard_client(USER, "internet_exchange").get("/rows")
+        assert r.status_code == 403 and r.json()["detail"]["error"] == "rights_gated"
+        assert "si_internet_exchanges" in r.json()["detail"]["datasets"]
+        a = _guard_client(ADMIN, "internet_exchange").get("/rows")
+        assert a.status_code == 200
+        assert a.headers["X-Dataset-Rights-Gate"] == "storage_forbidden,commercial_use_forbidden"
+        free = _guard_client(USER, "sec_13f_holdings").get("/rows")
+        assert free.status_code == 200 and "X-Dataset-Rights-Gate" not in free.headers
+
+    def test_every_guarded_dataset_is_gated(self):
+        from app.core.rights_guard import ENFORCED_PATHS
+
+        for key in ENFORCED_PATHS:
+            assert _spec(key).rights_gate, key
+
+    @pytest.mark.parametrize("path", [
+        "/api/v1/prediction-markets/markets/top", "/api/v1/prediction-markets/markets/{market_id}/history",
+        "/api/v1/medspa-discovery/prospects", "/api/v1/courtlistener/search", "/api/v1/courtlistener/stats",
+        "/api/v1/site-intel/telecom/ix", "/api/v1/site-intel/telecom/ix/nearby",
+        "/api/v1/site-intel/telecom/data-centers", "/api/v1/site-intel/telecom/data-centers/nearby",
+        "/api/v1/site-intel/logistics/warehouse-listings",
+        "/api/v1/site-intel/logistics/warehouse-listings/market-summary",
+        "/api/v1/realestate/zoning/districts", "/api/v1/realestate/zoning/summary",
+        "/api/v1/realestate/zoning/dc-eligible",
+    ])
+    def test_routes_are_wired(self, path):
+        from app.core.rights_guard import rights_gate_for
+        from app.main import app
+
+        routes = [r for r in app.routes if getattr(r, "path", None) == path and "GET" in (r.methods or ())]
+        assert routes, path
+        for r in routes:
+            tables = [t for t in (getattr(d.dependency, "rights_tables", None) for d in r.dependencies) if t]
+            assert tables, path
+            assert rights_gate_for(*tables[0]), path
+
+    def test_vertical_router_wired(self):
+        from app.main import app
+
+        vr = [r for r in app.routes if getattr(r, "path", "").startswith("/api/v1/vertical-discovery")]
+        assert vr and all(any(hasattr(d.dependency, "rights_tables") for d in r.dependencies) for r in vr)
+
+    def test_zip_scores_router_not_gated(self):
+        from app.main import app
+
+        zr = [r for r in app.routes if getattr(r, "path", "").startswith("/api/v1/zip-scores")]
+        assert zr and not any(hasattr(d.dependency, "rights_tables") for r in zr for d in r.dependencies)
+
+    def test_report_lists_enforced_and_unenforced_paths(self):
+        from app.catalog.rights_review import build_report, render_markdown
+
+        rep = build_report(None, live=False)
+        sp = rep["serving_paths"]
+        assert "si_internet_exchanges" in sp["enforced"] and sp["unenforced"]
+        assert any("econ-snapshot" in u["paths"] for u in sp["unenforced"])
+        h = {x["key"]: x for x in rep["storage_holdings"]}
+        assert "403" in h["si_internet_exchanges"]["gating_effect"]["source_api"]
+        assert "unenforced" in h["fred_series"]["gating_effect"]["source_api"]
+        ft = next(x for x in rep["storage_holdings"] if _spec(x["key"]).storage == "time_limited")
+        assert "not measured" in ft["gating_effect"]["time_limited"]
+        assert "Where the gate is enforced" in render_markdown(rep)
+
+
+class _Db:
+    def get_bind(self):
+        return object()
+
+
+def _rights_client(monkeypatch, principal):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from app.api.v1 import catalog_rights
+    from app.catalog import rights_review
+    from app.core.authz import current_principal
+    from app.core.database import get_db
+
+    row = {"id": 5, "dataset_key": "bls_series", "decision": "reject", "rights_hash": "a" * 64,
+           "proposal_hash": None, "rights_snapshot": {}, "proposal_snapshot": None,
+           "reviewer": "reviewer@nexdata.test", "reviewer_user_id": 42, "api_key_id": 9,
+           "note": "internal note about the terms", "reviewed_at": "2026-09-26T00:00:00Z"}
+    monkeypatch.setattr(rights_review, "review_history", lambda engine, key, limit=50: [dict(row)])
+    monkeypatch.setattr(rights_review, "latest_reviews", lambda engine: {"bls_series": dict(row)})
+    monkeypatch.setattr(rights_review, "build_report", lambda engine, live=True: {"ok": True})
+    app = FastAPI()
+    app.include_router(catalog_rights.router, prefix="/api/v1")
+    app.dependency_overrides[get_db] = lambda: _Db()
+    app.dependency_overrides[current_principal] = lambda: principal
+    return TestClient(app)
+
+
+@pytest.mark.unit
+class TestFixRightsReadsAdminOnly:
+    """F6: any signed-in user could read reviewer identities, notes and the holdings report."""
+
+    def test_report_is_admin_only(self, monkeypatch):
+        assert _rights_client(monkeypatch, USER).get("/api/v1/catalog/rights/report").status_code == 403
+        assert _rights_client(monkeypatch, USER).get("/api/v1/catalog/rights/report",
+                                                     params={"format": "md"}).status_code == 403
+        assert _rights_client(monkeypatch, ADMIN).get("/api/v1/catalog/rights/report").json() == {"ok": True}
+
+    def test_history_hides_reviewer_from_users(self, monkeypatch):
+        u = _rights_client(monkeypatch, USER).get("/api/v1/catalog/rights/bls_series").json()
+        assert u["reviews"] and u["review_state"] == "stale"
+        for f in ("reviewer", "reviewer_user_id", "api_key_id", "note"):
+            assert f not in u["reviews"][0], f
+        assert u["reviews"][0]["decision"] == "reject"
+        a = _rights_client(monkeypatch, ADMIN).get("/api/v1/catalog/rights/bls_series").json()
+        assert a["reviews"][0]["reviewer"] == "reviewer@nexdata.test" and a["reviews"][0]["note"]
