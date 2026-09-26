@@ -76,15 +76,36 @@ PRODUCER_MODULES: Dict[str, Tuple[str, ...]] = {
     "job:entity_resolve#feeds": ("app/entities/feeds.py",),
     "job:entity_resolve#bridge": ("app/entities/cik_crd_bridge.py",),
     "job:entity_resolve#resolve": ("app/entities/resolve.py", "app/entities/resolve_core.py"),
+    # the discovery routers (SPEC_143 fix round): collector, enrichment and
+    # ownership classifier all run plain SQL over catalog tables
+    "api:medspa_discovery": (
+        "app/sources/medspa_discovery/collector.py",
+        "app/sources/medspa_discovery/enrichment.py",
+        "app/sources/medspa_discovery/ownership_classifier.py",
+        # zip_medspa_scores (a table of medspa_prospects) is scored from IRS SOI here
+        "app/ml/zip_medspa_scorer.py",
+    ),
+    "api:vertical_discovery": (
+        "app/sources/vertical_discovery/configs.py",   # the per-vertical table names
+        "app/sources/vertical_discovery/collector.py",
+        "app/sources/vertical_discovery/enrichment.py",
+        "app/sources/vertical_discovery/ownership_classifier.py",
+    ),
+    "api:rollup_intel": (
+        "app/sources/rollup_intel/cbp_collector.py",
+        "app/ml/rollup_market_scorer.py",
+    ),
 }
 
-# derived_mart / entity specs whose inputs the SQL scan cannot check, and why.
-# Their declared inputs stand (verified by SPEC_141) and still form graph edges.
-SQL_UNCHECKED: Dict[str, str] = {
-    "medspa_prospects": "discovery calls the Yelp API and enriches from nppes_providers in "
-                        "Python; the IRS SOI / Yelp inputs are upstream sources, not SQL reads",
-    "vertical_prospects": "discovery calls the Yelp API and scores with IRS SOI in Python",
-    "rollup_market_scores": "the collector reads the Census CBP API and IRS SOI in Python",
+# Declared inputs a producer fetches from the publisher's API instead of reading
+# the catalog dataset's tables: the SQL scan cannot see them, so they are the
+# only declared inputs allowed to be absent from the SQL. Everything else a
+# derived/entity spec declares must be read, and everything read declared.
+API_INPUTS: Dict[str, Dict[str, str]] = {
+    "medspa_prospects": {
+        "yelp_businesses": "discovery calls the Yelp Fusion API (YelpClient) per ZIP"},
+    "vertical_prospects": {
+        "yelp_businesses": "discovery calls the Yelp Fusion API (YelpClient) per ZIP"},
 }
 
 # entity specs collected from outside the catalog (agents, websites, filings
@@ -194,6 +215,12 @@ def scan_source(source: str) -> Set[str]:
                 and id(node) not in fstring_parts):
             texts.append(node.value)
     refs: Set[str] = set()
+    # table names passed as keyword arguments (``table_name="dental_prospects"``)
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.keyword) and node.arg in ("table", "table_name")
+                and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str)
+                and _NAME.match(node.value.value)):
+            refs.add(_norm_ref(node.value.value))
     for body in texts:
         for m in _SQL_REF.finditer(_fill(body, consts)):
             refs.add(_norm_ref(m.group(1)))
@@ -392,6 +419,14 @@ def _add_view_edges(b: _Builder, deps: Mapping[str, Iterable[str]], origin: str,
                 owners = owners_of(t, claims, patterns)
                 src = b.node(f"table:{t}", owned_by=sorted(owners) or None,
                              undeclared=True if not owners else None)
+                if t not in claims:
+                    # owned through a table pattern (fred_* -> fred_interest_rates):
+                    # the concrete table has no declared stores edge, so the view
+                    # would hang off nothing. Tie it to its owning datasets.
+                    for k in sorted(owners):
+                        via = sorted(p for p, pk in patterns
+                                     if pk == k and pattern_matches(p, t))
+                        b.edge(_ds(k), src, "stores", via_pattern=via or None)
             b.edge(src, vid, "view", origin=[origin])
 
 
@@ -448,7 +483,7 @@ def build_static(specs: Sequence[DatasetSpec]) -> Dict[str, Any]:
         for key, tables in found["inputs"].items():
             b.edge(_ds(key), _ds(s.key), "sql", tables=list(tables))
         sql_keys = set(found["inputs"])
-        declared = set(s.inputs)
+        declared = set(s.inputs) - set(API_INPUTS.get(s.key, {}))
         for key in sorted(declared - sql_keys):
             drift.append({"dataset": s.key, "kind": "declared_not_read",
                           "input": key, "detail": "declared input the producer's SQL never reads"})
@@ -507,11 +542,20 @@ def _static_default() -> Dict[str, Any]:
 # =============================================================================
 
 _LATEST_BUILDS_SQL = """
-    SELECT DISTINCT ON (mart) id, mart, finished_at, inputs
+    SELECT DISTINCT ON (mart) id, mart, finished_at, inputs, stage_counts
     FROM core.mart_build
     WHERE status = 'success' AND NOT dry_run
     ORDER BY mart, id DESC
 """
+
+
+def _json(value: Any) -> Any:
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except ValueError:
+            return None
+    return value
 
 
 def latest_builds(engine) -> Dict[str, Any]:
@@ -534,16 +578,15 @@ def latest_builds(engine) -> Dict[str, Any]:
         return out
     out["available"] = True
     for r in rows:
-        inputs = r["inputs"]
-        if isinstance(inputs, str):
-            try:
-                inputs = json.loads(inputs)
-            except ValueError:
-                inputs = []
+        inputs = _json(r["inputs"])
+        counts = _json(r["stage_counts"])
+        stages = counts.get("stages") if isinstance(counts, dict) else None
         out["builds"].append({
             "id": r["id"], "mart": r["mart"],
             "finished_at": r["finished_at"].isoformat() if r["finished_at"] else None,
             "inputs": inputs if isinstance(inputs, list) else [],
+            # the stages that ran (keys of stage_counts.stages); None = unknown
+            "stages": sorted(stages) if isinstance(stages, dict) else None,
         })
     if not rows:
         out["note"] = ("no successful non-dry-run build recorded yet: every pe_mart_build / "
@@ -585,7 +628,34 @@ def observed_edges(builds: Sequence[Mapping[str, Any]], specs: Sequence[DatasetS
                 drift.append({"dataset": None, "kind": "observed_not_declared",
                               "mart": build["mart"], "input": src,
                               "detail": "the build asserted an input no dataset of the mart declares"})
+        drift += _declared_not_observed(build, job_type, specs)
     return edges, drift
+
+
+def _declared_not_observed(build: Mapping[str, Any], job_type: str,
+                           specs: Sequence[DatasetSpec]) -> List[Dict[str, Any]]:
+    """The other direction: inputs the stages that ran declare (bulk sources
+    and upstream marts, as ``stage_inputs`` derives them) that the build never
+    asserted. Only the stages recorded in ``stage_counts.stages`` count; a
+    build without stage counts is judged on every stage."""
+    want_bulk, want_up = stage_inputs(job_type, specs)
+    stage_ds = _stage_datasets(job_type, specs)
+    ran = build.get("stages")
+    stages = [s for s in (ran if ran is not None else stage_ds) if s in stage_ds]
+    seen = {(str(r.get("kind") or "bulk"), str(r["source"])) for r in build.get("inputs") or ()
+            if isinstance(r, Mapping) and r.get("source")}
+    out: List[Dict[str, Any]] = []
+    for stage in sorted(stages):
+        wanted = [("bulk", s) for s in want_bulk.get(stage, ())] + \
+                 [("mart", m) for m in want_up.get(stage, ())]
+        for kind, src in wanted:
+            if (kind, src) not in seen:
+                out.append({"dataset": stage_ds[stage], "kind": "declared_not_observed",
+                            "mart": build["mart"], "build_id": build.get("id"),
+                            "stage": f"{job_type}#{stage}", "input": src, "input_kind": kind,
+                            "detail": "the stage ran but the build never asserted this "
+                                      "declared input"})
+    return out
 
 
 _cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
@@ -681,6 +751,49 @@ def full_graph(engine=None, live: bool = True, consumers: bool = False,
 # =============================================================================
 # Walks
 # =============================================================================
+
+
+# SPEC_124 statuses that make a dataset a problem for what it feeds.
+PROBLEM_STATUSES = ("behind", "stalled", "failing", "partial", "blocked", "never_run")
+
+
+def impact(w: Mapping[str, Any], statuses: Optional[Mapping[str, Mapping[str, Any]]]
+           ) -> Dict[str, Any]:
+    """Join a walk to the SPEC_124 verdicts (``GET /datasets/status``):
+    each reached dataset gets ``status`` / ``status_reason``, and ``impact``
+    names the upstream problems and the downstream datasets they put at risk.
+
+    ``statuses`` is key -> {"status", "status_reason"}; None means the status
+    could not be computed, reported as ``impact.available = false``."""
+    out = dict(w)
+    if statuses is None:
+        out["impact"] = {"available": False, "note": "dataset status unavailable"}
+        return out
+
+    def tag(rows):
+        tagged = []
+        for r in rows:
+            st = statuses.get(r["key"]) or {}
+            tagged.append(dict(r, status=st.get("status"), status_reason=st.get("status_reason")))
+        return tagged
+
+    out["upstream"] = tag(w["upstream"])
+    out["downstream"] = tag(w["downstream"])
+    focal = statuses.get(w["key"]) or {}
+    problems = [{"key": r["key"], "depth": r["depth"], "status": r["status"],
+                 "status_reason": r["status_reason"]}
+                for r in out["upstream"] if r["status"] in PROBLEM_STATUSES]
+    focal_problem = focal.get("status") in PROBLEM_STATUSES
+    at_risk = [r["key"] for r in out["downstream"]] if (focal_problem or problems) else []
+    out["impact"] = {
+        "available": True,
+        "status": focal.get("status"),
+        "status_reason": focal.get("status_reason"),
+        "upstream_problems": problems,
+        "downstream_at_risk": at_risk,
+        "problem_statuses": list(PROBLEM_STATUSES),
+    }
+    return out
 
 
 def dataset_adjacency(edges: Iterable[Mapping[str, Any]]

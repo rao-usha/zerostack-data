@@ -68,16 +68,42 @@ class TestSqlReference:
         bad = [(s.key, i) for s in _catalog() for i in s.inputs if i not in keys]
         assert not bad, bad
 
-    def test_every_derived_spec_is_sql_checked_or_explained(self):
-        from app.catalog.lineage import (DERIVED_KINDS, NO_CATALOG_INPUTS, SQL_UNCHECKED,
-                                         producer_modules)
+    def test_every_derived_spec_is_sql_checked(self):
+        """Fix round: no whole-spec exemption. Every derived/entity spec with
+        catalog inputs has producer modules the scan checks."""
+        from app.catalog.lineage import DERIVED_KINDS, NO_CATALOG_INPUTS, producer_modules
 
         unchecked = [s.key for s in _catalog() if s.kind in DERIVED_KINDS
-                     and not producer_modules(s) and s.key not in SQL_UNCHECKED
-                     and s.key not in NO_CATALOG_INPUTS]
+                     and not producer_modules(s) and s.key not in NO_CATALOG_INPUTS]
         assert not unchecked, unchecked
-        for key in SQL_UNCHECKED:
-            assert _spec(key).inputs, key
+
+    def test_api_inputs_are_declared_and_not_sql(self):
+        """The only declared inputs allowed to be absent from the SQL are ones
+        the producer fetches from the publisher's API; each is explained."""
+        from app.catalog import lineage
+
+        specs = _catalog()
+        for key, extra in lineage.API_INPUTS.items():
+            s = _spec(key)
+            found = lineage.sql_inputs(s, specs)
+            for inp, why in extra.items():
+                assert inp in s.inputs and why, (key, inp)
+                assert inp not in found["inputs"], (key, inp)
+
+    def test_discovery_specs_declare_what_their_sql_reads(self):
+        # regression: vertical_prospects enrichment reads nppes_providers; both
+        # ownership classifiers read pe_portfolio_companies (pe_collection)
+        from app.catalog.lineage import sql_inputs
+
+        specs = _catalog()
+        v = sql_inputs(_spec("vertical_prospects"), specs)
+        assert {"irs_soi", "nppes_providers", "pe_collection"} == set(v["inputs"])
+        assert "dental_prospects" in v["self"]
+        assert {"nppes_providers", "pe_collection"} <= set(_spec("vertical_prospects").inputs)
+        m = sql_inputs(_spec("medspa_prospects"), specs)
+        assert {"irs_soi", "nppes_providers", "pe_collection"} == set(m["inputs"])
+        r = sql_inputs(_spec("rollup_market_scores"), specs)
+        assert set(r["inputs"]) == {"census_cbp", "irs_soi"}
 
     def test_producer_modules_exist_and_are_producers(self):
         from app.catalog.lineage import PRODUCER_MODULES
@@ -91,7 +117,7 @@ class TestSqlReference:
     def test_inputs_equal_the_tables_the_sql_reads(self):
         """The SQL-reference test: every table a producer reads belongs to a
         declared input or the dataset itself, and every declared input is read."""
-        from app.catalog.lineage import producer_modules, sql_inputs
+        from app.catalog.lineage import API_INPUTS, producer_modules, sql_inputs
 
         specs = _catalog()
         bad = []
@@ -101,10 +127,11 @@ class TestSqlReference:
                 continue
             checked += 1
             found = sql_inputs(s, specs)
-            if set(found["inputs"]) != set(s.inputs) or found["ambiguous"]:
+            want = set(s.inputs) - set(API_INPUTS.get(s.key, {}))
+            if set(found["inputs"]) != want or found["ambiguous"]:
                 bad.append((s.key, sorted(s.inputs), found))
             assert found["self"], f"{s.key}: the scan found none of its own tables"
-        assert checked >= 7
+        assert checked >= 10
         assert not bad, bad
 
     def test_plan_corrections(self):
@@ -122,7 +149,8 @@ class TestSqlReference:
         ev = json.loads((REPO / "app/catalog/evidence/verification_2026-09-25.json")
                         .read_text(encoding="utf-8"))
         by = {e["key"]: e for e in ev["entries"]}
-        for key in ("pe_firms_sec", "pe_funds_sec", "pe_people_sec", "entity_cik_crd_bridge"):
+        for key in ("pe_firms_sec", "pe_funds_sec", "pe_people_sec", "entity_cik_crd_bridge",
+                    "medspa_prospects", "vertical_prospects"):
             assert by[key]["disposition"]["inputs"].startswith("amended:SPEC_143"), key
 
     def test_scanner_reads_constants_fstrings_and_format(self):
@@ -137,11 +165,12 @@ B = """SELECT * FROM {fund_filings} pff JOIN "core"."identifier" x ON 1=1""".for
 FUND_FILINGS = "public.sec_adv_private_fund_filings"
 def f(conn):
     conn.execute("select * from latest_cte")
+DENTAL = VerticalConfig(slug="dental", table_name="dental_prospects")
 '''
         refs = scan_source(src)
         assert {"sec_adv_filings", "form_d_issuers", "sec_adv_private_fund_filings",
                 "core.identifier", "sec_adv_private_funds", "fred_interest_rates",
-                "fred_commodities"} <= refs
+                "fred_commodities", "dental_prospects"} <= refs
 
 
 # ---------------------------------------------------------------------------
@@ -287,6 +316,31 @@ class TestGraph:
         w = walk(_static(), "sec_companyfacts", direction="down", depth=1)
         assert "public_company_financials" in w["views"]
 
+    def test_views_over_pattern_owned_tables_reach_their_dataset(self):
+        # regression: fred_series declares fred_* only; fred_observations reads
+        # the concrete fred_interest_rates ... tables
+        from app.catalog.lineage import walk
+
+        g = _static()
+        w = walk(g, "fred_series", direction="down", depth=1)
+        assert "fred_observations" in w["views"]
+        assert "fred_interest_rates" in w["tables"]
+        stores = next(e for e in g["edges"] if e["type"] == "stores"
+                      and e["from"] == "dataset:fred_series"
+                      and e["to"] == "table:fred_interest_rates")
+        assert stores["via_pattern"] == ["fred_*"]
+
+    def test_pattern_owned_view_input_from_pg_depend(self):
+        from app.catalog import lineage
+
+        b = lineage._Builder()
+        claims, patterns = lineage.table_owners(_catalog())
+        lineage._add_view_edges(b, {"v_rates": ["fred_commodities"]}, "pg_depend",
+                                claims, patterns)
+        g = b.result()
+        assert ("dataset:fred_series", "table:fred_commodities", "stores") in {
+            (e["from"], e["to"], e["type"]) for e in g["edges"]}
+
     def test_declared_and_sql_agree_today(self):
         kinds = {d["kind"] for d in _static()["drift"]}
         assert not kinds & {"declared_not_read", "read_not_declared", "ambiguous_table",
@@ -318,7 +372,60 @@ class TestGraph:
         assert ("dataset:entity_master", "dataset:pe_firms_sec") in got
         rk = next(e for e in edges if e["to"] == "dataset:pe_funds_sec")["release_keys"]
         assert rk == ["2026q2"]
-        assert [d["input"] for d in drift] == ["sec_bogus"]
+        assert [d["input"] for d in drift if d["kind"] == "observed_not_declared"] == ["sec_bogus"]
+
+    def test_declared_but_not_observed(self):
+        """The other direction: a stage that ran without asserting a declared input."""
+        from app.catalog.lineage import observed_edges
+
+        full = [{"source": s, "kind": "bulk"} for s in
+                ("sec_adv_roster", "sec_adv_schedule_d", "sec_form_d")] + \
+               [{"source": "entity_resolve", "kind": "mart"}]
+        ok = {"id": 1, "mart": "pe_marts", "stages": ["adv_private_funds", "firms", "funds",
+                                                        "people"], "inputs": full}
+        _, drift = observed_edges([ok], _catalog())
+        assert drift == []
+        # the funds stage ran, but the build dropped sec_adv_schedule_d
+        dropped = dict(ok, id=2, inputs=[r for r in full if r["source"] != "sec_adv_schedule_d"])
+        _, drift = observed_edges([dropped], _catalog())
+        got = {(d["kind"], d["stage"], d["input"], d["dataset"]) for d in drift}
+        assert got == {
+            ("declared_not_observed", "pe_mart_build#adv_private_funds", "sec_adv_schedule_d",
+             "sec_adv_private_funds"),
+            ("declared_not_observed", "pe_mart_build#funds", "sec_adv_schedule_d",
+             "pe_funds_sec")}
+        # the upstream mart the firms stage declares
+        no_up = dict(ok, id=3, inputs=[r for r in full if r["kind"] == "bulk"])
+        _, drift = observed_edges([no_up], _catalog())
+        assert [(d["stage"], d["input"], d["input_kind"]) for d in drift] == [
+            ("pe_mart_build#firms", "entity_resolve", "mart")]
+        # only the stages that ran are judged
+        firms_only = dict(ok, id=4, stages=["firms"],
+                          inputs=[{"source": "sec_adv_roster", "kind": "bulk"},
+                                  {"source": "entity_resolve", "kind": "mart"}])
+        assert observed_edges([firms_only], _catalog())[1] == []
+
+    def test_impact_joins_status_verdicts(self):
+        from app.catalog.lineage import impact, walk
+
+        w = walk(_static(), "pe_funds_sec", direction="both", depth=1)
+        statuses = {"pe_funds_sec": {"status": "current", "status_reason": "ok"},
+                    "sec_form_d": {"status": "failing", "status_reason": "last run failed"},
+                    "sec_adv_roster": {"status": "current", "status_reason": "ok"}}
+        out = impact(w, statuses)
+        up = {r["key"]: r for r in out["upstream"]}
+        assert up["sec_form_d"]["status"] == "failing"
+        assert up["sec_adv_private_funds"]["status"] is None
+        imp = out["impact"]
+        assert imp["available"] and imp["status"] == "current"
+        assert [p["key"] for p in imp["upstream_problems"]] == ["sec_form_d"]
+        assert "pe_people_sec" in imp["downstream_at_risk"]
+        healthy = impact(w, {k: {"status": "current", "status_reason": ""}
+                             for k in [r["key"] for r in w["upstream"] + w["downstream"]]
+                             + ["pe_funds_sec"]})
+        assert healthy["impact"]["upstream_problems"] == []
+        assert healthy["impact"]["downstream_at_risk"] == []
+        assert impact(w, None)["impact"]["available"] is False
 
     def test_non_pg_engine_degrades(self):
         from sqlalchemy import create_engine
@@ -401,6 +508,33 @@ class TestApi:
                           params={"direction": "x"}).status_code == 422
         assert client.get("/api/v1/catalog/sec_form_d/lineage",
                           params={"depth": 0}).status_code == 422
+
+    def test_status_impact_param(self, client, monkeypatch):
+        from app.services import dataset_status
+
+        seen = {}
+
+        def fake(db, **kw):
+            seen.update(kw)
+            return {"datasets": [{"key": k, "status": "failing" if k == "sec_form_d" else
+                                  "current", "status_reason": "x"} for k in kw["keys"]]}
+
+        monkeypatch.setattr(dataset_status, "build_status", fake)
+        body = client.get("/api/v1/catalog/pe_funds_sec/lineage",
+                          params={"direction": "up", "depth": 1, "status": "true"}).json()
+        assert seen["include_errors"] is False and "pe_funds_sec" in seen["keys"]
+        assert body["impact"]["available"] is True
+        assert [p["key"] for p in body["impact"]["upstream_problems"]] == ["sec_form_d"]
+        # without status=true there is no impact block
+        assert "impact" not in client.get("/api/v1/catalog/pe_funds_sec/lineage").json()
+
+        def boom(db, **kw):
+            raise RuntimeError("no status")
+
+        monkeypatch.setattr(dataset_status, "build_status", boom)
+        body = client.get("/api/v1/catalog/pe_funds_sec/lineage",
+                          params={"status": "true"}).json()
+        assert body["impact"]["available"] is False
 
     def test_catalog_detail_still_served(self, client):
         # /catalog/{key} is not swallowed and /catalog/lineage is not a dataset key
@@ -510,7 +644,26 @@ EXPECTED_UNRESOLVED = {
     "census_bfs", "epa_ghg", "dot_grants", "cms_hospitals", "ffiec_banks", "ferc_energy",
     "google_trends", "test_manual", "job:pe_mart_build", "freight_index", "pe_collection",
     "pe_fund_data", "pe_people", "news_collection",
+    # fix round: maintenance over job_postings, not a producer run
+    "job_postings_skills",
 }
+# 280 before the fix round dropped the 7 job_postings_skills rows
+EXPECTED_RESOLVED = 273
+
+
+def _load_fixture(engine):
+    from sqlalchemy import text
+
+    with engine.begin() as conn:
+        conn.execute(text("CREATE TABLE ingestion_jobs (id INTEGER PRIMARY KEY, source TEXT, "
+                          "config TEXT, dataset_key TEXT)"))
+        i = 0
+        for source, config, n in UNRESOLVED_2026_09_26:
+            for _ in range(n):
+                i += 1
+                conn.execute(text("INSERT INTO ingestion_jobs (id, source, config) "
+                                  "VALUES (:i, :s, :c)"),
+                             {"i": i, "s": source, "c": json.dumps(config)})
 
 
 @pytest.mark.unit
@@ -534,11 +687,90 @@ class TestJobKeyAliases:
                 unresolved += n
                 left.add(source)
         assert left == EXPECTED_UNRESOLVED
-        assert resolved >= 280 and unresolved <= 43, (resolved, unresolved)
+        assert resolved == EXPECTED_RESOLVED and unresolved == 323 - EXPECTED_RESOLVED, \
+            (resolved, unresolved)
+
+    def test_backfill_plan_uses_the_aliases(self):
+        """Regression: backfill_dataset_key.plan() resolved with producer_for_job
+        only (53 of 323); it must resolve what dataset_key_for_job resolves."""
+        from sqlalchemy import create_engine
+
+        from app.catalog import backfill_dataset_key as bf
+
+        engine = create_engine("sqlite://")
+        _load_fixture(engine)
+        m = self._map()
+        out = bf.plan(engine, m)
+        rep = out["report"]
+        assert rep["null_before"] == 323
+        assert rep["resolvable"] == EXPECTED_RESOLVED, rep
+        assert rep["ambiguous"] == 1 and rep["ambiguous_sources"] == {"job:pe_mart_build": 1}
+        assert set(rep["unresolved_sources"]) == EXPECTED_UNRESOLVED - {"job:pe_mart_build"}
+        assert rep["by_dataset"]["job_postings"] == 162
+        assert rep["by_dataset"]["intl_oecd"] == 24
+        assert rep["by_dataset"]["usda_nass"] == 10
+        assert rep["by_dataset"]["family_offices"] == 1  # config.tables
+        # every planned row agrees with the insert listener's resolver
+        from sqlalchemy import text
+
+        with engine.connect() as conn:
+            rows = {r[0]: (r[1], json.loads(r[2])) for r in conn.execute(
+                text("SELECT id, source, config FROM ingestion_jobs"))}
+        for key, ids in out["updates"].items():
+            for i in ids:
+                assert m.dataset_key_for_job(*rows[i]) == key
+        # and --apply writes them
+        applied = bf.backfill(engine, apply=True, pmap=m)
+        assert applied["updated"] == EXPECTED_RESOLVED
+        assert applied["null_after"] == 323 - EXPECTED_RESOLVED
+
+    def test_one_resolver(self):
+        m = self._map()
+        assert m.datasets_for_job("job:pe_mart_build", {}) == m.datasets_for("job:pe_mart_build")
+        assert len(m.datasets_for_job("job:pe_mart_build", {})) > 1
+        assert m.datasets_for_job("usda", {}) == ("usda_nass",)
+        assert m.datasets_for_job("job_postings_skills", {"action": "backfill_skills"}) == ()
+        assert m.datasets_for_job(None, {}) == ()
+
+    def test_skills_backfill_is_maintenance_not_a_run(self):
+        from app.catalog.job_keys import JOB_SOURCE_DATASETS, MAINTENANCE_SOURCES
+
+        assert "job_postings_skills" not in JOB_SOURCE_DATASETS
+        assert MAINTENANCE_SOURCES["job_postings_skills"] == "job_postings"
+        assert self._map().dataset_key_for_job("job_postings_skills", {}) is None
+
+    def test_status_read_uses_the_aliases(self):
+        """dataset_status's NULL-dataset_key fallback and batch-run counts use the
+        same resolver; an api:<source> producer never becomes a batch default."""
+        import inspect
+
+        from app.services import dataset_status as ds
+
+        src = inspect.getsource(ds.collect_facts)
+        assert src.count("datasets_for_job(") == 2
+
+        class Src:
+            def __init__(self, key, cfg):
+                self.key, self.default_config = key, cfg
+
+        class Tier:
+            def __init__(self, sources):
+                self.sources = sources
+
+        import app.core.batch_service as bs
+
+        m = self._map()
+        orig = bs.TIERS
+        try:
+            bs.TIERS = [Tier([Src("census_cbp", {"year": 2022}), Src("fred", {})])]
+            got = ds._batch_defaults(m)
+        finally:
+            bs.TIERS = orig
+        assert "fred" in got and "" not in got and not any(k.startswith("api") for k in got)
+        assert len(got) == 1
 
     @pytest.mark.parametrize("source,config,key", [
         ("job_postings", {"company_id": 5}, "job_postings"),
-        ("job_postings_skills", {}, "job_postings"),
         ("usda", {"incremental": True}, "usda_nass"),
         ("usda", {"dataset": "crop"}, "usda_nass"),
         ("international_econ_oecd", {"dataset": "mei"}, "intl_oecd"),
@@ -571,10 +803,11 @@ class TestJobKeyAliases:
         assert m.producer_for_job("not_a_source", {}) is None
 
     def test_alias_table_is_valid(self):
-        from app.catalog.job_keys import JOB_SOURCE_DATASETS
+        from app.catalog.job_keys import JOB_SOURCE_DATASETS, MAINTENANCE_SOURCES
 
         m = self._map()
         keys = {s.key for s in _catalog()}
+        assert not set(JOB_SOURCE_DATASETS) & set(MAINTENANCE_SOURCES)
         for source, key in JOB_SOURCE_DATASETS.items():
             assert key in keys, key
             # an alias never shadows a real dispatch key or router producer

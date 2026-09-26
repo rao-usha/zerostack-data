@@ -55,12 +55,39 @@ def catalog_dataset_lineage(
     direction: str = Query("both", description="up | down | both"),
     depth: int = Query(lineage_mod.DEFAULT_DEPTH, ge=1, le=lineage_mod.MAX_DEPTH),
     live: bool = Query(True, description="add pg_depend view edges and the mart ledger"),
+    status: bool = Query(False, description="join the SPEC_124 dataset status verdicts "
+                                            "(impact analysis)"),
     db: Session = Depends(get_db),
 ):
-    """Upstream and downstream datasets of one dataset, to ``depth`` hops."""
+    """Upstream and downstream datasets of one dataset, to ``depth`` hops.
+
+    With ``status=true`` every reached dataset carries its ``GET /datasets/status``
+    verdict, and ``impact`` lists the upstream problems and the downstream
+    datasets they put at risk."""
     if get_spec(key) is None:
         raise HTTPException(status_code=404, detail=f"unknown dataset {key!r}")
     if direction not in lineage_mod.DIRECTIONS:
         raise HTTPException(status_code=422,
                             detail=f"direction must be one of {list(lineage_mod.DIRECTIONS)}")
-    return lineage_mod.walk(_graph(db, live), key, direction=direction, depth=depth)
+    w = lineage_mod.walk(_graph(db, live), key, direction=direction, depth=depth)
+    if status:
+        w = lineage_mod.impact(w, _statuses(db, [key] + [r["key"] for r in
+                                                         w["upstream"] + w["downstream"]]))
+    return w
+
+
+def _statuses(db: Session, keys):
+    """key -> verdict for ``keys``; None when the status cannot be computed."""
+    try:
+        from app.services.dataset_status import build_status
+
+        body = build_status(db, scheduler=None, include_errors=False, keys=keys)
+    except Exception as e:
+        logger.warning(f"[catalog_lineage] dataset status unavailable: {type(e).__name__}")
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return None
+    return {d["key"]: {"status": d["status"], "status_reason": d["status_reason"]}
+            for d in body.get("datasets", [])}

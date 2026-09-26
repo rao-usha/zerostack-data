@@ -559,8 +559,10 @@ def collect_facts(db: Session, pmap: ProducerMap, now: datetime) -> Facts:
             elif r["dataset_key"]:
                 keys = (r["dataset_key"],)
             else:
-                keys = pmap.datasets_for(
-                    pmap.producer_for_job(source, {"dataset": r["dataset"]} if r["dataset"] else {}))
+                # a NULL dataset_key row: the insert listener's resolver
+                # (SPEC_143 aliases included), so history and new rows agree
+                keys = pmap.datasets_for_job(
+                    source, {"dataset": r["dataset"]} if r["dataset"] else {})
             for key in keys:
                 ev = facts.ev(key)
                 if r["term_at"]:
@@ -574,8 +576,8 @@ def collect_facts(db: Session, pmap: ProducerMap, now: datetime) -> Facts:
             facts.batch_first_at = _naive_utc(r["first_at"])
             if not r["source"]:
                 continue
-            producer = pmap.producer_for_job(r["source"], {"dataset": r["dataset"]} if r["dataset"] else {})
-            for key in pmap.datasets_for(producer):
+            for key in pmap.datasets_for_job(
+                    r["source"], {"dataset": r["dataset"]} if r["dataset"] else {}):
                 facts.batch_runs_30d[key] = facts.batch_runs_30d.get(key, 0) + int(r["runs"] or 0)
 
     if has_releases:
@@ -1265,7 +1267,9 @@ def _batch_defaults(pmap: ProducerMap) -> Dict[str, Dict[str, Any]]:
     for tier in TIERS:
         for source_def in tier.sources:
             producer = pmap.producer_for_job(source_def.key, source_def.default_config)
-            if producer:
+            # only dispatch producers carry a batch default (an api:<source>
+            # router producer, SPEC_143, is not a dispatch key)
+            if producer and producer.startswith("dispatch:"):
                 out.setdefault(producer[len("dispatch:"):], dict(source_def.default_config))
     return out
 

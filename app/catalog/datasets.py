@@ -383,8 +383,8 @@ _DERIVED: List[DatasetSpec] = [
         coverage_from="2025-01-02",
         slo_lag_hours=24 * 12),
     _ds("pe_firms_sec", "pe_marts", "PE firms (SEC-derived)",
-        "Private equity and venture advisers derived from Form ADV rosters and the IAPD "
-        "feed, keyed by CRD, with CIK links (about 610 firms) and SPV-platform flags.",
+        "Private equity and venture advisers derived from Form ADV rosters, keyed by CRD, "
+        "with CIK links from the entity master (about 610 firms) and SPV-platform flags.",
         "derived_mart", "one row per adviser firm (CRD); rows with a crd_number",
         "job:pe_mart_build#firms", "monthly",
         tables=("pe_firms",), primary_key=("crd_number",),
@@ -2093,7 +2093,10 @@ _API: List[DatasetSpec] = [
         "api:medspa_discovery", "ad_hoc",
         tables=("medspa_prospects", "medspa_prospect_snapshots", "zip_medspa_scores"),
         pii="personal",
-        inputs=("irs_soi", "yelp_businesses", "nppes_providers"), status="archival",
+        # SPEC_143: the ownership classifier reads pe_portfolio_companies (pe_collection);
+        # yelp_businesses is the Yelp API the collector calls (lineage.API_INPUTS)
+        inputs=("irs_soi", "yelp_businesses", "nppes_providers", "pe_collection"),
+        status="archival",
         primary_key=("yelp_id",),
         coverage_sql="SELECT max(updated_at) FROM medspa_prospects",
         coverage_basis="as_of",
@@ -2107,7 +2110,10 @@ _API: List[DatasetSpec] = [
         "ad_hoc",
         tables=("dental_prospects", "veterinary_prospects", "hvac_prospects",
                 "car_wash_prospects", "physical_therapy_prospects"),
-        inputs=("irs_soi", "yelp_businesses"), status="archival",
+        # SPEC_143: enrichment reads nppes_providers and the ownership classifier
+        # pe_portfolio_companies (pe_collection); yelp_businesses is the Yelp API
+        inputs=("irs_soi", "yelp_businesses", "nppes_providers", "pe_collection"),
+        status="archival",
         primary_key=("yelp_id",),
         data_state="missing_tables",
         missing_tables=("dental_prospects", "veterinary_prospects", "hvac_prospects",

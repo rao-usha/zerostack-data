@@ -24,7 +24,8 @@ producer nor a dispatch key (the 322 rows SPEC_144's backfill left unresolved):
 - ``api:<source>``: a router that records its in-process run under its own
   name (``form_d``, ``app_rankings``, ``census_cbp`` ...) is that producer;
 - ``JOB_SOURCE_DATASETS``: legacy or per-router source names whose rows land
-  in one dataset (``job_postings``, ``international_econ_oecd`` ...);
+  in one dataset (``job_postings``, ``international_econ_oecd`` ...); maintenance
+  jobs (``MAINTENANCE_SOURCES``) are deliberately not aliased;
 - ``config["tables"]``: a backfilled row that names its tables resolves to the
   one dataset that declares all of them (shared tables stay unresolved).
 
@@ -43,11 +44,12 @@ from app.catalog.spec import DatasetSpec
 MART_JOB_TYPES = {"pe_marts": "pe_mart_build", "entity_resolve": "entity_resolve"}
 
 # ingestion_jobs.source -> dataset key, for sources that name no producer (SPEC_143).
+# Only producer runs belong here: a resolved row counts as a run of the dataset
+# in the SPEC_124 status (last success, failures). Maintenance jobs that rewrite
+# existing rows stay unresolved (MAINTENANCE_SOURCES).
 JOB_SOURCE_DATASETS: Dict[str, str] = {
     # /job-postings router runs (company / all / discover) record the bare source
     "job_postings": "job_postings",
-    # the skills backfill rewrites requirements on existing job_postings rows
-    "job_postings_skills": "job_postings",
     # /usda router runs without config.dataset (incremental / all)
     "usda": "usda_nass",
     # app.sources.international_econ records f"international_econ_{source}"
@@ -55,6 +57,14 @@ JOB_SOURCE_DATASETS: Dict[str, str] = {
     "international_econ_worldbank": "intl_worldbank",
     "international_econ_bis": "intl_bis",
     "international_econ_imf": "intl_imf",
+}
+
+# ingestion_jobs.source values that are maintenance over an existing dataset,
+# not a run of its producer: never aliased, so they never move its freshness.
+MAINTENANCE_SOURCES: Dict[str, str] = {
+    # POST /job-postings/extract-skills/backfill rewrites `requirements` on
+    # postings already stored; it ingests nothing.
+    "job_postings_skills": "job_postings",
 }
 
 
@@ -143,20 +153,29 @@ class ProducerMap:
             return [f"job:{job_type}"]
         return []
 
-    def dataset_key_for_job(self, source: Optional[str], config: Any) -> Optional[str]:
-        producer = self.producer_for_job(source, config)
-        keys = self.datasets_for(producer)
-        if producer and keys:
-            # several datasets (job:pe_mart_build): ambiguous, never aliased
-            return keys[0] if len(keys) == 1 else None
+    def datasets_for_job(self, source: Optional[str], config: Any) -> Tuple[str, ...]:
+        """Every dataset an ``ingestion_jobs`` row ran: its producer's datasets
+        (several for ``job:pe_mart_build``), else the SPEC_143 aliases. The one
+        resolver the insert listener, the backfill and the status read share."""
+        keys = self.datasets_for(self.producer_for_job(source, config))
+        if keys:
+            # a multi-dataset producer is never narrowed by an alias
+            return keys
         if not source:
-            return None
+            return ()
         alias = JOB_SOURCE_DATASETS.get(self._base(source))
         if alias in self.keys:
-            return alias
+            return (alias,)
         if isinstance(config, dict):
-            return self.dataset_for_tables(config.get("tables"))
-        return None
+            one = self.dataset_for_tables(config.get("tables"))
+            if one:
+                return (one,)
+        return ()
+
+    def dataset_key_for_job(self, source: Optional[str], config: Any) -> Optional[str]:
+        keys = self.datasets_for_job(source, config)
+        # several datasets (job:pe_mart_build): ambiguous
+        return keys[0] if len(keys) == 1 else None
 
 
 @lru_cache(maxsize=1)
