@@ -215,6 +215,10 @@ Treasury `meta.labels` harvesting (needs a live API call — follow-up).
    (PLAN_088 §3 item 5). The fields arrive with SPEC_142; until then `storage_forbidden()` is
    False for every spec and admins can still sample storage-forbidden sources that are also
    `restricted` (FRED, Yelp, M5 ...). Non-admins are blocked today by `restricted`.
+   **Superseded by SPEC_142:** the fields exist now; a gated table (storage or commercial use
+   forbidden, or commercial use needing an agreement) is refused to non-admins and served to
+   admins with a `rights_gate` flag and an `X-Dataset-Rights-Gate` header. /schema examples stay
+   withheld from everyone when storage or commercial use is forbidden.
 6. **SPEC_141 `row_filters`** are applied to the /sample query (`WHERE (<predicate>)`) and reported
    as `row_filter` in /schema and /sample (read with `getattr`, so this branch works before and
    after the merge).

@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 
 from app.core.database import get_db
+from app.core.rights_guard import require_rights_clear
 from app.core.models_site_intel import (
     FreightRateIndex,
     TruckingLaneRate,
@@ -993,7 +994,7 @@ async def get_3pl_data_quality(db: Session = Depends(get_db)):
 # =============================================================================
 
 
-@router.get("/warehouse-listings")
+@router.get("/warehouse-listings", dependencies=[Depends(require_rights_clear("warehouse_listing"))])
 async def search_warehouse_listings(
     state: Optional[str] = Query(None),
     city: Optional[str] = Query(None),
@@ -1049,7 +1050,7 @@ async def search_warehouse_listings(
     ]
 
 
-@router.get("/warehouse-listings/market-summary")
+@router.get("/warehouse-listings/market-summary", dependencies=[Depends(require_rights_clear("warehouse_listing"))])
 async def get_warehouse_market_summary(
     state: Optional[str] = Query(None),
     db: Session = Depends(get_db),

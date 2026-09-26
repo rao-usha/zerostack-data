@@ -1,5 +1,5 @@
 {
- "dictionary_hash": "336a32d0a9ebbf66",
+ "dictionary_hash": "5fd84b9a2d1c5b45",
  "format_version": 1,
  "package_columns": {
   "cms": {
@@ -35434,12 +35434,10 @@
     }
    ],
    "datasets": [
-    "medspa_prospects"
+    "zip_medspa_scores"
    ],
    "origin": "ddl",
-   "packages": [
-    "medspa_discovery"
-   ]
+   "packages": []
   },
   "zoning_district": {
    "columns": [

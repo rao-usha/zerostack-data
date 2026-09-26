@@ -1,0 +1,601 @@
+{
+ "_comment": "Declared rights per dataset at 1769e81 (before SPEC_142). SPEC_142 monotonicity baseline: never edit to make a loosening pass.",
+ "datasets": {
+  "afdc_ev_stations": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "agentic_portfolios": {
+   "redistribution": "internal_only",
+   "pii_class": "none"
+  },
+  "app_rankings": {
+   "redistribution": "restricted",
+   "pii_class": "none"
+  },
+  "bea_gdp_industry": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "bea_international": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "bea_nipa": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "bea_regional": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "bls_series": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "bts_border_crossing": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "bts_faf_regional": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "bts_vmt": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "census_acs5": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "census_acs_county_tract": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "census_cbp": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "census_cbp_county_yearly": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "cftc_cot": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "cms_drug_pricing": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "cms_hospital_cost_reports": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "cms_medicare_utilization": {
+   "redistribution": "open",
+   "pii_class": "personal"
+  },
+  "courtlistener_dockets": {
+   "redistribution": "attribution",
+   "pii_class": "personal"
+  },
+  "data_commons_observations": {
+   "redistribution": "attribution",
+   "pii_class": "none"
+  },
+  "dunl_reference": {
+   "redistribution": "restricted",
+   "pii_class": "none"
+  },
+  "eia_electricity": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "eia_natural_gas": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "eia_petroleum": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "eia_retail_gas_prices": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "eia_steo": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "entity_cik_crd_bridge": {
+   "redistribution": "internal_only",
+   "pii_class": "business_contact"
+  },
+  "entity_master": {
+   "redistribution": "internal_only",
+   "pii_class": "personal"
+  },
+  "entity_source_records": {
+   "redistribution": "internal_only",
+   "pii_class": "personal"
+  },
+  "epa_echo_facilities": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "family_offices": {
+   "redistribution": "internal_only",
+   "pii_class": "personal"
+  },
+  "fbi_crime_estimates": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "fbi_crime_hate_crime": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "fbi_crime_leoka": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "fbi_crime_nibrs": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "fbi_crime_summarized": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "fcc_broadband": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "fda_device_registrations": {
+   "redistribution": "open",
+   "pii_class": "business_contact"
+  },
+  "fdic_bank_financials": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "fdic_failed_banks": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "fdic_institutions": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "fdic_summary_deposits": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "fema_disaster_declarations": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "fema_hma_projects": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "fema_pa_projects": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "foot_traffic_locations": {
+   "redistribution": "restricted",
+   "pii_class": "business_contact"
+  },
+  "foot_traffic_observations": {
+   "redistribution": "restricted",
+   "pii_class": "business_contact"
+  },
+  "fred_series": {
+   "redistribution": "restricted",
+   "pii_class": "none"
+  },
+  "github_analytics": {
+   "redistribution": "restricted",
+   "pii_class": "personal"
+  },
+  "glassdoor": {
+   "redistribution": "restricted",
+   "pii_class": "business_contact"
+  },
+  "intl_bis": {
+   "redistribution": "attribution",
+   "pii_class": "none"
+  },
+  "intl_imf": {
+   "redistribution": "attribution",
+   "pii_class": "none"
+  },
+  "intl_oecd": {
+   "redistribution": "attribution",
+   "pii_class": "none"
+  },
+  "intl_worldbank": {
+   "redistribution": "attribution",
+   "pii_class": "none"
+  },
+  "irs_soi": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "job_postings": {
+   "redistribution": "internal_only",
+   "pii_class": "none"
+  },
+  "kaggle_m5": {
+   "redistribution": "restricted",
+   "pii_class": "none"
+  },
+  "lp_collection": {
+   "redistribution": "internal_only",
+   "pii_class": "business_contact"
+  },
+  "medspa_prospects": {
+   "redistribution": "restricted",
+   "pii_class": "personal"
+  },
+  "noaa_climate": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "nppes_providers": {
+   "redistribution": "open",
+   "pii_class": "personal"
+  },
+  "opencorporates": {
+   "redistribution": "restricted",
+   "pii_class": "personal"
+  },
+  "osha": {
+   "redistribution": "open",
+   "pii_class": "business_contact"
+  },
+  "pe_collection": {
+   "redistribution": "internal_only",
+   "pii_class": "personal"
+  },
+  "pe_firms_sec": {
+   "redistribution": "internal_only",
+   "pii_class": "business_contact"
+  },
+  "pe_funds_sec": {
+   "redistribution": "internal_only",
+   "pii_class": "business_contact"
+  },
+  "pe_people_sec": {
+   "redistribution": "internal_only",
+   "pii_class": "personal"
+  },
+  "people_org_charts": {
+   "redistribution": "internal_only",
+   "pii_class": "personal"
+  },
+  "prediction_markets": {
+   "redistribution": "restricted",
+   "pii_class": "none"
+  },
+  "public_lp_strategies": {
+   "redistribution": "internal_only",
+   "pii_class": "none"
+  },
+  "realestate_fhfa_hpi": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "realestate_hud_permits": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "realestate_osm_buildings": {
+   "redistribution": "restricted",
+   "pii_class": "none"
+  },
+  "realestate_redfin": {
+   "redistribution": "restricted",
+   "pii_class": "none"
+  },
+  "rollup_market_scores": {
+   "redistribution": "internal_only",
+   "pii_class": "none"
+  },
+  "sam_gov_entities": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "sec_13f": {
+   "redistribution": "open",
+   "pii_class": "business_contact"
+  },
+  "sec_adv_private_funds": {
+   "redistribution": "internal_only",
+   "pii_class": "business_contact"
+  },
+  "sec_adv_roster": {
+   "redistribution": "open",
+   "pii_class": "business_contact"
+  },
+  "sec_adv_schedule_d": {
+   "redistribution": "open",
+   "pii_class": "business_contact"
+  },
+  "sec_company_filings": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "sec_companyfacts": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "sec_edgar_submissions": {
+   "redistribution": "open",
+   "pii_class": "personal"
+  },
+  "sec_form_adv_firms": {
+   "redistribution": "open",
+   "pii_class": "personal"
+  },
+  "sec_form_adv_legacy": {
+   "redistribution": "open",
+   "pii_class": "business_contact"
+  },
+  "sec_form_d": {
+   "redistribution": "open",
+   "pii_class": "personal"
+  },
+  "sec_iapd_feed": {
+   "redistribution": "open",
+   "pii_class": "business_contact"
+  },
+  "sec_insider": {
+   "redistribution": "open",
+   "pii_class": "personal"
+  },
+  "si_3pl_companies": {
+   "redistribution": "restricted",
+   "pii_class": "business_contact"
+  },
+  "si_air_cargo": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "si_airports_ports": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "si_broadband_availability": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "si_brownfields": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "si_building_permits": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "si_certified_sites": {
+   "redistribution": "internal_only",
+   "pii_class": "business_contact"
+  },
+  "si_county_elevation": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "si_drewry_wci": {
+   "redistribution": "restricted",
+   "pii_class": "none"
+  },
+  "si_environmental_facilities": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "si_flood_zones": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "si_foreign_trade_zones": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "si_freightos_fbx": {
+   "redistribution": "restricted",
+   "pii_class": "none"
+  },
+  "si_frontier_datacenters": {
+   "redistribution": "attribution",
+   "pii_class": "none"
+  },
+  "si_government_units": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "si_grid_infrastructure": {
+   "redistribution": "restricted",
+   "pii_class": "none"
+  },
+  "si_incentive_deals": {
+   "redistribution": "restricted",
+   "pii_class": "none"
+  },
+  "si_incentive_programs": {
+   "redistribution": "internal_only",
+   "pii_class": "none"
+  },
+  "si_industry_employment": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "si_intermodal_terminals": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "si_internet_exchanges": {
+   "redistribution": "restricted",
+   "pii_class": "business_contact"
+  },
+  "si_labor_markets": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "si_motor_carriers": {
+   "redistribution": "open",
+   "pii_class": "personal"
+  },
+  "si_national_risk_index": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "si_natural_gas_infra": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "si_nj_land_use": {
+   "redistribution": "attribution",
+   "pii_class": "none"
+  },
+  "si_opportunity_zones": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "si_port_throughput": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "si_power_plants": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "si_public_water_systems": {
+   "redistribution": "open",
+   "pii_class": "business_contact"
+  },
+  "si_rail_lines": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "si_renewable_resources": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "si_scfi": {
+   "redistribution": "restricted",
+   "pii_class": "none"
+  },
+  "si_seismic_hazard": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "si_trade_gateways": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "si_truck_rates": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "si_utility_rates": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "si_warehouse_listings": {
+   "redistribution": "restricted",
+   "pii_class": "business_contact"
+  },
+  "si_water_monitoring": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "si_wetlands": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "si_zoning_districts": {
+   "redistribution": "restricted",
+   "pii_class": "none"
+  },
+  "synthetic_job_postings": {
+   "redistribution": "internal_only",
+   "pii_class": "none"
+  },
+  "synthetic_lp_gp_universe": {
+   "redistribution": "internal_only",
+   "pii_class": "none"
+  },
+  "treasury_auctions": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "treasury_daily_balance": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "treasury_debt_outstanding": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "treasury_interest_rates": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "treasury_monthly_statement": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "us_trade_exports_hs": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "us_trade_exports_state": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "us_trade_imports_hs": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "us_trade_port_trade": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "us_trade_summary": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "usaspending_awards": {
+   "redistribution": "open",
+   "pii_class": "business_contact"
+  },
+  "usda_nass": {
+   "redistribution": "open",
+   "pii_class": "none"
+  },
+  "uspto_patents": {
+   "redistribution": "attribution",
+   "pii_class": "personal"
+  },
+  "vertical_prospects": {
+   "redistribution": "restricted",
+   "pii_class": "business_contact"
+  },
+  "web_traffic": {
+   "redistribution": "restricted",
+   "pii_class": "none"
+  },
+  "yelp_businesses": {
+   "redistribution": "restricted",
+   "pii_class": "business_contact"
+  },
+  "yelp_categories": {
+   "redistribution": "restricted",
+   "pii_class": "none"
+  }
+ }
+}

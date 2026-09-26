@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
 from app.core.database import get_db
+from app.core.rights_guard import require_rights_clear
 from app.core.job_helpers import create_and_dispatch_job
 from app.core.models_site_intel import ZoningDistrict, LandUseParcel
 
@@ -292,7 +293,7 @@ async def get_realestate_info():
 # =============================================================================
 
 
-@router.get("/zoning/districts")
+@router.get("/zoning/districts", dependencies=[Depends(require_rights_clear("zoning_district"))])
 async def get_zoning_districts(
     state: Optional[str] = Query(None, description="State filter (e.g., NJ)"),
     jurisdiction: Optional[str] = Query(None, description="Jurisdiction filter"),
@@ -354,7 +355,7 @@ async def get_zoning_districts(
     }
 
 
-@router.get("/zoning/summary")
+@router.get("/zoning/summary", dependencies=[Depends(require_rights_clear("zoning_district"))])
 async def get_zoning_summary(
     state: Optional[str] = Query(None, description="State filter"),
     db: Session = Depends(get_db),
@@ -412,7 +413,7 @@ async def get_zoning_summary(
     }
 
 
-@router.get("/zoning/dc-eligible")
+@router.get("/zoning/dc-eligible", dependencies=[Depends(require_rights_clear("zoning_district"))])
 async def get_dc_eligible_zones(
     state: Optional[str] = Query(None, description="State filter"),
     limit: int = Query(50, ge=1, le=500),

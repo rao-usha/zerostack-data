@@ -158,7 +158,8 @@ def catalog_dataset_sample(
     principal: Dict[str, Any] = Depends(current_principal),
 ):
     """Up to 20 rows of documented columns. PII is masked for non-admin callers; guessed
-    emails are always NULL; restricted datasets are admin-only."""
+    emails are always NULL; restricted datasets are admin-only, and so are datasets whose terms
+    forbid storage or commercial use or need an agreement (SPEC_142: admins get a rights_gate flag)."""
     from app.catalog.schema_live import SampleForbidden, TableNotFound, attribution_of, build_sample
 
     spec = _spec_or_404(key)
@@ -181,6 +182,9 @@ def catalog_dataset_sample(
         raise HTTPException(status_code=503, detail="sample unavailable")
     response.headers["X-Dataset-Attribution"] = attribution_of(spec)
     response.headers["X-Dataset-Origin"] = ",".join(body["rights"]["origins"])
+    gate = body["flags"].get("rights_gate") or []
+    if gate:  # SPEC_142: only admins get here; tell them the terms do not allow holding / using it
+        response.headers["X-Dataset-Rights-Gate"] = ",".join(gate)
     return body
 
 

@@ -704,14 +704,20 @@ class TestSamplePg:
         assert body["flags"]["origin"] == "official" and body["flags"]["reviewed"] is False
         assert body["rights"]["status_public"] == "internal" and body["row_filter"] is None
 
-    def test_storage_forbidden_refuses_admins(self, pg137, monkeypatch):
+    def test_storage_forbidden_refuses_non_admins_and_flags_admins(self, pg137, monkeypatch):
+        """SPEC_142 replaced item 5 (refuse admins too): gated data is refused to non-admins and
+        served to admins with the gate in the body and the X-Dataset-Rights-Gate header."""
         from app.catalog import schema_live
 
         engine, _ = pg137
         real = schema_live.table_writers
         monkeypatch.setattr(schema_live, "table_writers",
                             lambda t, s: [_Proxy(w, commercial_use="forbidden") for w in real(t, s)])
-        assert _client(engine, "admin").get("/api/v1/catalog/t137_people_ds/sample").status_code == 403
+        assert _client(engine).get("/api/v1/catalog/t137_people_ds/sample").status_code == 403
+        r = _client(engine, "admin").get("/api/v1/catalog/t137_people_ds/sample")
+        assert r.status_code == 200
+        assert r.headers["X-Dataset-Rights-Gate"] == "commercial_use_forbidden"
+        assert r.json()["flags"]["rights_gate"] == ["commercial_use_forbidden"]
 
     def test_row_filter_scopes_shared_table(self, pg137):
         from app.catalog.schema_live import build_sample

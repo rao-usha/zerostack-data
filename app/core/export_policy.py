@@ -11,7 +11,7 @@ admin, a leaked credential cannot be un-leaked.
 """
 
 import re
-from typing import Iterable
+from typing import Any, Dict, Iterable, List, Optional
 
 DENIED_TABLES = frozenset(
     {
@@ -88,3 +88,31 @@ def is_exportable(table: str, columns: Iterable[str]) -> bool:
     if is_denied_table_name(table):
         return False
     return not any(is_sensitive_column(c) for c in columns)
+
+
+def catalog_rights_gate(table: str) -> Optional[Dict[str, Any]]:
+    """SPEC_142: the catalog datasets writing ``table`` whose source terms forbid storing it,
+    forbid commercial use or need an agreement first — ``{"reasons": [...], "datasets": [...]}``,
+    or None when no writer is gated (or the table is not in the catalog)."""
+    try:
+        from app.catalog.registry import get_catalog
+        from app.catalog.tables import pattern_matches
+    except Exception:  # the catalog failing to import must not open the gate
+        return {"reasons": ["catalog_unavailable"], "datasets": []}
+    reasons: List[str] = []
+    datasets: List[str] = []
+    for spec in get_catalog():
+        if table in spec.tables or any(pattern_matches(p, table) for p in spec.table_patterns):
+            gate = spec.rights_gate
+            if gate:
+                datasets.append(spec.key)
+                reasons += [r for r in gate if r not in reasons]
+    return {"reasons": reasons, "datasets": datasets} if datasets else None
+
+
+def export_allowed(table: str, columns: Iterable[str], admin: bool) -> bool:
+    """`is_exportable`, and for non-admins also not rights-gated (SPEC_142). Admins may export a
+    gated table (flag-only decision, PLAN_088 decision 3); callers show them the gate."""
+    if not is_exportable(table, columns):
+        return False
+    return admin or catalog_rights_gate(table) is None

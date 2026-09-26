@@ -15,13 +15,18 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.database import get_db
+from app.core.rights_guard import require_rights_clear
 from app.sources.medspa_discovery.collector import MedSpaDiscoveryCollector
 from app.sources.medspa_discovery.enrichment import MedSpaEnrichmentPipeline
 from app.sources.medspa_discovery.ownership_classifier import MedSpaOwnershipClassifier
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/medspa-discovery", tags=["Med-Spa Discovery"])
+router = APIRouter(
+    prefix="/medspa-discovery", tags=["Med-Spa Discovery"],
+    # SPEC_142: rows carry Yelp content the Yelp terms forbid storing: non-admins 403, admins flagged
+    dependencies=[Depends(require_rights_clear("medspa_prospects"))],
+)
 
 
 # ---------------------------------------------------------------------------

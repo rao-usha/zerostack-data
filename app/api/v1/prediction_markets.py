@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
 from app.core.database import get_db
+from app.core.rights_guard import require_rights_clear
 from app.core.models import (
     PredictionMarket,
     MarketObservation,
@@ -40,7 +41,11 @@ from app.sources.prediction_markets.metadata import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/prediction-markets", tags=["Prediction Markets"])
+router = APIRouter(
+    prefix="/prediction-markets", tags=["Prediction Markets"],
+    # SPEC_142: Kalshi terms forbid storing / commercial use: non-admins 403, admins flagged
+    dependencies=[Depends(require_rights_clear("prediction_markets", "market_observations"))],
+)
 
 
 # =============================================================================

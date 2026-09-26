@@ -12,6 +12,7 @@ from sqlalchemy import func
 from pydantic import BaseModel
 
 from app.core.database import get_db
+from app.core.rights_guard import require_rights_clear
 from app.core.models_site_intel import (
     BroadbandAvailability,
     InternetExchange,
@@ -192,7 +193,7 @@ async def get_broadband_at_location(
 # =============================================================================
 
 
-@router.get("/ix", response_model=List[InternetExchangeResponse])
+@router.get("/ix", response_model=List[InternetExchangeResponse], dependencies=[Depends(require_rights_clear("internet_exchange"))])
 async def search_internet_exchanges(
     country: Optional[str] = Query("US", description="Country code (default: US)"),
     state: Optional[str] = Query(None, description="Filter by state"),
@@ -220,7 +221,8 @@ async def search_internet_exchanges(
     return [InternetExchangeResponse.model_validate(ix) for ix in exchanges]
 
 
-@router.get("/ix/nearby", response_model=List[InternetExchangeResponse])
+@router.get("/ix/nearby", response_model=List[InternetExchangeResponse],
+            dependencies=[Depends(require_rights_clear("internet_exchange"))])
 async def find_nearby_internet_exchanges(
     lat: float = Query(..., ge=-90, le=90),
     lng: float = Query(..., ge=-180, le=180),
@@ -272,7 +274,8 @@ async def find_nearby_internet_exchanges(
 # =============================================================================
 
 
-@router.get("/data-centers", response_model=List[DataCenterResponse])
+@router.get("/data-centers", response_model=List[DataCenterResponse],
+            dependencies=[Depends(require_rights_clear("data_center_facility"))])
 async def search_data_centers(
     country: Optional[str] = Query("US", description="Country code"),
     state: Optional[str] = Query(None, description="Filter by state"),
@@ -303,7 +306,8 @@ async def search_data_centers(
     return [DataCenterResponse.model_validate(dc) for dc in facilities]
 
 
-@router.get("/data-centers/nearby", response_model=List[DataCenterResponse])
+@router.get("/data-centers/nearby", response_model=List[DataCenterResponse],
+            dependencies=[Depends(require_rights_clear("data_center_facility"))])
 async def find_nearby_data_centers(
     lat: float = Query(..., ge=-90, le=90),
     lng: float = Query(..., ge=-180, le=180),
