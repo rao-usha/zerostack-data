@@ -547,6 +547,15 @@ _TABLES: Dict[str, tuple] = {
         "candidates": "Candidate CRDs with their evidence (JSON).",
         "built_at": "When the refusal was recorded.",
     }),
+    # ------------------------------------------- natural-person names the name rules miss
+    "oc_officers": ("curated", None, {
+        "name": {"description": "Officer or director name as published by OpenCorporates; usually a natural "
+                                "person.", "pii": _B},
+    }),
+    "family_offices": ("curated", None, {
+        "principal_name": {"description": "Main family member behind the office (a natural person).", "pii": _B},
+        "principal_family": {"description": "Family behind the office (a family surname).", "pii": _B},
+    }),
     # ---------------------------------------------------------------- people
     "people": ("curated", None, {
         "email": {"description": "Email address. Most values are inferred (guessed from a pattern), not "

@@ -121,22 +121,30 @@ def catalog_dataset_schema(
     response: Response,
     table: Optional[str] = Query(None, description="one of the dataset's tables"),
     db: Session = Depends(get_db),
+    principal: Dict[str, Any] = Depends(current_principal),
 ):
     """Columns of the dataset's tables: type, nullability, description, unit, semantic type,
-    PII, source, profile null % / distinct count, and the table's keys."""
+    PII, source, profile null % / distinct count, and the table's keys. Examples drawn from
+    profiled row values are withheld from non-admins of restricted or export-denied tables."""
     from app.catalog.schema_live import MAX_SCHEMA_TABLES, dataset_schema
 
     spec = _spec_or_404(key)
     engine = db.get_bind()
-    tables, existing = _resolved(engine, spec)
+    if spec.table_patterns:
+        tables, existing = _resolved(engine, spec)
+    else:
+        # no pattern to expand: skip the inspector round trips (PLAN_088: < 300 ms); the
+        # facts query itself reports a declared table that does not exist (exists=False)
+        tables, existing = list(spec.tables), set(spec.tables)
     if table is not None:
         if table not in tables:
             raise HTTPException(status_code=404, detail=f"{table!r} is not a table of {key!r}")
         chosen = [table]
     else:
         chosen = tables[:MAX_SCHEMA_TABLES]
-    body = dataset_schema(engine, spec, chosen, existing, len(tables) if table is None else 1)
-    response.headers["ETag"] = f'W/"{body["dictionary_hash"]}"'
+    admin = _is_admin(principal)
+    body = dataset_schema(engine, spec, chosen, existing, len(tables) if table is None else 1, admin=admin)
+    response.headers["ETag"] = f'W/"{body["dictionary_hash"]}{"-a" if admin else ""}"'
     return body
 
 
@@ -172,6 +180,7 @@ def catalog_dataset_sample(
         logger.warning(f"[catalog] sample of {key}/{table} failed: {type(e).__name__}")
         raise HTTPException(status_code=503, detail="sample unavailable")
     response.headers["X-Dataset-Attribution"] = attribution_of(spec)
+    response.headers["X-Dataset-Origin"] = ",".join(body["rights"]["origins"])
     return body
 
 

@@ -273,14 +273,30 @@ def harvest_static_ddl() -> Dict[str, Dict[str, Dict[str, Any]]]:
     return out
 
 
+# keys a column-definition dict may carry besides "description"; a dict with any other key
+# (table_name, display_name, series, category, refresh_frequency ...) describes a dataset, a
+# series or a vendor, not a column, and must not lend its text to a same-named column
+_COLUMN_DEF_KEYS = frozenset((
+    "description", "type", "sql_type", "pg_type", "nullable", "unit", "units", "example", "format",
+    "primary_key", "index", "unique", "default", "length", "precision", "scale", "required",
+))
+
+
+def _is_column_def(v: Any) -> bool:
+    return (isinstance(v, dict) and isinstance(v.get("description"), str) and set(v) <= _COLUMN_DEF_KEYS)
+
+
 def _description_dicts(obj: Any, found: Dict[str, str], depth: int = 0) -> None:
-    """Collect ``{column: {"description": text}}`` maps anywhere inside ``obj``."""
+    """Collect ``{column: {"description": text, "type": ...}}`` maps anywhere inside ``obj``."""
     if depth > 4:
         return
     if isinstance(obj, dict):
-        hits = {k: v["description"] for k, v in obj.items()
-                if isinstance(k, str) and isinstance(v, dict) and isinstance(v.get("description"), str)
-                and re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", k)}
+        cands = {k: v for k, v in obj.items()
+                 if isinstance(k, str) and isinstance(v, dict) and isinstance(v.get("description"), str)
+                 and re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", k)}
+        # every entry must look like a column definition, else the whole map is not a column map
+        hits = ({k: v["description"] for k, v in cands.items()}
+                if cands and all(_is_column_def(v) for v in cands.values()) else {})
         if len(hits) >= 2:
             for k, d in hits.items():
                 if d.strip():
@@ -292,6 +308,9 @@ def _description_dicts(obj: Any, found: Dict[str, str], depth: int = 0) -> None:
         for v in obj:
             if isinstance(v, (dict, list, tuple)):
                 _description_dicts(v, found, depth + 1)
+
+
+_DDL_COMMENT_LINE = re.compile(r"^[ \t]*\"?([a-z_][a-z0-9_]*)\"?[ \t]+[A-Z][A-Za-z0-9_(), ]*?,?[ \t]*--[ \t]*(\S.*)$")
 
 
 def harvest_metadata() -> Dict[str, Dict[str, str]]:
@@ -310,10 +329,13 @@ def harvest_metadata() -> Dict[str, Dict[str, str]]:
             val = getattr(mod, name)
             if isinstance(val, (dict, list, tuple)):
                 _description_dicts(val, found)
-        # `col TYPE, -- comment` lines in DDL templates (f-strings included)
+        # `col TYPE, -- comment` lines in DDL templates (f-strings included). One physical line
+        # only: a comment on a line of its own is a section header, not the previous column's text.
         text = path.read_text(encoding="utf-8", errors="ignore")
-        for m in re.finditer(r"^\s*\"?([a-z_][a-z0-9_]*)\"?\s+[A-Z][A-Za-z0-9_(), ]*?,?\s*--\s*(.+)$", text, re.M):
-            found.setdefault(m.group(1), m.group(2).strip())
+        for line in text.splitlines():
+            m = _DDL_COMMENT_LINE.match(line)
+            if m:
+                found.setdefault(m.group(1), m.group(2).strip())
         if found:
             out[pkg] = dict(sorted(found.items()))
     return out

@@ -182,3 +182,55 @@ New PII finding (not fixed here, `datasets.py` belongs to SPEC_141): `si_public_
 
 Alembic-only DDL; normalising `core.identifier` on write; a `catalog_column` DB table; upstream
 Treasury `meta.labels` harvesting (needs a live API call — follow-up).
+
+## Review fixes (2026-09-26, branch spec-137-fix)
+
+1. **Personal datasets deny by default.** `effective_pii` masks every column of a table any writer
+   classes `personal` unless it is PII-free by type (number/date/bool), carries an identifier
+   `semantic_type`, is clearly non-person by name (`columns.personal_safe`: ids, status, city,
+   company_name, title ...) or a curated row sets `pii='none'`. New glossary rules tag person names
+   without a `first_/last_` suffix (`name_first`, `principal_name`, `person_name`, `ceo_name`,
+   `*_contact_name` ...) and social/profile links (`linkedin*`, `twitter*` → business_contact;
+   `photo_url`, `avatar_url`, `personal_website` → personal); curated rows tag
+   `oc_officers.name` and `family_offices.principal_name/principal_family`. The PII-name lint
+   now also matches `name_first|name_last|linkedin|twitter|photo|principal_name|person_name|
+   contact_name|ceo_name|officer_name`.
+2. **/schema examples are gated like /sample.** Profile `top_values` are real row values: withheld
+   from non-admins when any writer is `restricted` or the table fails `is_exportable`, never shown
+   for sensitive, JSON or (effective) PII columns, and withheld from everyone when a writer's
+   `storage`/`commercial_use` is `forbidden`. The route passes the caller's role; the ETag gets
+   an `-a` suffix for admins.
+3. **Generator: DDL section headers.** The `col TYPE, -- text` harvest is one physical line
+   (`_DDL_COMMENT_LINE`); a comment on a line of its own no longer describes the previous column
+   (28 wrong `metadata` descriptions gone: `*.id = 'Company identifiers'` etc.). Description
+   dicts count only when every entry looks like a column definition (keys ⊆ description/type/
+   nullable/unit/...), so dataset/series/vendor dicts (bls, dunl, job_postings,
+   prediction_markets, foot_traffic, cms dataset entries) no longer lend text to columns.
+4. **Flags wherever data is served.** `/schema` has `flags` (status_public, origin, reviewed,
+   redistribution, effective_redistribution, data_state and limitations once SPEC_141 lands) and
+   per-table `rights` (`mirror.merge_rights` over all writers: origins, strictest redistribution
+   and status); `/sample` has both plus the `X-Dataset-Origin` header (e.g. `synthetic,scraped`
+   for `job_postings`).
+5. **storage / commercial_use = forbidden refuses samples for every caller, admins included**
+   (PLAN_088 §3 item 5). The fields arrive with SPEC_142; until then `storage_forbidden()` is
+   False for every spec and admins can still sample storage-forbidden sources that are also
+   `restricted` (FRED, Yelp, M5 ...). Non-admins are blocked today by `restricted`.
+6. **SPEC_141 `row_filters`** are applied to the /sample query (`WHERE (<predicate>)`) and reported
+   as `row_filter` in /schema and /sample (read with `getattr`, so this branch works before and
+   after the merge).
+7. **Sample order uses an index only**: the declared key when a unique index backs it, else the
+   first unique index, else no ORDER BY (never a full sort on an unindexed or never-analyzed table).
+8. **Latency**: /schema reads facts, census labels and profile stats in one read-only transaction
+   (the statement timeout folded into the first query, relation+columns in one statement,
+   optional-table checks cached), and skips the inspector for datasets without table patterns.
+   Live `GET /catalog/sec_13f/schema` through the router in `nexdata-api-1` (39 ms round trip to
+   Cloud SQL): median 704 ms → **287 ms** (budget 300). `tests/integration/test_spec_137_live_schema.py`
+   asserts it, plus the restricted-example gate and the people sample masking.
+9. Live read-only dry run of `sync_column_comments`: 253 tables, would write 1,072 comments,
+   adopt 1, 1 unchanged, 0 skipped (2.1 s). Nothing was written.
+
+New PII finding: `glassdoor` is `pii_class='none'` but `glassdoor_companies.ceo_name` is a person
+name (added to `PENDING_PII_RAISES`; SPEC_141 marks the dataset archival/demo).
+
+Not done: Treasury `meta.labels` / Census `variables.json` seeding (needs a live upstream call);
+a `catalog_column` table / BI view; live-only pattern tables in the join index.

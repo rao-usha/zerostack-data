@@ -21,9 +21,26 @@ pg = pytest.mark.skipif(not PG_URL, reason="TEST_PG_URL not set")
 REPO = Path(__file__).resolve().parents[1]
 
 # dataset pii_class below its max column PII, being raised by SPEC_141 (sec_13f)
-# or newly found here and reported (si_public_water_systems.admin_contact_phone).
-# The live offender set must stay a subset: it can only shrink.
-PENDING_PII_RAISES = {"sec_13f", "si_public_water_systems"}
+# or newly found here and reported (si_public_water_systems.admin_contact_phone,
+# glassdoor_companies.ceo_name). The live offender set must stay a subset: it can only shrink.
+PENDING_PII_RAISES = {"sec_13f", "si_public_water_systems", "glassdoor"}
+
+# DDL section headers the old metadata regex attributed to the previous column (review finding)
+SECTION_HEADERS = {"Company identifiers", "Filing metadata", "Sub-scores (each 0-100)", "Metadata",
+                   "Acquisition prospect score", "Size distribution", "Derived", "Composite", "Rankings",
+                   "Raw metrics", "Yelp business data (denormalized)", "Discovery metadata"}
+
+
+class _Proxy:
+    """A DatasetSpec with extra attributes (SPEC_141/142 fields this branch lacks)."""
+
+    def __init__(self, spec, **extra):
+        self._spec, self._extra = spec, extra
+
+    def __getattr__(self, name):
+        if name in self._extra:
+            return self._extra[name]
+        return getattr(self._spec, name)
 
 
 @pytest.fixture(scope="module")
@@ -89,6 +106,40 @@ class TestGeneration:
         pc = built["package_columns"]
         assert "cert" in pc["fdic"] and "npi" in pc["nppes"]
         assert "index_nsa" in pc["realestate"]  # DDL `-- comment`
+
+    def test_ddl_section_headers_are_not_column_text(self, built):
+        """A `-- header` line of its own is not the previous column's description."""
+        bad = [f"{t}.{c['name']}={c['description']!r}" for t, e in built["tables"].items() for c in e["columns"]
+               if c["description"] in SECTION_HEADERS]
+        assert not bad, bad
+        for p, cols in built["package_columns"].items():
+            assert not (set(cols.values()) & SECTION_HEADERS), (p, set(cols.values()) & SECTION_HEADERS)
+        ids = {t: {c["name"]: c for c in built["tables"][t]["columns"]}["id"]
+               for t in ("sec_income_statement", "form_d_filings")}
+        assert all(c["source"] == "glossary" and c["description"].startswith("Surrogate") for c in ids.values())
+
+    def test_ddl_comment_line_is_single_line(self):
+        from app.catalog.dictionary_build import _DDL_COMMENT_LINE
+
+        assert _DDL_COMMENT_LINE.match("    cik VARCHAR(10), -- SEC CIK").groups() == ("cik", "SEC CIK")
+        assert _DDL_COMMENT_LINE.match("    id SERIAL PRIMARY KEY,") is None
+        assert _DDL_COMMENT_LINE.match("    -- Company identifiers") is None
+
+    def test_dataset_level_dicts_are_not_column_text(self, built):
+        """{"cpi": {"description", "series"}} / {"job_postings": {"table_name", ...}} describe datasets."""
+        from app.catalog.dictionary_build import _description_dicts
+
+        found = {}
+        _description_dicts({"cpi": {"description": "Consumer prices", "series": {}},
+                            "ces": {"description": "Employment", "series": {}}}, found)
+        _description_dicts({"jobs": {"description": "Jobs", "table_name": "jobs"},
+                            "snap": {"description": "Snapshots", "table_name": "snap"}}, found)
+        assert found == {}
+        _description_dicts({"npi": {"type": "TEXT", "description": "NPI"}, "name": {"description": "Name"}}, found)
+        assert found == {"npi": "NPI", "name": "Name"}
+        pc = built["package_columns"]
+        assert "bls" not in pc and "job_postings" not in pc and "prediction_markets" not in pc
+        assert "medicare_utilization" not in pc.get("cms", {})
 
     def test_curated_rows_name_real_columns(self, built):
         from app.catalog.columns_curated import CURATED
@@ -173,6 +224,89 @@ class TestPii:
         bad = [f"{t}.{c['name']}" for t, e in body["tables"].items() for c in e["columns"]
                if pii_name_lint_applies(c["name"], c.get("pg_type")) and c["pii"] == "none"]
         assert not bad, f"PII-named columns tagged pii='none': {bad}"
+
+    @pytest.mark.parametrize("table, column, pii", [
+        ("people", "linkedin_url", "business_contact"),
+        ("people", "twitter_url", "business_contact"),
+        ("people", "linkedin_id", "business_contact"),
+        ("people", "photo_url", "personal"),
+        ("pe_people", "linkedin_url", "business_contact"),
+        ("pe_people", "twitter_url", "business_contact"),
+        ("family_offices", "principal_name", "business_contact"),
+        ("family_offices", "principal_family", "business_contact"),
+        ("oc_officers", "name", "business_contact"),
+        ("leadership_changes", "person_name", "business_contact"),
+        ("glassdoor_companies", "ceo_name", "business_contact"),
+        ("public_water_system", "admin_contact_name", "business_contact"),
+        ("uspto_inventors", "name_first", "business_contact"),
+        ("uspto_inventors", "name_last", "business_contact"),
+    ])
+    def test_person_columns_the_old_rules_missed(self, table, column, pii):
+        cols = {c["name"]: c for c in _dict()["tables"][table]["columns"]}
+        assert cols[column]["pii"] == pii
+
+    def test_lint_covers_person_names_and_profile_links(self):
+        from app.catalog.columns import pii_name_lint_applies
+
+        for n in ("name_first", "name_last", "linkedin_url", "twitter_url", "photo_url", "principal_name",
+                  "person_name", "admin_contact_name", "ceo_name", "officer_name"):
+            assert pii_name_lint_applies(n, "text"), n
+        assert not pii_name_lint_applies("website", "text")
+
+    def test_personal_dataset_denies_by_default(self):
+        """In a 'personal' dataset a column the rules miss is masked; identifiers, numbers,
+        dates and clearly non-person columns are not."""
+        from app.catalog import get_catalog, get_spec
+        from app.catalog.schema_live import effective_pii
+
+        w = [s for s in get_catalog() if s.pii_class == "personal"][:1]
+        assert w
+
+        def eff(name, pg="text", st=None, pii="none", table=None):
+            return effective_pii({"name": name, "pg_type": pg, "semantic_type": st, "pii": pii}, w, table)
+
+        assert eff("nickname") == "personal" and eff("name") == "personal" and eff("bio") == "personal"
+        assert eff("email", pii="business_contact") == "personal"
+        assert eff("id", "integer") == "none" and eff("joined", "date") == "none"
+        assert eff("cik", st="cik") == "none" and eff("company_name") == "none" and eff("title") == "none"
+        assert eff("status") == "none" and eff("seniority_level") == "none"
+        assert eff("email_confidence") == "none"
+        # a non-personal dataset keeps the column tag
+        assert effective_pii({"name": "nickname", "pg_type": "text", "pii": "none"},
+                             [get_spec("sec_13f")]) == "none"
+
+    def test_curated_pii_none_opts_out(self, monkeypatch):
+        from app.catalog import columns_curated, get_catalog
+        from app.catalog.schema_live import effective_pii
+
+        w = [s for s in get_catalog() if s.pii_class == "personal"][:1]
+        monkeypatch.setitem(columns_curated.CURATED, "t137_x.nickname", {"pii": "none", "source": "curated"})
+        col = {"name": "nickname", "pg_type": "text", "pii": "none"}
+        assert effective_pii(col, w, "t137_x") == "none" and effective_pii(col, w, "t137_y") == "personal"
+
+    def test_storage_forbidden_gate(self):
+        from app.catalog import get_spec
+        from app.catalog.schema_live import storage_forbidden
+
+        s = get_spec("sec_13f")
+        assert not storage_forbidden([s])
+        assert storage_forbidden([s, _Proxy(s, storage="forbidden")])
+        assert storage_forbidden([_Proxy(s, commercial_use="forbidden")])
+        assert not storage_forbidden([_Proxy(s, storage="allowed", commercial_use="allowed")])
+
+    def test_natural_key_needs_an_index(self):
+        from app.catalog import get_spec
+        from app.catalog.schema_live import _natural_key
+
+        s = _Proxy(get_spec("sec_13f"), primary_key=("accession_number",))
+        cols = [{"name": n} for n in ("accession_number", "x")]
+        t = s.tables[0]
+        assert _natural_key(s, t, {"columns": cols, "unique_keys": []}) == []
+        assert _natural_key(s, t, {"columns": cols, "unique_keys": [
+            {"columns": ["x"], "primary": False}, {"columns": ["accession_number"], "primary": True}]}) == [
+            "accession_number"]
+        assert _natural_key(s, "other", {"columns": cols,
+                                         "unique_keys": [{"columns": ["x"], "primary": True}]}) == ["x"]
 
     def test_lint_ignores_non_contact_types(self):
         from app.catalog.columns import pii_name_lint_applies
@@ -351,15 +485,23 @@ def pg137(monkeypatch):
         conn.execute(text("DELETE FROM data_profile_snapshots WHERE table_name LIKE 't137%'"))
         conn.execute(text(
             "CREATE TABLE t137_people (id INTEGER PRIMARY KEY, full_name TEXT, first_name TEXT, email TEXT, "
-            "email_confidence TEXT, phone TEXT, cik TEXT, mystery_blob TEXT, extra JSONB)"))
+            "email_confidence TEXT, phone TEXT, cik TEXT, mystery_blob TEXT, extra JSONB, nickname TEXT)"))
         conn.execute(text("CREATE UNIQUE INDEX ux_t137_people_cik ON t137_people (cik)"))
         conn.execute(text(
             "INSERT INTO t137_people SELECT g, 'Person ' || g, 'Jane' || g, 'jane' || g || '@acme.com', "
             "CASE WHEN g % 3 = 0 THEN 'inferred' ELSE 'verified' END, '(212) 555-' || lpad(g::text, 4, '0'), "
-            "lpad(g::text, 10, '0'), 'blob', '{\"a\": 1}'::jsonb FROM generate_series(1, 25) g"))
+            "lpad(g::text, 10, '0'), 'blob', '{\"a\": 1}'::jsonb, 'Nick' || g FROM generate_series(1, 25) g"))
         conn.execute(text("CREATE TABLE t137_secret (id INTEGER PRIMARY KEY, api_key TEXT)"))
         conn.execute(text("INSERT INTO t137_secret VALUES (1, 'k')"))
         conn.execute(text("CREATE TABLE t137_acs (geo_id TEXT PRIMARY KEY, b01001_001e INTEGER)"))
+        conn.execute(text("INSERT INTO t137_acs VALUES ('06075', 870000)"))
+        acs_sid = conn.execute(text(
+            "INSERT INTO data_profile_snapshots (table_name, row_count, column_count, total_null_count, "
+            "profiled_at) VALUES ('t137_acs', 1, 2, 0, now()) RETURNING id")).scalar()
+        conn.execute(text(
+            "INSERT INTO data_profile_columns (snapshot_id, column_name, null_count, null_pct, distinct_count, "
+            "stats) VALUES (:s, 'geo_id', 0, 0.0, 1, CAST(:st AS json))"),
+            {"s": acs_sid, "st": '{"top_values": [{"value": "06075", "count": 1}]}'})
         conn.execute(text(
             "INSERT INTO census_variable_metadata (dataset_id, variable_name, column_name, label, concept, "
             "created_at) VALUES ('t137_acs', 'B01001_001E', 'b01001_001e', 'Estimate!!Total:', 'SEX BY AGE', "
@@ -399,6 +541,9 @@ def pg137(monkeypatch):
          "confidence": "high"},
         {"name": "extra", "description": "Extra JSON.", "source": "model", "pii": "none", "semantic_type": None,
          "unit": None, "example": None, "pg_type": "jsonb", "nullable": True, "confidence": "medium"},
+        {"name": "nickname", "description": "What friends call them.", "source": "model", "pii": "none",
+         "semantic_type": None, "unit": None, "example": None, "pg_type": "text", "nullable": True,
+         "confidence": "medium"},
     ]}
     monkeypatch.setattr(dictionary, "load_dictionary", lambda: body)
     clear_sample_cache()
@@ -454,7 +599,9 @@ class TestSchemaPg:
         assert cols["cik"]["normalize_sql"] == "lpad(ltrim(\"cik\"::text,'0'),10,'0')"
         assert cols["full_name"]["source"] == "curated"
         assert cols["mystery_blob"]["description"] is None
-        assert body["coverage"]["columns"] == 9 and body["coverage"]["described"] == 7
+        assert body["coverage"]["columns"] == 10 and body["coverage"]["described"] == 8
+        assert body["flags"]["status_public"] == "internal" and body["flags"]["origin"] == "official"
+        assert t["rights"]["origins"] == ["official"] and t["row_filter"] is None
 
     def test_schema_missing_table_and_census_label(self, pg137):
         engine, _ = pg137
@@ -467,6 +614,28 @@ class TestSchemaPg:
         assert col["source"] == "upstream" and "Total" in col["description"] and "Sex by age" in col["description"]
         assert c.get("/api/v1/catalog/t137_acs_ds/schema", params={"table": "nope"}).status_code == 404
         assert c.get("/api/v1/catalog/nope/schema").status_code == 404
+
+    def test_restricted_profile_examples_are_admin_only(self, pg137):
+        """Review finding: /schema leaked profile top_values of restricted tables to anyone."""
+        engine, _ = pg137
+
+        def geo(role):
+            body = _client(engine, role).get("/api/v1/catalog/t137_restricted_ds/schema").json()
+            return next(c for c in body["tables"][0]["columns"] if c["name"] == "geo_id")
+
+        assert geo("user")["example"] is None
+        assert geo("admin")["example"] == "06075"
+
+    def test_storage_forbidden_examples_withheld_from_admins(self, pg137, monkeypatch):
+        from app.catalog import schema_live
+
+        engine, _ = pg137
+        real = schema_live.table_writers
+        monkeypatch.setattr(schema_live, "table_writers",
+                            lambda t, s: [_Proxy(w, storage="forbidden") for w in real(t, s)])
+        body = _client(engine, "admin").get("/api/v1/catalog/t137_people_ds/schema").json()
+        cik = next(c for c in body["tables"][0]["columns"] if c["name"] == "cik")
+        assert cik["example"] is None
 
     def test_schema_is_fast_for_sec_13f(self, pg137):
         import time
@@ -514,6 +683,44 @@ class TestSamplePg:
         engine, _ = pg137
         row = _client(engine).get("/api/v1/catalog/t137_personal_ds/sample").json()["rows"][0]
         assert row["first_name"] is None and row["email"] is None and row["cik"] == "0000000001"
+
+    def test_personal_dataset_masks_columns_the_rules_miss(self, pg137):
+        """Review finding: a person column tagged pii='none' was served in clear (deny by default)."""
+        engine, _ = pg137
+        body = _client(engine).get("/api/v1/catalog/t137_personal_ds/sample").json()
+        meta = {c["name"]: c for c in body["columns"]}
+        assert meta["nickname"]["pii"] == "personal" and meta["nickname"]["masked"]
+        assert body["rows"][0]["nickname"] is None and body["rows"][0]["id"] == 1
+        # the same column in a business_contact dataset is shown
+        assert _client(engine).get("/api/v1/catalog/t137_people_ds/sample").json()["rows"][0]["nickname"] == "Nick1"
+        schema = _client(engine).get("/api/v1/catalog/t137_personal_ds/schema").json()
+        assert {c["name"]: c for c in schema["tables"][0]["columns"]}["nickname"]["pii"] == "personal"
+
+    def test_sample_carries_origin_and_rights(self, pg137):
+        engine, _ = pg137
+        r = _client(engine).get("/api/v1/catalog/t137_people_ds/sample")
+        body = r.json()
+        assert r.headers["X-Dataset-Origin"] == "official"
+        assert body["flags"]["origin"] == "official" and body["flags"]["reviewed"] is False
+        assert body["rights"]["status_public"] == "internal" and body["row_filter"] is None
+
+    def test_storage_forbidden_refuses_admins(self, pg137, monkeypatch):
+        from app.catalog import schema_live
+
+        engine, _ = pg137
+        real = schema_live.table_writers
+        monkeypatch.setattr(schema_live, "table_writers",
+                            lambda t, s: [_Proxy(w, commercial_use="forbidden") for w in real(t, s)])
+        assert _client(engine, "admin").get("/api/v1/catalog/t137_people_ds/sample").status_code == 403
+
+    def test_row_filter_scopes_shared_table(self, pg137):
+        from app.catalog.schema_live import build_sample
+
+        engine, specs = pg137
+        spec = _Proxy(specs["t137_people_ds"], row_filters=(("t137_people", "id % 5 = 0"),))
+        body = build_sample(engine, spec, "t137_people", 20, admin=True, use_cache=False)
+        assert [r["id"] for r in body["rows"]] == [5, 10, 15, 20, 25]
+        assert body["row_filter"] == "id % 5 = 0"
 
     def test_restricted_is_admin_only(self, pg137):
         engine, _ = pg137
@@ -603,15 +810,15 @@ class TestCommentSyncPg:
                     "WHERE a.attrelid = 't137_people'::regclass AND a.attnum > 0")).fetchall())
 
         dry = sync_column_comments(engine, specs=spec, dry_run=True)
-        assert dry["would_write"] == 1 and dry["written"] == 0 and comments()["full_name"] is None
+        assert dry["would_write"] == 2 and dry["written"] == 0 and comments()["full_name"] is None
         first = sync_column_comments(engine, specs=spec)
-        assert first["written"] == 1 and first["adopted"] == 1 and not first["skipped_tables"]
+        assert first["written"] == 2 and first["adopted"] == 1 and not first["skipped_tables"]
         got = comments()
         assert got["full_name"] == "Full name, 100% as filed."
         assert got["extra"] == "hand written"  # adopted, never overwritten
         assert got["email"] is None  # glossary text is not written back
         again = sync_column_comments(engine, specs=spec)
-        assert again["written"] == 0 and again["unchanged"] == 1 and again["adopted"] == 1
+        assert again["written"] == 0 and again["unchanged"] == 2 and again["adopted"] == 1
 
     def test_lock_timeout_skips_table(self, pg137):
         from sqlalchemy import text

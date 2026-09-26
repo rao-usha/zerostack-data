@@ -100,6 +100,16 @@ GLOSSARY: Tuple[Tuple[str, str, Optional[str], str, Optional[str]], ...] = (
      "Name of a natural person as published by the source.", None, _B, None),
     (r"(^|_)signature(_name|_title)?$", "Name or title of the natural person who signed the filing.",
      None, _B, None),
+    # person names without a first_/last_ suffix, and a person's profile links / photo (SPEC_137 review)
+    (r"^name_(first|middle|last|full)$|^(principal_name|principal_family|person_name|ceo_name|cfo_name|"
+     r"officer_name|director_name|executive_name|contact_name|contact_person|inventor_name|signer_name)$"
+     r"|_(contact|person)_name$",
+     "Name of a natural person as published by the source.", None, _B, None),
+    (r"^(linkedin|twitter|facebook|instagram)(_url|_id|_handle|_profile|_username)?$",
+     "Social-media profile link or handle (of a natural person in people datasets) as published by the source.",
+     None, _B, None),
+    (r"^(photo|headshot|avatar|profile_photo|profile_image|profile_picture)(_url)?$|^personal_(website|url)$",
+     "Photo or personal web page of a natural person.", None, _P, None),
     (r"(^|_)(street|street\d|street_address|address\d|address_line\d?|addr\d?)$",
      "Street address line as published by the source.", None, _B, None),
     # a bare `address` is usually a facility / site location, not a contact detail
@@ -216,7 +226,8 @@ GLOSSARY: Tuple[Tuple[str, str, Optional[str], str, Optional[str]], ...] = (
 _GLOSSARY_RX = tuple((re.compile(rx), d, st, pii, unit) for rx, d, st, pii, unit in GLOSSARY)
 
 # PLAN_088: a column named like personal data must not be pii='none'
-PII_NAME_RE = re.compile(r"email|phone|fax|first_name|last_name|signature|street|birth")
+PII_NAME_RE = re.compile(r"email|phone|fax|first_name|last_name|name_first|name_last|signature|street|birth|"
+                         r"linkedin|twitter|photo|principal_name|person_name|contact_name|ceo_name|officer_name")
 # ... unless its type cannot hold contact data (signature_date, has_email, email_count)
 _NON_CONTACT_TYPE = re.compile(
     r"^(bool|boolean|date|timestamp|time|int|integer|bigint|smallint|numeric|decimal|real|double|float)", re.I)
@@ -238,6 +249,26 @@ def pii_name_lint_applies(name: str, pg_type: Optional[str]) -> bool:
     if not PII_NAME_RE.search(n) or _NON_CONTACT_NAME.search(n):
         return False
     return not (pg_type and _NON_CONTACT_TYPE.match(pg_type.strip()))
+
+
+# In a dataset classed 'personal' every text column is masked for non-admins unless it is one of
+# these clearly non-person columns, carries an identifier semantic type, or a curated row sets
+# pii='none' explicitly (deny by default: a person column the name rules miss stays masked).
+_PERSONAL_SAFE_NAME = re.compile(
+    r"^id$|_(id|uuid|key)$|_(type|status|source|confidence|code|category|method|level|count)$"
+    r"|^(status|source|data_source|confidence|category|country|city|state|state_province|region|currency|"
+    r"industry|sector|seniority|department|function|title|job_title|role|position|company_name|firm_name|"
+    r"entity_name|org_name|organization_name|legal_name|fund_name|ticker)$")
+
+
+def personal_safe(name: str, pg_type: Optional[str], semantic_type: Optional[str] = None,
+                  curated_none: bool = False) -> bool:
+    """True when a pii='none' column of a 'personal' dataset may be shown to non-admins."""
+    if curated_none or semantic_type:
+        return True
+    if pg_type and _NON_CONTACT_TYPE.match(pg_type.strip()):
+        return True
+    return bool(_PERSONAL_SAFE_NAME.search((name or "").lower()))
 
 
 def max_pii(values) -> str:

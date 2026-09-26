@@ -1,15 +1,7 @@
 {
- "dictionary_hash": "589a6838eb32f2ce",
+ "dictionary_hash": "e1a4cfbe2007ed29",
  "format_version": 1,
  "package_columns": {
-  "bls": {
-   "ces": "Current Employment Statistics - Establishment Survey",
-   "cpi": "Consumer Price Index - Measures of Inflation",
-   "cps": "Current Population Survey - Labor Force Statistics",
-   "jolts": "Job Openings and Labor Turnover Survey",
-   "oes": "Occupational Employment and Wage Statistics - Aesthetics-Adjacent Occupations",
-   "ppi": "Producer Price Index - Wholesale/Producer Prices"
-  },
   "cms": {
    "adr_vndr_cd": "Automated Desk Review Vendor Code",
    "avg_mdcr_alowd_amt": "Average Medicare Allowed Amount",
@@ -18,7 +10,6 @@
    "avg_sbmtd_chrg": "Average Submitted Charge Amount",
    "bed_cnt": "Number of Beds",
    "brnd_name": "Brand Name",
-   "drug_pricing": "Medicare Part D prescription drug costs and utilization by brand name and generic drugs",
    "fi_creat_dt": "FI Create Date",
    "fi_num": "Fiscal Intermediary Number",
    "fi_rcpt_dt": "FI Receipt Date",
@@ -28,10 +19,8 @@
    "hcpcs_cd": "HCPCS Code",
    "hcpcs_desc": "HCPCS Description",
    "hcpcs_drug_ind": "HCPCS Drug Indicator",
-   "hospital_cost_reports": "Hospital Cost Reporting Information System data including financial information, utilization data, and cost reports",
    "initl_rpt_sw": "Initial Report Switch",
    "last_rpt_sw": "Last Report Switch",
-   "medicare_utilization": "Medicare Part B claims data for physicians and other healthcare practitioners",
    "net_income": "Net Income",
    "npi": "National Provider Identifier",
    "npr_dt": "Notice of Program Reimbursement Date",
@@ -76,28 +65,6 @@
    "unit_cnt_per_clm": "Unit Count Per Claim",
    "util_cd": "Utilization Code",
    "year": "Year"
-  },
-  "dunl": {
-   "calendars": "Commodity market holiday calendars from DUNL.org. CC licensed.",
-   "currencies": "ISO currency codes and names from S&P Global Data Unlocked (DUNL.org). CC licensed.",
-   "ports": "Commodity trading port symbols and locations from DUNL.org. CC licensed.",
-   "uom": "Units of measure for commodity trading from DUNL.org. CC licensed.",
-   "uom_conversions": "Unit-of-measure conversion factors from DUNL.org. CC licensed."
-  },
-  "fbi_crime": {
-   "activity_count": "Metadata",
-   "arson": "Rates per 100,000 population",
-   "assaulted_weapon_hands": "Activity type when killed/assaulted",
-   "cleared_18_under": "Metadata",
-   "count": "Demographics (when applicable)",
-   "motor_vehicle_theft_rate": "Metadata",
-   "nibrs_participating": "Metadata",
-   "offender_count": "Metadata",
-   "offense": "Crime counts",
-   "offense_category": "Counts by variable type",
-   "state_name": "Hate crime categories",
-   "victim_count": "Metadata",
-   "victim_type": "Counts"
   },
   "fdic": {
    "active": "Active Status (0=Inactive, 1=Active)",
@@ -159,9 +126,7 @@
    "frepo": "Federal Funds and Repos - Sold",
    "frepp": "Federal Funds and Repos - Purchased",
    "fund": "Insurance Fund",
-   "id": "Bank Identification",
    "idt1cer": "Tier 1 Leverage Ratio (%)",
-   "ingested_at": "Unique constraint",
    "insdate": "FDIC Insurance Date",
    "insfdic": "FDIC Insured",
    "instcrcd": "Institution Category Code",
@@ -256,29 +221,6 @@
    "zip": "ZIP Code",
    "zipbr": "ZIP Code"
   },
-  "foot_traffic": {
-   "chicago": "Pedestrian counts via sensors",
-   "city_data": "Public pedestrian counters in select cities",
-   "foursquare": "POI metadata and check-in data",
-   "google": "Popular Times relative traffic patterns",
-   "placer": "Retail analytics with trade area analysis",
-   "safegraph": "Mobile location data with ~10-15% population sample",
-   "seattle": "Automated pedestrian counters at major intersections"
-  },
-  "job_postings": {
-   "company_ats_config": "ATS detection results and crawl configuration per company",
-   "job_posting_snapshots": "Daily aggregate snapshots for hiring trend analysis",
-   "job_postings": "Job posting intelligence collected from corporate ATS platforms"
-  },
-  "medspa_discovery": {
-   "acquisition_grade": "Sub-scores (each 0-100)",
-   "adjusted_acquisition_score": "Discovery metadata",
-   "competitor_count_in_zip": "Ownership classification",
-   "id": "Yelp business data (denormalized)",
-   "is_closed": "ZIP score context (snapshot at discovery time)",
-   "price_tier_sub": "Competition context",
-   "zip_avg_agi": "Acquisition prospect score"
-  },
   "nppes": {
    "credential": "Provider credential (e.g., MD, DO)",
    "dba_name": "Doing Business As name",
@@ -311,19 +253,6 @@
    "taxonomy_license": "Taxonomy state license number",
    "taxonomy_state": "Taxonomy state"
   },
-  "prediction_markets": {
-   "btcusd": "Bitcoin price",
-   "climate": "Climate/weather",
-   "cpi": "Consumer Price Index",
-   "ethusd": "Ethereum price",
-   "fed": "Federal Reserve rate decisions",
-   "gdp": "GDP growth",
-   "house": "House control",
-   "inxd": "Stock indices",
-   "pres": "Presidential election",
-   "senate": "Senate control",
-   "unrate": "Unemployment rate"
-  },
   "realestate": {
    "area_sqm": "Building footprint area",
    "avg_sale_to_list": "Sale-to-list price ratio",
@@ -352,32 +281,8 @@
    "tags": "Additional OSM tags",
    "yoy_pct_change": "Year-over-year percent change"
   },
-  "rollup_intel": {
-   "annual_payroll_thousands": "Size distribution",
-   "data_year": "Composite",
-   "estab_250_plus": "Derived",
-   "grade": "Sub-scores (each 0-100)",
-   "labor_score": "Raw metrics",
-   "total_returns": "Rankings"
-  },
   "sec": {
-   "company_name": "Filing metadata",
-   "id": "Company identifiers",
-   "interactive_data_url": "File details",
-   "items": "For 8-K, which items were triggered",
-   "report_date": "Filing URLs"
-  },
-  "vertical_discovery": {
-   "acquisition_grade": "Sub-scores (each 0-100)",
-   "adjusted_acquisition_score": "NPPES enrichment (healthcare verticals only)",
-   "competitor_count_in_zip": "Ownership classification",
-   "density_enriched_at": "Discovery metadata",
-   "id": "Yelp business data (denormalized)",
-   "is_closed": "ZIP score context (snapshot at discovery time)",
-   "nppes_enriched_at": "Revenue estimation",
-   "price_tier_sub": "Competition context",
-   "revenue_estimated_at": "Competitive density",
-   "zip_avg_agi": "Acquisition prospect score"
+   "items": "For 8-K, which items were triggered"
   }
  },
  "tables": {
@@ -2316,15 +2221,15 @@
   "census_cbp": {
    "columns": [
     {
-     "confidence": "medium",
-     "description": "Size distribution",
+     "confidence": null,
+     "description": null,
      "example": null,
      "name": "annual_payroll_thousands",
      "nullable": true,
      "pg_type": "bigint",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": null,
      "unit": null
     },
     {
@@ -2412,15 +2317,15 @@
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "Derived",
+     "confidence": null,
+     "description": null,
      "example": null,
      "name": "estab_250_plus",
      "nullable": true,
      "pg_type": "integer",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": null,
      "unit": null
     },
     {
@@ -6432,12 +6337,12 @@
     },
     {
      "confidence": "low",
-     "description": "Web address as published by the source.",
+     "description": "Social-media profile link or handle (of a natural person in people datasets) as published by the source.",
      "example": null,
      "name": "linkedin_url",
      "nullable": true,
      "pg_type": "varchar(500)",
-     "pii": "none",
+     "pii": "business_contact",
      "semantic_type": null,
      "source": "glossary",
      "unit": null
@@ -6778,15 +6683,15 @@
      "unit": null
     },
     {
-     "confidence": null,
-     "description": null,
+     "confidence": "low",
+     "description": "Social-media profile link or handle (of a natural person in people datasets) as published by the source.",
      "example": null,
      "name": "linkedin",
      "nullable": true,
      "pg_type": "varchar(500)",
-     "pii": "none",
+     "pii": "business_contact",
      "semantic_type": null,
-     "source": null,
+     "source": "glossary",
      "unit": null
     },
     {
@@ -6862,27 +6767,27 @@
      "unit": null
     },
     {
-     "confidence": null,
-     "description": null,
+     "confidence": "high",
+     "description": "Family behind the office (a family surname).",
      "example": "\"Gates Family\", \"Soros\"",
      "name": "principal_family",
      "nullable": true,
      "pg_type": "varchar(500)",
-     "pii": "none",
+     "pii": "business_contact",
      "semantic_type": null,
-     "source": null,
+     "source": "curated",
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "Main family member",
+     "confidence": "high",
+     "description": "Main family member behind the office (a natural person).",
      "example": null,
      "name": "principal_name",
      "nullable": true,
      "pg_type": "varchar(500)",
-     "pii": "none",
+     "pii": "business_contact",
      "semantic_type": null,
-     "source": "model",
+     "source": "curated",
      "unit": null
     },
     {
@@ -7921,15 +7826,15 @@
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "Company identifiers",
+     "confidence": "low",
+     "description": "Surrogate row id assigned by the database; not stable across reloads.",
      "example": null,
      "name": "id",
      "nullable": false,
      "pg_type": "serial",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": "glossary",
      "unit": null
     },
     {
@@ -8356,15 +8261,15 @@
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "Company identifiers",
+     "confidence": "low",
+     "description": "Surrogate row id assigned by the database; not stable across reloads.",
      "example": null,
      "name": "id",
      "nullable": false,
      "pg_type": "serial",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": "glossary",
      "unit": null
     },
     {
@@ -9839,12 +9744,12 @@
    "columns": [
     {
      "confidence": "low",
-     "description": "Web address as published by the source.",
+     "description": "Photo or personal web page of a natural person.",
      "example": null,
      "name": "avatar_url",
      "nullable": true,
      "pg_type": "varchar(500)",
-     "pii": "none",
+     "pii": "personal",
      "semantic_type": null,
      "source": "glossary",
      "unit": null
@@ -10185,15 +10090,15 @@
      "unit": null
     },
     {
-     "confidence": null,
-     "description": null,
+     "confidence": "low",
+     "description": "Social-media profile link or handle (of a natural person in people datasets) as published by the source.",
      "example": null,
      "name": "twitter_username",
      "nullable": true,
      "pg_type": "varchar(100)",
-     "pii": "none",
+     "pii": "business_contact",
      "semantic_type": null,
-     "source": null,
+     "source": "glossary",
      "unit": null
     },
     {
@@ -10591,15 +10496,15 @@
      "unit": null
     },
     {
-     "confidence": null,
-     "description": null,
+     "confidence": "low",
+     "description": "Name of a natural person as published by the source.",
      "example": null,
      "name": "ceo_name",
      "nullable": true,
      "pg_type": "varchar(255)",
-     "pii": "none",
+     "pii": "business_contact",
      "semantic_type": null,
-     "source": null,
+     "source": "glossary",
      "unit": null
     },
     {
@@ -14131,15 +14036,15 @@
      "unit": null
     },
     {
-     "confidence": null,
-     "description": null,
+     "confidence": "low",
+     "description": "Name of a natural person as published by the source.",
      "example": null,
      "name": "person_name",
      "nullable": false,
      "pg_type": "varchar(500)",
-     "pii": "none",
+     "pii": "business_contact",
      "semantic_type": null,
-     "source": null,
+     "source": "glossary",
      "unit": null
     },
     {
@@ -16191,7 +16096,7 @@
      "name": "linkedin_url",
      "nullable": true,
      "pg_type": "text",
-     "pii": "none",
+     "pii": "business_contact",
      "semantic_type": null,
      "source": "model",
      "unit": null
@@ -16976,27 +16881,27 @@
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "Yelp business data (denormalized)",
+     "confidence": "low",
+     "description": "Surrogate row id assigned by the database; not stable across reloads.",
      "example": null,
      "name": "id",
      "nullable": false,
      "pg_type": "serial",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": "glossary",
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "ZIP score context (snapshot at discovery time)",
+     "confidence": null,
+     "description": null,
      "example": null,
      "name": "is_closed",
      "nullable": true,
      "pg_type": "boolean",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": null,
      "unit": null
     },
     {
@@ -17059,15 +16964,15 @@
   "medspa_prospects": {
    "columns": [
     {
-     "confidence": "medium",
-     "description": "Sub-scores (each 0-100)",
+     "confidence": null,
+     "description": null,
      "example": null,
      "name": "acquisition_grade",
      "nullable": false,
      "pg_type": "varchar(1)",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": null,
      "unit": null
     },
     {
@@ -17095,15 +17000,15 @@
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "Discovery metadata",
+     "confidence": null,
+     "description": null,
      "example": null,
      "name": "adjusted_acquisition_score",
      "nullable": true,
      "pg_type": "numeric(5,2)",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": null,
      "unit": null
     },
     {
@@ -17179,15 +17084,15 @@
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "Ownership classification",
+     "confidence": "low",
+     "description": "US ZIP / postal code.",
      "example": null,
      "name": "competitor_count_in_zip",
      "nullable": true,
      "pg_type": "integer",
      "pii": "none",
      "semantic_type": "zip5",
-     "source": "metadata",
+     "source": "glossary",
      "unit": null
     },
     {
@@ -17203,15 +17108,15 @@
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "Yelp business data (denormalized)",
+     "confidence": "low",
+     "description": "Surrogate row id assigned by the database; not stable across reloads.",
      "example": null,
      "name": "id",
      "nullable": false,
      "pg_type": "serial",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": "glossary",
      "unit": null
     },
     {
@@ -17227,15 +17132,15 @@
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "ZIP score context (snapshot at discovery time)",
+     "confidence": null,
+     "description": null,
      "example": null,
      "name": "is_closed",
      "nullable": true,
      "pg_type": "boolean",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": null,
      "unit": null
     },
     {
@@ -17359,15 +17264,15 @@
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "Competition context",
+     "confidence": null,
+     "description": null,
      "example": null,
      "name": "price_tier_sub",
      "nullable": true,
      "pg_type": "numeric(5,2)",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": null,
      "unit": null
     },
     {
@@ -17503,15 +17408,15 @@
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "Acquisition prospect score",
+     "confidence": null,
+     "description": null,
      "example": null,
      "name": "zip_avg_agi",
      "nullable": true,
      "pg_type": "numeric(12,2)",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": null,
      "unit": null
     },
     {
@@ -19116,15 +19021,15 @@
      "unit": null
     },
     {
-     "confidence": "low",
-     "description": "Name of the organisation / entity as published by the source.",
+     "confidence": "high",
+     "description": "Officer or director name as published by OpenCorporates; usually a natural person.",
      "example": null,
      "name": "name",
      "nullable": false,
      "pg_type": "varchar(500)",
-     "pii": "none",
+     "pii": "business_contact",
      "semantic_type": null,
-     "source": "glossary",
+     "source": "curated",
      "unit": null
     },
     {
@@ -20847,12 +20752,12 @@
     },
     {
      "confidence": "low",
-     "description": "Web address as published by the source.",
+     "description": "Social-media profile link or handle (of a natural person in people datasets) as published by the source.",
      "example": null,
      "name": "linkedin_url",
      "nullable": true,
      "pg_type": "varchar(500)",
-     "pii": "none",
+     "pii": "business_contact",
      "semantic_type": null,
      "source": "glossary",
      "unit": null
@@ -21830,12 +21735,12 @@
     },
     {
      "confidence": "low",
-     "description": "Web address as published by the source.",
+     "description": "Social-media profile link or handle (of a natural person in people datasets) as published by the source.",
      "example": null,
      "name": "linkedin_url",
      "nullable": true,
      "pg_type": "varchar(500)",
-     "pii": "none",
+     "pii": "business_contact",
      "semantic_type": null,
      "source": "glossary",
      "unit": null
@@ -21914,12 +21819,12 @@
     },
     {
      "confidence": "low",
-     "description": "Web address as published by the source.",
+     "description": "Social-media profile link or handle (of a natural person in people datasets) as published by the source.",
      "example": null,
      "name": "twitter_url",
      "nullable": true,
      "pg_type": "varchar(500)",
-     "pii": "none",
+     "pii": "business_contact",
      "semantic_type": null,
      "source": "glossary",
      "unit": null
@@ -22142,12 +22047,12 @@
     },
     {
      "confidence": "low",
-     "description": "Web address as published by the source.",
+     "description": "Social-media profile link or handle (of a natural person in people datasets) as published by the source.",
      "example": null,
      "name": "linkedin_url",
      "nullable": true,
      "pg_type": "varchar(500)",
-     "pii": "none",
+     "pii": "business_contact",
      "semantic_type": null,
      "source": "glossary",
      "unit": null
@@ -22530,19 +22435,19 @@
      "name": "linkedin_id",
      "nullable": true,
      "pg_type": "varchar(100)",
-     "pii": "none",
+     "pii": "business_contact",
      "semantic_type": null,
      "source": "model",
      "unit": null
     },
     {
      "confidence": "low",
-     "description": "Web address as published by the source.",
+     "description": "Social-media profile link or handle (of a natural person in people datasets) as published by the source.",
      "example": null,
      "name": "linkedin_url",
      "nullable": true,
      "pg_type": "varchar(500)",
-     "pii": "none",
+     "pii": "business_contact",
      "semantic_type": null,
      "source": "glossary",
      "unit": null
@@ -22560,15 +22465,15 @@
      "unit": null
     },
     {
-     "confidence": null,
-     "description": null,
+     "confidence": "low",
+     "description": "Photo or personal web page of a natural person.",
      "example": null,
      "name": "personal_website",
      "nullable": true,
      "pg_type": "varchar(500)",
-     "pii": "none",
+     "pii": "personal",
      "semantic_type": null,
-     "source": null,
+     "source": "glossary",
      "unit": null
     },
     {
@@ -22585,12 +22490,12 @@
     },
     {
      "confidence": "low",
-     "description": "Web address as published by the source.",
+     "description": "Photo or personal web page of a natural person.",
      "example": null,
      "name": "photo_url",
      "nullable": true,
      "pg_type": "varchar(500)",
-     "pii": "none",
+     "pii": "personal",
      "semantic_type": null,
      "source": "glossary",
      "unit": null
@@ -22621,12 +22526,12 @@
     },
     {
      "confidence": "low",
-     "description": "Web address as published by the source.",
+     "description": "Social-media profile link or handle (of a natural person in people datasets) as published by the source.",
      "example": null,
      "name": "twitter_url",
      "nullable": true,
      "pg_type": "varchar(500)",
-     "pii": "none",
+     "pii": "business_contact",
      "semantic_type": null,
      "source": "glossary",
      "unit": null
@@ -24396,15 +24301,15 @@
   "public_water_system": {
    "columns": [
     {
-     "confidence": null,
-     "description": null,
+     "confidence": "low",
+     "description": "Name of a natural person as published by the source.",
      "example": null,
      "name": "admin_contact_name",
      "nullable": true,
      "pg_type": "varchar(255)",
-     "pii": "none",
+     "pii": "business_contact",
      "semantic_type": null,
-     "source": null,
+     "source": "glossary",
      "unit": null
     },
     {
@@ -25095,15 +25000,15 @@
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "Composite",
+     "confidence": "low",
+     "description": "Year the observation refers to.",
      "example": null,
      "name": "data_year",
      "nullable": false,
      "pg_type": "integer",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": "glossary",
      "unit": null
     },
     {
@@ -25143,15 +25048,15 @@
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "Sub-scores (each 0-100)",
+     "confidence": null,
+     "description": null,
      "example": null,
      "name": "grade",
      "nullable": false,
      "pg_type": "varchar(1)",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": null,
      "unit": null
     },
     {
@@ -25191,15 +25096,15 @@
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "Raw metrics",
+     "confidence": null,
+     "description": null,
      "example": null,
      "name": "labor_score",
      "nullable": true,
      "pg_type": "numeric(5,2)",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": null,
      "unit": null
     },
     {
@@ -25359,15 +25264,15 @@
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "Rankings",
+     "confidence": null,
+     "description": null,
      "example": null,
      "name": "total_returns",
      "nullable": true,
      "pg_type": "integer",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": null,
      "unit": null
     }
    ],
@@ -28342,15 +28247,15 @@
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "Filing metadata",
+     "confidence": "low",
+     "description": "Name of the organisation / entity as published by the source.",
      "example": null,
      "name": "company_name",
      "nullable": true,
      "pg_type": "text",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": "glossary",
      "unit": null
     },
     {
@@ -28438,15 +28343,15 @@
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "Company identifiers",
+     "confidence": "low",
+     "description": "Surrogate row id assigned by the database; not stable across reloads.",
      "example": null,
      "name": "id",
      "nullable": false,
      "pg_type": "integer",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": "glossary",
      "unit": null
     },
     {
@@ -28774,15 +28679,15 @@
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "Filing metadata",
+     "confidence": "low",
+     "description": "Name of the organisation / entity as published by the source.",
      "example": null,
      "name": "company_name",
      "nullable": true,
      "pg_type": "text",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": "glossary",
      "unit": null
     },
     {
@@ -28906,15 +28811,15 @@
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "Company identifiers",
+     "confidence": "low",
+     "description": "Surrogate row id assigned by the database; not stable across reloads.",
      "example": null,
      "name": "id",
      "nullable": false,
      "pg_type": "integer",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": "glossary",
      "unit": null
     },
     {
@@ -29723,15 +29628,15 @@
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "Filing metadata",
+     "confidence": "low",
+     "description": "Name of the organisation / entity as published by the source.",
      "example": null,
      "name": "company_name",
      "nullable": true,
      "pg_type": "text",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": "glossary",
      "unit": null
     },
     {
@@ -29819,15 +29724,15 @@
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "Company identifiers",
+     "confidence": "low",
+     "description": "Surrogate row id assigned by the database; not stable across reloads.",
      "example": null,
      "name": "id",
      "nullable": false,
      "pg_type": "integer",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": "glossary",
      "unit": null
     },
     {
@@ -30119,15 +30024,15 @@
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "Company identifiers",
+     "confidence": "low",
+     "description": "Surrogate row id assigned by the database; not stable across reloads.",
      "example": null,
      "name": "id",
      "nullable": false,
      "pg_type": "serial",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": "glossary",
      "unit": null
     },
     {
@@ -30455,15 +30360,15 @@
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "Company identifiers",
+     "confidence": "low",
+     "description": "Surrogate row id assigned by the database; not stable across reloads.",
      "example": null,
      "name": "id",
      "nullable": false,
      "pg_type": "serial",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": "glossary",
      "unit": null
     },
     {
@@ -30586,15 +30491,15 @@
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "Filing metadata",
+     "confidence": "low",
+     "description": "Name of the organisation / entity as published by the source.",
      "example": null,
      "name": "company_name",
      "nullable": true,
      "pg_type": "text",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": "glossary",
      "unit": null
     },
     {
@@ -30694,15 +30599,15 @@
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "Company identifiers",
+     "confidence": "low",
+     "description": "Surrogate row id assigned by the database; not stable across reloads.",
      "example": null,
      "name": "id",
      "nullable": false,
      "pg_type": "integer",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": "glossary",
      "unit": null
     },
     {
@@ -33374,27 +33279,27 @@
      "unit": null
     },
     {
-     "confidence": null,
-     "description": null,
+     "confidence": "low",
+     "description": "Name of a natural person as published by the source.",
      "example": null,
      "name": "name_first",
      "nullable": true,
      "pg_type": "varchar(255)",
-     "pii": "none",
+     "pii": "business_contact",
      "semantic_type": null,
-     "source": null,
+     "source": "glossary",
      "unit": null
     },
     {
-     "confidence": null,
-     "description": null,
+     "confidence": "low",
+     "description": "Name of a natural person as published by the source.",
      "example": null,
      "name": "name_last",
      "nullable": true,
      "pg_type": "varchar(255)",
-     "pii": "none",
+     "pii": "business_contact",
      "semantic_type": null,
-     "source": null,
+     "source": "glossary",
      "unit": null
     },
     {
@@ -35368,15 +35273,15 @@
      "unit": null
     },
     {
-     "confidence": "medium",
-     "description": "Yelp business data (denormalized)",
+     "confidence": "low",
+     "description": "Surrogate row id assigned by the database; not stable across reloads.",
      "example": null,
      "name": "id",
      "nullable": false,
      "pg_type": "serial",
      "pii": "none",
      "semantic_type": null,
-     "source": "metadata",
+     "source": "glossary",
      "unit": null
     },
     {
