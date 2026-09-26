@@ -81,7 +81,7 @@ class TestEvidence:
             if missing:
                 bad.append((e["key"], sorted(missing)))
             for field, d in e["disposition"].items():
-                if not re.match(r"^(applied|waived:.+|deferred:(SPEC|BUG)[-_A-Z0-9]+.*|folded:[a-z0-9_]+)$", d):
+                if not re.match(r"^(applied|waived:.+|amended:.+|deferred:(SPEC|BUG)[-_A-Z0-9]+.*|folded:[a-z0-9_]+)$", d):
                     bad.append((e["key"], field, d))
         assert not bad, bad
 
@@ -611,4 +611,201 @@ def test_every_coverage_sql_runs_on_the_live_db():
             slow.append(s.key)
         if value is not None and not isinstance(value, date):
             bad.append((s.key, type(value).__name__))
+        elif value is not None and _as_date(value) > date.today():
+            bad.append((s.key, "coverage in the future", str(value)))
     assert not slow and not bad, (slow, bad)
+
+
+def _as_date(value):
+    from datetime import datetime
+
+    return value.date() if isinstance(value, datetime) else value
+
+
+@integration
+def test_every_primary_key_column_exists_on_the_live_db():
+    """primary_key names columns of tables[0] (pattern-only: of some resolved
+    table). A key column the loader does not write yet must be named in a
+    limitation (cms_drug_pricing: mftr_name, BUG-CMS-IDEMPOTENT)."""
+    from sqlalchemy import text
+
+    from app.catalog.live import existing_tables, resolve_tables
+    from app.catalog.tables import split
+    from app.core.database import get_engine
+
+    engine = get_engine()
+    existing = existing_tables(engine, {split(t)[0] for s in _catalog() for t in s.tables})
+    bad = []
+
+    def columns(conn, table):
+        schema, name = split(table)
+        return {r[0] for r in conn.execute(text(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema = :s AND table_name = :t"), {"s": schema, "t": name})}
+
+    with engine.connect() as conn:
+        for s in _catalog():
+            if not s.primary_key:
+                continue
+            if s.tables:
+                candidates = [s.tables[0]] if s.tables[0] in existing else []
+            else:
+                candidates = [t for t in resolve_tables(s, existing) if t in existing]
+            if not candidates:
+                continue  # missing_tables: nothing to check
+            best = min(([c for c in s.primary_key if c not in columns(conn, t)], t)
+                       for t in candidates)
+            missing, table = best
+            flagged = " ".join(s.limitations)
+            if any(c not in flagged for c in missing):
+                bad.append((s.key, table, missing))
+    assert not bad, bad
+
+
+# ---------------------------------------------------------------------------
+# Review fixes (spec-141-fix)
+# ---------------------------------------------------------------------------
+
+# multi-table coverage that is still greatest(): the tables are one stream
+# (the same run writes all of them), so the freshest is the coverage
+GREATEST_OK = {
+    "sec_company_filings": "10-K/10-Q/8-K come from one submissions pull per company; least() "
+                           "would report the seasonal 10-K date",
+    "cftc_cot": "the three report types come from the same weekly release",
+    "app_rankings": "rankings and rating history are written by the same lookup",
+}
+LEAST_KEYS = ("fred_series", "bls_series", "fbi_crime_estimates", "irs_soi", "intl_oecd",
+              "intl_bis", "usda_nass")
+
+
+@pytest.mark.unit
+class TestReviewFixes:
+    def test_multi_table_coverage_uses_least(self):
+        from app.catalog import get_spec
+
+        for key in LEAST_KEYS:
+            sql = get_spec(key).coverage_sql.lower()
+            assert "least(" in sql and "greatest(" not in sql, key
+            assert "union all" not in sql, key
+
+    def test_no_new_gap_hiding_coverage(self):
+        for s in _catalog():
+            sql = (s.coverage_sql or "").lower()
+            if "greatest(" in sql:
+                assert s.key in GREATEST_OK, f"{s.key}: greatest() hides a stale table"
+            if "union all" in sql:
+                pytest.fail(f"{s.key}: a max over a UNION hides a stale table; use _least_of")
+
+    def test_usda_coverage_is_capped_at_today(self):
+        from app.catalog import get_spec
+
+        sql = get_spec("usda_nass").coverage_sql
+        assert "current_date" in sql
+
+    def test_least_of_shape(self):
+        from app.catalog.datasets import _least_of
+
+        assert _least_of("SELECT 1", "SELECT 2") == "SELECT least((SELECT 1), (SELECT 2))"
+        capped = _least_of("SELECT 1", cap_today=True)
+        assert capped.startswith("SELECT CASE WHEN c > current_date THEN current_date ELSE c END")
+
+    def test_amended_dispositions_match_least(self):
+        amended = {e["key"] for e in _evidence()["entries"]
+                   if e["disposition"].get("coverage_sql", "").startswith("amended:")}
+        assert amended == set(LEAST_KEYS) - {"fred_series"}
+
+    def test_seismic_origin_is_not_official(self):
+        from app.catalog import get_spec
+
+        s = get_spec("si_seismic_hazard")
+        assert s.origin == "synthetic" and s.data_state == "fabricated"
+
+    def test_other_recommendations_have_a_disposition(self):
+        """An evidence 'other' note that names origin or status has a
+        disposition, so an omission like the seismic origin is recorded."""
+        pats = {"origin": re.compile(r"\borigin\b", re.I),
+                "status": re.compile(r"\bstatus\b|archival|retire", re.I)}
+        bad = []
+        for e in _evidence()["entries"]:
+            for o in e["issues"].get("other") or []:
+                for field, pat in pats.items():
+                    if pat.search(o) and f"other.{field}" not in e["disposition"]:
+                        bad.append((e["key"], field))
+        assert not bad, sorted(set(bad))
+
+    def test_applied_origin_recommendations_moved_off_official(self):
+        from app.catalog import get_spec
+
+        for e in _evidence()["entries"]:
+            if e["disposition"].get("other.origin") != "applied":
+                continue
+            text_ = " ".join(o for o in e["issues"]["other"] if "origin" in o.lower())
+            if "should not be" in text_ or "rather than 'official'" in text_ \
+                    or "not be 'official'" in text_:
+                assert get_spec(e["key"]).origin != "official", e["key"]
+
+    def test_unverified_key_gets_no_default_state(self):
+        from app.catalog.datasets import _ds
+
+        s = _ds("zz_new_dataset", "sec", "New", "A dataset added after the verification pass, "
+                "with no evidence entry.", "filings", "one row per filing", "bulk:sec_form_d",
+                "monthly", tables=("form_d_filings",))
+        assert s.data_state is None and s.verified_at is None
+        v = _ds("sec_form_d", "sec", "Form D", "A dataset the 2026-09-25 verification checked, "
+                "so it defaults to that date.", "filings", "one row per filing",
+                "bulk:sec_form_d", "monthly", tables=("form_d_filings",))
+        assert v.data_state == "ok" and v.verified_at == "2026-09-25"
+
+    def test_every_spec_has_explicit_or_verified_state(self):
+        from app.catalog.datasets import _verified_keys
+
+        unverified = [s.key for s in _catalog() if s.key not in _verified_keys()]
+        # the specs added after the evidence file state it themselves
+        assert set(unverified) == {"census_cbp", "census_acs_county_tract",
+                                   "census_cbp_county_yearly"}
+        for s in _catalog():
+            assert s.verified_at and s.data_state is not None, s.key
+
+    def test_census_cbp_county_yearly_is_declared(self):
+        from app.catalog import get_spec
+
+        s = get_spec("census_cbp_county_yearly")
+        assert s.tables == ("census_cbp_county_yearly",)
+        assert s.primary_key == ("year", "geo_id", "naics_code")
+        assert s.producer == "script:ingest_cbp_county" and s.data_state == "ok"
+
+
+@pytest.mark.unit
+class TestMirrorFlags:
+    def test_block_carries_worst_state_and_all_limitations(self):
+        from app.catalog import get_spec
+        from app.catalog.mirror import catalog_block
+
+        b = catalog_block(get_spec("si_seismic_hazard"))
+        assert b["data_state"] == "fabricated"
+        assert any("BUG-SEISMIC-FABRICATED" in lim for lim in b["limitations"])
+        assert b["origin"] == "synthetic"
+
+    def test_merge_takes_the_most_severe_state(self):
+        from dataclasses import replace
+
+        from app.catalog import get_spec
+        from app.catalog.mirror import DATA_STATE_SEVERITY, merge_flags
+
+        from app.catalog.spec import DATA_STATES
+
+        assert set(DATA_STATE_SEVERITY) == set(DATA_STATES)
+        a = replace(get_spec("sec_form_d"), data_state="stale", limitations=("a", "b"))
+        b = replace(get_spec("sec_form_d"), data_state="seeded", limitations=("b", "c"))
+        got = merge_flags([a, b])
+        assert got == {"data_state": "seeded", "limitations": ["a", "b", "c"]}
+
+    def test_shared_seeded_table_is_flagged(self):
+        """job_postings: scraped rows plus the (empty) synthetic writer."""
+        from app.catalog.mirror import catalog_block, table_writers
+
+        specs = _catalog()
+        ws = table_writers(specs, {"job_postings"})["job_postings"]
+        b = catalog_block(ws[0], ws)
+        assert b["data_state"] is not None
+        assert set(b["limitations"]) >= {lim for w in ws for lim in w.limitations}

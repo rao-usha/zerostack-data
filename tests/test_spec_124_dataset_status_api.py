@@ -1394,3 +1394,112 @@ def test_startup_refuses_an_unmigrated_schema():
             conn.execute(text("DROP TABLE IF EXISTS public.collection_audit_log CASCADE"))
             conn.execute(text("DROP TABLE IF EXISTS public.ingestion_jobs CASCADE"))
         engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# SPEC_141 review fixes: pattern-only coverage, row_filters, honesty flags,
+# chunked + rotating coverage
+# ---------------------------------------------------------------------------
+
+
+@pg
+def test_pattern_only_spec_gets_its_coverage(pgdb):
+    """A spec with only table_patterns and a coverage_sql is measured, not
+    reported as 'missing_tables'; a pattern that matches nothing still is."""
+    from sqlalchemy import text
+
+    with pgdb.get_bind().begin() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS public.t124pat_a"))
+        conn.execute(text("CREATE TABLE public.t124pat_a (d DATE)"))
+        conn.execute(text("INSERT INTO t124pat_a VALUES ('2026-08-31')"))
+        conn.execute(text("ANALYZE t124pat_a"))
+    try:
+        specs = [
+            _spec("t124_pat", "dispatch:t124pat", slo=240, tables=(),
+                  table_patterns=("t124pat_*",), coverage="SELECT max(d) FROM t124pat_a"),
+            _spec("t124_nopat", "dispatch:t124nopat", slo=240, tables=(),
+                  table_patterns=("t124zzz_*",), coverage="SELECT max(d) FROM t124zzz_a"),
+        ]
+        _, by = _build(pgdb, specs)
+        pat = by["t124_pat"]
+        assert pat["clocks"]["coverage_through"] == "2026-08-31"
+        assert pat["clocks"].get("coverage_error") is None
+        assert [t["name"] for t in pat["tables"]] == ["t124pat_a"]
+        assert by["t124_nopat"]["clocks"]["coverage_error"] == "missing_tables"
+    finally:
+        with pgdb.get_bind().begin() as conn:
+            conn.execute(text("DROP TABLE IF EXISTS public.t124pat_a"))
+
+
+@pg
+def test_filtered_share_never_reports_the_whole_table(pgdb):
+    """A dataset that owns part of a shared table (row_filters) never shows
+    the whole table's planner estimate on a live-cache miss."""
+    from sqlalchemy import text
+
+    with pgdb.get_bind().begin() as conn:
+        conn.execute(text("INSERT INTO t124_cov SELECT DATE '2026-01-01' FROM generate_series(1, 50)"))
+        conn.execute(text("ANALYZE t124_cov"))
+    specs = [
+        _spec("t124_whole", "dispatch:t124whole"),
+        _spec("t124_share", "dispatch:t124share", row_filters=(("t124_cov", "d > '2026-06-01'"),),
+              data_state="seeded", limitations=("seed rows only",)),
+    ]
+    _, by = _build(pgdb, specs)
+    assert by["t124_whole"]["rows_total"] and by["t124_whole"]["rows_total"] > 1
+    share = by["t124_share"]
+    assert share["tables"][0]["rows"] is None and share["tables"][0]["rows_exact"] is False
+    assert not share["rows_total"]
+    # an uncounted share is unknown, not empty: it is not "never_run"
+    assert share["status"] != "never_run"
+    assert by["t124_whole"]["status"] != "never_run"
+    # the declared honesty flags travel with the status row
+    assert share["data_state"] == "seeded"
+    assert share["limitations"] == ["seed rows only"]
+    assert by["t124_whole"]["data_state"] is None and by["t124_whole"]["limitations"] == []
+
+
+@pg
+def test_coverage_chunks_isolate_a_slow_query(pgdb, monkeypatch):
+    """One slow query fails only its own chunk; the other chunks' values
+    come from their combined statements."""
+    import app.services.dataset_status as ds
+
+    monkeypatch.setattr(ds, "COVERAGE_CHUNK", 1)
+    monkeypatch.setattr(ds, "COVERAGE_TIMEOUT_MS", 300)
+    monkeypatch.setattr(ds, "COVERAGE_FALLBACK_TIMEOUT_MS", 200)
+    specs = [_spec("t124_c1", "dispatch:t124c1", coverage="SELECT max(d) FROM t124_cov"),
+             _spec("t124_c2", "dispatch:t124c2", coverage="SELECT max(d) FROM t124_old"),
+             _spec("t124_cs", "dispatch:t124cs",
+                   coverage="SELECT max(d) FROM t124_old, (SELECT pg_sleep(1)) s")]
+    out = ds._compute_coverage(pgdb.get_bind(), specs)
+    assert str(out["t124_c1"][0]) == "2026-08-31" and out["t124_c1"][1] is None
+    assert str(out["t124_c2"][0]) == "2026-05-31" and out["t124_c2"][1] is None
+    assert out["t124_cs"] == (None, "timeout")
+
+
+@pg
+def test_coverage_deadline_rotates_so_every_query_runs(pgdb, monkeypatch):
+    """With a deadline that allows one query per pass, successive passes run
+    different queries (least recently attempted first) until the slow one is
+    found and isolated; after that the combined statement succeeds."""
+    import app.services.dataset_status as ds
+
+    monkeypatch.setattr(ds, "COVERAGE_TIMEOUT_MS", 300)
+    monkeypatch.setattr(ds, "COVERAGE_FALLBACK_TIMEOUT_MS", 200)
+    monkeypatch.setattr(ds, "COVERAGE_FALLBACK_DEADLINE_S", -1.0)  # one query per pass
+    specs = [_spec("t124_r1", "dispatch:t124r1", coverage="SELECT max(d) FROM t124_cov"),
+             _spec("t124_r2", "dispatch:t124r2", coverage="SELECT max(d) FROM t124_q"),
+             _spec("t124_rs", "dispatch:t124rs",
+                   coverage="SELECT max(d) FROM t124_old, (SELECT pg_sleep(1)) s")]
+    engine = pgdb.get_bind()
+    ran = []
+    for _ in range(3):
+        out = ds._compute_coverage(engine, specs)
+        ran.append({k for k, (_, err) in out.items() if err != "deadline"})
+    assert all(len(r) == 1 for r in ran), ran
+    assert set().union(*ran) == {"t124_r1", "t124_r2", "t124_rs"}
+    # the slow one is now suspect; the rest go back to one combined statement
+    out = ds._compute_coverage(engine, specs)
+    assert out["t124_r1"][1] is None and out["t124_r2"][1] is None
+    assert str(out["t124_r2"][0]) == "2026-03-31"

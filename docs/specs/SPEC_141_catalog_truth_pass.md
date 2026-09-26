@@ -126,3 +126,28 @@ else (rights review, dictionary, browser) builds on it.
 Fixing ingestors (PLAN_088 §3.7 bug ids are referenced from `limitations`), deleting
 or moving data, rights loosenings and the new rights fields (SPEC_142), lineage
 (SPEC_143), dictionary (SPEC_137), quality block (SPEC_144).
+
+## Review fixes (spec-141-fix)
+
+- Status page (`app/services/dataset_status.py`): coverage runs for pattern-only specs
+  (gate: every declared table exists and at least one resolved table exists, not
+  `spec.tables`); a table with a `row_filter` reports `rows=None` on a live-cache miss;
+  each dataset row carries `data_state` and `limitations`.
+- Coverage batch: combined statements of `COVERAGE_CHUNK` (32) queries; both passes take
+  the least recently attempted queries first; chunks not started within
+  `COVERAGE_FALLBACK_DEADLINE_S` wait for the next pass; the serial pass always runs at
+  least one query. A slow query late in the list is reached and isolated.
+- Multi-table coverage over independent streams uses `_least_of()` (per-table maxima,
+  least): `bls_series`, `fbi_crime_estimates`, `irs_soi`, `intl_oecd`, `intl_bis`,
+  `usda_nass` (also capped at `current_date`). Their evidence disposition is
+  `amended:<reason>`. `greatest()` stays only where the tables are one stream
+  (`sec_company_filings`, `cftc_cot`, `app_rankings`).
+- Mirror: the `dataset_registry` catalog block carries the writers' worst `data_state`
+  (`DATA_STATE_SEVERITY`) and the union of their `limitations`.
+- `si_seismic_hazard` origin `synthetic`; evidence `other` recommendations naming origin,
+  status or kind have `other.<field>` dispositions.
+- `_ds()` defaults `data_state="ok"` / `verified_at` only for keys in the evidence file;
+  any other key must state them.
+- New spec `census_cbp_county_yearly` (script:ingest_cbp_county, also api:atlas).
+- Integration tests: no live coverage value after today; every `primary_key` column
+  exists on the live table.

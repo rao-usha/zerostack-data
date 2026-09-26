@@ -7,7 +7,8 @@
   "applied",
   "waived:<reason>",
   "deferred:<SPEC_x|BUG_x>",
-  "folded:<dataset key>"
+  "folded:<dataset key>",
+  "amended:<reason>"
  ],
  "note": "row counts are exact count(*) where the verifier ran one; approx_rows otherwise (PLAN_088 section 1.1: exact counts win over reltuples).",
  "entries": [
@@ -43,7 +44,8 @@
     "primary_key": "applied",
     "coverage_sql": "applied",
     "description": "applied",
-    "grain": "applied"
+    "grain": "applied",
+    "other.status": "applied"
    }
   },
   {
@@ -77,7 +79,7 @@
    },
    "disposition": {
     "primary_key": "applied",
-    "coverage_sql": "applied",
+    "coverage_sql": "amended:per-table least() replaces the union max / greatest() (SPEC_141 review: one stale table was hidden by the freshest)",
     "coverage_from": "applied",
     "grain": "applied"
    }
@@ -152,7 +154,8 @@
     "primary_key": "applied",
     "coverage_sql": "applied",
     "description": "applied",
-    "grain": "applied"
+    "grain": "applied",
+    "other.kind": "waived:kind geo kept (evidence: defensible)"
    }
   },
   {
@@ -185,7 +188,8 @@
     "primary_key": "applied",
     "coverage_sql": "applied",
     "description": "applied",
-    "pii": "applied"
+    "pii": "applied",
+    "other.status": "waived:user decision (PLAN_088): flag only, never delete (no purge)"
    }
   },
   {
@@ -217,7 +221,8 @@
    },
    "disposition": {
     "primary_key": "applied",
-    "pii": "applied"
+    "pii": "applied",
+    "other.status": "waived:user decision (PLAN_088): phantom/empty entries stay archival with a limitation, not retired"
    }
   },
   {
@@ -388,7 +393,9 @@
      "The pattern is correct (ingest_trade_summary calls prepare_table_for_trade_data(db,'trade_summary'), and generate_table_name gives 'us_trade_trade_summary'), but it has never been ingested. status_public='internal' overstates it. Mark it archival/phantom until it is loaded."
     ]
    },
-   "disposition": {}
+   "disposition": {
+    "other.status": "applied"
+   }
   },
   {
    "key": "bts_border_crossing",
@@ -447,7 +454,9 @@
      "bts/metadata.generate_table_name('vmt') gives bts_vmt, so the pattern is right, but the table has never been created or loaded. Phantom dataset. Keep it archival or retire it."
     ]
    },
-   "disposition": {}
+   "disposition": {
+    "other.status": "applied"
+   }
   },
   {
    "key": "bts_faf_regional",
@@ -590,7 +599,7 @@
    },
    "disposition": {
     "primary_key": "applied",
-    "coverage_sql": "applied",
+    "coverage_sql": "amended:per-table least() replaces the union max / greatest() (SPEC_141 review: one stale table was hidden by the freshest)",
     "coverage_from": "applied",
     "description": "applied",
     "grain": "applied"
@@ -628,7 +637,7 @@
    },
    "disposition": {
     "primary_key": "applied",
-    "coverage_sql": "applied",
+    "coverage_sql": "amended:per-table least() replaces the union max / greatest() (SPEC_141 review: one stale table was hidden by the freshest)",
     "grain": "applied"
    }
   },
@@ -799,7 +808,8 @@
     "primary_key": "applied",
     "coverage_sql": "applied",
     "grain": "applied",
-    "pii": "applied"
+    "pii": "applied",
+    "other.status": "applied"
    }
   },
   {
@@ -917,7 +927,8 @@
     "primary_key": "applied",
     "coverage_sql": "waived:untested - the table does not exist in the live DB",
     "description": "applied",
-    "grain": "applied"
+    "grain": "applied",
+    "other.status": "applied"
    }
   },
   {
@@ -990,7 +1001,8 @@
     "primary_key": "applied",
     "coverage_sql": "waived:untested - the table does not exist in the live DB",
     "description": "applied",
-    "grain": "waived:confirmed as declared (defects, if any, are in limitations)"
+    "grain": "waived:confirmed as declared (defects, if any, are in limitations)",
+    "other.kind": "waived:kind stays timeseries; the forecast horizon is a limitation"
    }
   },
   {
@@ -1031,7 +1043,8 @@
     "primary_key": "applied",
     "coverage_sql": "waived:untested - the table does not exist in the live DB",
     "description": "applied",
-    "grain": "waived:confirmed as declared (defects, if any, are in limitations)"
+    "grain": "waived:confirmed as declared (defects, if any, are in limitations)",
+    "other.status": "applied"
    }
   },
   {
@@ -1102,7 +1115,7 @@
    },
    "disposition": {
     "primary_key": "applied",
-    "coverage_sql": "applied",
+    "coverage_sql": "amended:per-table least() replaces the union max / greatest() (SPEC_141 review: one stale table was hidden by the freshest)",
     "coverage_from": "applied",
     "description": "applied",
     "grain": "applied"
@@ -1286,7 +1299,8 @@
     "primary_key": "applied",
     "coverage_sql": "applied",
     "coverage_from": "applied",
-    "grain": "waived:confirmed as declared (defects, if any, are in limitations)"
+    "grain": "waived:confirmed as declared (defects, if any, are in limitations)",
+    "other.kind": "waived:kind filings kept (evidence: fine to keep)"
    }
   },
   {
@@ -1322,7 +1336,8 @@
     "primary_key": "applied",
     "coverage_sql": "applied",
     "description": "applied",
-    "grain": "applied"
+    "grain": "applied",
+    "other.status": "applied"
    }
   },
   {
@@ -1663,7 +1678,7 @@
    },
    "disposition": {
     "primary_key": "applied",
-    "coverage_sql": "applied",
+    "coverage_sql": "amended:per-table least() replaces the union max / greatest() (SPEC_141 review: one stale table was hidden by the freshest)",
     "description": "applied",
     "grain": "applied"
    }
@@ -1840,7 +1855,8 @@
     "coverage_sql": "applied",
     "coverage_from": "applied",
     "grain": "applied",
-    "pii": "applied"
+    "pii": "applied",
+    "other.kind": "waived:kind holdings kept; spec.KINDS includes it"
    }
   },
   {
@@ -2389,7 +2405,8 @@
     "primary_key": "applied",
     "coverage_sql": "applied",
     "description": "applied",
-    "grain": "applied"
+    "grain": "applied",
+    "other.status": "applied"
    }
   },
   {
@@ -2528,7 +2545,8 @@
     "coverage_sql": "applied",
     "description": "applied",
     "grain": "waived:confirmed as declared (defects, if any, are in limitations)",
-    "pii": "applied"
+    "pii": "applied",
+    "other.kind": "deferred:SPEC_145 kind review with the browser facets"
    }
   },
   {
@@ -2601,7 +2619,8 @@
     "coverage_sql": "applied",
     "coverage_from": "applied",
     "description": "applied",
-    "grain": "applied"
+    "grain": "applied",
+    "other.status": "applied"
    }
   },
   {
@@ -2725,7 +2744,8 @@
     "primary_key": "applied",
     "coverage_sql": "applied",
     "description": "applied",
-    "grain": "applied"
+    "grain": "applied",
+    "other.status": "applied"
    }
   },
   {
@@ -2760,7 +2780,8 @@
     "primary_key": "applied",
     "coverage_sql": "applied",
     "description": "applied",
-    "grain": "applied"
+    "grain": "applied",
+    "other.status": "applied"
    }
   },
   {
@@ -2864,7 +2885,10 @@
     "coverage_sql": "applied",
     "coverage_from": "applied",
     "description": "applied",
-    "grain": "applied"
+    "grain": "applied",
+    "other.origin": "applied",
+    "other.status": "applied",
+    "other.kind": "deferred:SPEC_145 kind review with the browser facets"
    }
   },
   {
@@ -3117,7 +3141,8 @@
     "primary_key": "applied",
     "coverage_sql": "applied",
     "description": "applied",
-    "grain": "applied"
+    "grain": "applied",
+    "other.status": "applied"
    }
   },
   {
@@ -3148,7 +3173,8 @@
    "disposition": {
     "primary_key": "applied",
     "coverage_sql": "applied",
-    "description": "applied"
+    "description": "applied",
+    "other.status": "waived:user decision (PLAN_088): phantom/empty entries stay archival with a limitation, not retired"
    }
   },
   {
@@ -3215,7 +3241,8 @@
     "coverage_sql": "applied",
     "coverage_from": "applied",
     "description": "applied",
-    "pii": "waived:kept the conservative class (PLAN_088 SPEC_134 item 4: only the verified raises/lowerings)"
+    "pii": "waived:kept the conservative class (PLAN_088 SPEC_134 item 4: only the verified raises/lowerings)",
+    "other.origin": "applied"
    }
   },
   {
@@ -3250,7 +3277,8 @@
     "coverage_sql": "applied",
     "coverage_from": "applied",
     "description": "applied",
-    "grain": "applied"
+    "grain": "applied",
+    "other.origin": "applied"
    }
   },
   {
@@ -3322,7 +3350,8 @@
     "primary_key": "applied",
     "coverage_sql": "waived:untested - the table does not exist in the live DB",
     "description": "applied",
-    "pii": "applied"
+    "pii": "applied",
+    "other.status": "waived:user decision (PLAN_088): phantom/empty entries stay archival with a limitation, not retired"
    }
   },
   {
@@ -3406,7 +3435,8 @@
     "coverage_sql": "waived:untested - the table does not exist in the live DB",
     "inputs": "applied",
     "description": "applied",
-    "grain": "waived:confirmed as declared (defects, if any, are in limitations)"
+    "grain": "waived:confirmed as declared (defects, if any, are in limitations)",
+    "other.status": "waived:user decision (PLAN_088): phantom/empty entries stay archival with a limitation, not retired"
    }
   },
   {
@@ -3447,7 +3477,8 @@
     "coverage_sql": "waived:untested - the table does not exist in the live DB",
     "inputs": "applied",
     "description": "applied",
-    "grain": "applied"
+    "grain": "applied",
+    "other.kind": "applied"
    }
   },
   {
@@ -3713,7 +3744,8 @@
     "primary_key": "applied",
     "coverage_sql": "applied",
     "description": "applied",
-    "grain": "applied"
+    "grain": "applied",
+    "other.kind": "deferred:SPEC_145 kind review with the browser facets"
    }
   },
   {
@@ -3916,7 +3948,8 @@
     "primary_key": "applied",
     "coverage_sql": "waived:collected_at is the reload time of a hard-coded seed list, not a source vintage (evidence suggests leaving it null)",
     "description": "applied",
-    "grain": "applied"
+    "grain": "applied",
+    "other.origin": "applied"
    }
   },
   {
@@ -3952,7 +3985,9 @@
     "coverage_sql": "applied",
     "coverage_from": "applied",
     "description": "applied",
-    "grain": "applied"
+    "grain": "applied",
+    "other.origin": "applied",
+    "other.kind": "deferred:SPEC_145 kind review with the browser facets"
    }
   },
   {
@@ -4019,7 +4054,8 @@
     "coverage_sql": "applied",
     "description": "applied",
     "grain": "applied",
-    "pii": "applied"
+    "pii": "applied",
+    "other.status": "waived:user decision (PLAN_088): phantom/empty entries stay archival with a limitation, not retired"
    }
   },
   {
@@ -4261,7 +4297,8 @@
     "primary_key": "applied",
     "coverage_sql": "waived:collected_at is the reload time of a hard-coded seed list",
     "description": "applied",
-    "grain": "applied"
+    "grain": "applied",
+    "other.origin": "applied"
    }
   },
   {
@@ -4447,7 +4484,8 @@
     "coverage_from": "applied",
     "description": "applied",
     "grain": "waived:confirmed as declared (defects, if any, are in limitations)",
-    "pii": "applied"
+    "pii": "applied",
+    "other.status": "applied"
    }
   },
   {
@@ -4486,7 +4524,8 @@
     "coverage_sql": "applied",
     "coverage_from": "applied",
     "description": "applied",
-    "grain": "applied"
+    "grain": "applied",
+    "other.status": "applied"
    }
   },
   {
@@ -4595,7 +4634,7 @@
    },
    "disposition": {
     "primary_key": "applied",
-    "coverage_sql": "applied",
+    "coverage_sql": "amended:per-table least() replaces the union max / greatest() (SPEC_141 review: one stale table was hidden by the freshest; capped at current_date for forward estimates)",
     "coverage_from": "applied",
     "description": "applied",
     "grain": "applied"
@@ -4632,7 +4671,8 @@
     "primary_key": "applied",
     "coverage_sql": "applied",
     "description": "applied",
-    "grain": "waived:confirmed as declared (defects, if any, are in limitations)"
+    "grain": "waived:confirmed as declared (defects, if any, are in limitations)",
+    "other.status": "applied"
    }
   },
   {
@@ -4771,7 +4811,8 @@
     "primary_key": "applied",
     "coverage_sql": "applied",
     "grain": "waived:confirmed as declared (defects, if any, are in limitations)",
-    "pii": "applied"
+    "pii": "applied",
+    "other.status": "applied"
    }
   },
   {
@@ -4803,7 +4844,8 @@
     "primary_key": "applied",
     "coverage_sql": "applied",
     "grain": "waived:confirmed as declared (defects, if any, are in limitations)",
-    "pii": "applied"
+    "pii": "applied",
+    "other.status": "applied"
    }
   },
   {
@@ -4883,7 +4925,8 @@
     "inputs": "applied",
     "description": "applied",
     "grain": "applied",
-    "pii": "applied"
+    "pii": "applied",
+    "other.origin": "applied"
    }
   },
   {
@@ -5089,7 +5132,8 @@
     "coverage_sql": "applied",
     "coverage_from": "applied",
     "description": "applied",
-    "grain": "applied"
+    "grain": "applied",
+    "other.kind": "deferred:SPEC_145 kind review with the browser facets"
    }
   },
   {
@@ -5296,8 +5340,11 @@
     "primary_key": "applied",
     "coverage_sql": "waived:all rows are seed samples; a freshness date would imply EIA coverage",
     "description": "applied",
-    "grain": "applied"
+    "grain": "applied",
+    "other.origin": "applied",
+    "other.status": "applied"
    }
   }
- ]
+ ],
+ "other_disposition_note": "'other.origin' / 'other.status' / 'other.kind' record the disposition of free-text 'other' recommendations that name that field (SPEC_141 review)."
 }

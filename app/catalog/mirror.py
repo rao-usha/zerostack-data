@@ -24,7 +24,9 @@ LLM-collected PE rows; ``job_postings``: scraped and synthetic rows) gets a
 *merged* rights block: the most restrictive redistribution and PII class of
 all its writers, and every origin, so a table-level consumer never sees less
 restriction than the table's contents carry. The owner (``key``) is the
-first-declared writer.
+first-declared writer. The block also carries the writers' worst declared
+``data_state`` and the union of their ``limitations`` (SPEC_141), so a
+fabricated or seeded table is flagged wherever the registry is read.
 
 Ingestors replace ``source_metadata`` wholesale; a ``before_update`` listener
 on ``DatasetRegistry`` (app/core/models.py) and ``_update_dataset_registry``
@@ -55,6 +57,10 @@ REDISTRIBUTION_RANK = ("open", "attribution", "internal_only", "restricted")
 PII_RANK = ("none", "business_contact", "personal")
 # origins a consumer must be warned about, most severe first
 ORIGIN_SEVERITY = ("synthetic", "llm_extracted", "scraped", "curated", "derived", "official")
+# declared data states, most severe first (SPEC_141): the table carries the
+# worst state of its writers, so a flag travels with the data
+DATA_STATE_SEVERITY = ("fabricated", "sample_mixed", "seeded", "demo", "placeholder",
+                       "key_columns_null", "empty", "missing_tables", "stale", "ok")
 _PUBLISHED = ("ga", "beta")
 
 
@@ -81,6 +87,23 @@ def merge_rights(specs: Sequence[DatasetSpec]) -> Dict[str, Any]:
         "pii_class": _most((s.pii_class for s in specs), PII_RANK),
         "origin": origins[0],
         "origins": origins,
+        **merge_flags(specs),
+    }
+
+
+def merge_flags(specs: Sequence[DatasetSpec]) -> Dict[str, Any]:
+    """The worst declared ``data_state`` of the writers and the union of their
+    ``limitations`` (first-seen order): the flag-only decision (PLAN_088)
+    means the flag must reach every table-level consumer of the data."""
+    states = [s.data_state for s in specs if s.data_state]
+    limitations: List[str] = []
+    for s in specs:
+        for lim in s.limitations:
+            if lim not in limitations:
+                limitations.append(lim)
+    return {
+        "data_state": min(states, key=DATA_STATE_SEVERITY.index) if states else None,
+        "limitations": limitations,
     }
 
 

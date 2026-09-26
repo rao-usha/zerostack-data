@@ -27,7 +27,10 @@ proposed field are in ``app/catalog/evidence/verification_2026-09-25.json``
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Sequence, Tuple
+import json
+from functools import lru_cache
+from pathlib import Path
+from typing import Dict, FrozenSet, List, Optional, Sequence, Tuple
 
 from app.catalog.rights import rights_for
 from app.catalog.spec import DatasetSpec
@@ -140,6 +143,30 @@ _ZERO_ROW_BUG = ("BUG-ZERO-ROW-SUCCESS: jobs report success while inserting 0 ro
                  "rows).")
 
 
+EVIDENCE_FILE = Path(__file__).resolve().parent / "evidence" / f"verification_{VERIFIED}.json"
+
+
+@lru_cache(maxsize=1)
+def _verified_keys() -> FrozenSet[str]:
+    """Dataset keys the checked-in verification evidence covers."""
+    data = json.loads(EVIDENCE_FILE.read_text(encoding="utf-8"))
+    return frozenset(e["key"] for e in data["entries"])
+
+
+def _least_of(*maxima: str, cap_today: bool = False) -> str:
+    """Coverage of a dataset made of independent streams (one table each):
+    the least of the per-table maxima, so one stale table shows instead of
+    being hidden by the freshest (a greatest() or a max over a UNION hides
+    it). An empty table's max is NULL, which least() ignores; its emptiness
+    is a limitation. ``cap_today``: forward-looking rows (forecasts,
+    projected estimates) never push coverage past today."""
+    inner = "least(" + ", ".join(f"({m})" for m in maxima) + ")"
+    if not cap_today:
+        return f"SELECT {inner}"
+    return (f"SELECT CASE WHEN c > current_date THEN current_date ELSE c END "
+            f"FROM (SELECT {inner} AS c) t")
+
+
 def _ds(
     key: str,
     source: str,
@@ -161,8 +188,13 @@ def _ds(
 ) -> DatasetSpec:
     r = rights_for(key, source, collector)
     kw.setdefault("keywords", _KEYWORDS.get(source, ()))
-    kw.setdefault("verified_at", VERIFIED)
-    kw.setdefault("data_state", "ok")
+    # Only an entry the 2026-09-25 verification checked defaults to that
+    # date and to "ok". Any other key must state data_state and verified_at
+    # itself; left out they stay None, which the catalog tests reject and
+    # which DatasetSpec never publishes (ga/beta need data_state "ok").
+    if key in _verified_keys():
+        kw.setdefault("verified_at", VERIFIED)
+        kw.setdefault("data_state", "ok")
     for field in ("limitations", "primary_key", "inputs", "missing_tables", "row_filters"):
         if field in kw:
             kw[field] = tuple(kw[field])
@@ -632,19 +664,21 @@ _DISPATCH: List[DatasetSpec] = [
                       "bls_ces_employment"),
               also=("dispatch:bls:series",),
               primary_key=("series_id", "year", "period"),
-              coverage_sql=("SELECT max(make_date(year, CASE WHEN period ~ '^M(0[1-9]|1[0-2])$' "
-                            "THEN substring(period,2)::int ELSE 12 END, 1)) FROM (SELECT year, "
-                            "period FROM bls_cpi UNION ALL SELECT year, period FROM "
-                            "bls_cps_labor_force UNION ALL SELECT year, period FROM bls_jolts "
-                            "UNION ALL SELECT year, period FROM bls_ppi UNION ALL SELECT year, "
-                            "period FROM bls_ces_employment UNION ALL SELECT year, period FROM "
-                            "bls_oes) t WHERE period <> 'M13'"),
+              # least() over the programs (SPEC_141 review): the union max showed
+              # 2026-01 from legacy CES alone while bls_oes ends 2024-12
+              coverage_sql=_least_of(*(
+                  "SELECT max(make_date(year, CASE WHEN period ~ '^M(0[1-9]|1[0-2])$' THEN "
+                  f"substring(period,2)::int ELSE 12 END, 1)) FROM {t} WHERE period <> 'M13'"
+                  for t in ("bls_cpi", "bls_cps_labor_force", "bls_jolts", "bls_ppi",
+                            "bls_ces_employment", "bls_oes"))),
               coverage_basis="period",
               coverage_from="2015-01-01",
               data_state="stale",
               limitations=(
                   "Latest observation 2026-01; last successful load 2026-03-04 (CES jobs zombie "
                   "since April).",
+                  "Coverage is the least() of the per-program maxima: bls_oes ends 2024-12 and the "
+                  "current-schema tables end 2025-12, so the stale programs show.",
                   "Legacy duplicate tables bls_cpi_consumer_prices, bls_cps_unemployment, "
                   "bls_ppi_producer_prices and bls_jolts_openings (other schema) are not part of "
                   "this dataset.",
@@ -831,9 +865,9 @@ _DISPATCH: List[DatasetSpec] = [
               "dispatch:fbi_crime", "annual",
               patterns=("fbi_crime_estimates_*",), status="archival",
               primary_key=("year", "state_abbr", "offense"),
-              coverage_sql=("SELECT make_date(max(year),12,31) FROM (SELECT year FROM "
-                            "fbi_crime_estimates_national UNION ALL SELECT year FROM "
-                            "fbi_crime_estimates_state) t"),
+              coverage_sql=_least_of(
+                  "SELECT make_date(max(year),12,31) FROM fbi_crime_estimates_national",
+                  "SELECT make_date(max(year),12,31) FROM fbi_crime_estimates_state"),
               coverage_basis="period",
               data_state="empty", limitations=(_EMPTY, _ZERO_ROW_BUG)),
     _dispatch("fbi_crime_summarized", "fbi_crime", "FBI summarized agency crime",
@@ -893,11 +927,10 @@ _DISPATCH: List[DatasetSpec] = [
               also=("dispatch:irs_soi:county_income", "dispatch:irs_soi:migration",
                     "dispatch:irs_soi:business_income", "dispatch:irs_soi:all"),
               primary_key=("tax_year", "zip_code", "agi_class"),
-              coverage_sql=("SELECT make_date(max(tax_year), 12, 31) FROM (SELECT max(tax_year) "
-                            "AS tax_year FROM irs_soi_zip_income UNION ALL SELECT max(tax_year) "
-                            "FROM irs_soi_county_income UNION ALL SELECT max(tax_year) FROM "
-                            "irs_soi_migration UNION ALL SELECT max(tax_year) FROM "
-                            "irs_soi_business_income) t"),
+              coverage_sql=_least_of(*(
+                  f"SELECT make_date(max(tax_year), 12, 31) FROM {t}"
+                  for t in ("irs_soi_zip_income", "irs_soi_county_income", "irs_soi_migration",
+                            "irs_soi_business_income"))),
               coverage_basis="period",
               coverage_from="2018-01-01"),
     # Data Commons
@@ -1074,18 +1107,22 @@ _DISPATCH: List[DatasetSpec] = [
               also=("dispatch:international_econ:oecd_kei", "dispatch:international_econ:oecd_labor",
                     "dispatch:international_econ:oecd_trade", "dispatch:international_econ:oecd_tax"),
               primary_key=("indicator_code", "country_code", "frequency", "period", "measure", "transformation"),
-              coverage_sql=("SELECT max(CASE WHEN period ~ '^\\d{4}-\\d{2}$' THEN "
-                            "(to_date(period,'YYYY-MM') + interval '1 month - 1 day')::date "
-                            "WHEN period ~ '^\\d{4}$' THEN make_date(period::int,12,31) END) "
-                            "FROM (SELECT period FROM intl_oecd_mei UNION ALL SELECT period "
-                            "FROM intl_oecd_kei UNION ALL SELECT period FROM intl_oecd_alfs "
-                            "UNION ALL SELECT period FROM intl_oecd_tax UNION ALL SELECT period "
-                            "FROM intl_oecd_batis) p"),
+              # least() over the extracts (SPEC_141 review): alfs/tax end 2024 and
+              # the union max hid it; empty batis is NULL and ignored
+              coverage_sql=_least_of(*(
+                  "SELECT max(CASE WHEN period ~ '^\\d{4}-\\d{2}$' THEN "
+                  "(to_date(period,'YYYY-MM') + interval '1 month - 1 day')::date "
+                  "WHEN period ~ '^\\d{4}$' THEN make_date(period::int,12,31) END) "
+                  f"FROM {t}"
+                  for t in ("intl_oecd_mei", "intl_oecd_kei", "intl_oecd_alfs", "intl_oecd_tax",
+                            "intl_oecd_batis"))),
               coverage_basis="period",
               coverage_from="2000-01-01",
               limitations=("BUG-INTL-UNIQUE: no unique constraints; reruns appended duplicates "
                            "(intl_oecd_kei has 1,577 duplicate key groups).",
-                           "intl_oecd_tax: tax_type and government_level are NULL on every row.")),
+                           "intl_oecd_tax: tax_type and government_level are NULL on every row.",
+                           "Coverage is the least() of the per-table maxima: alfs and tax end 2024; "
+                           "batis is empty and left out.")),
     _dispatch("intl_bis", "international_econ", "BIS exchange rates and property prices",
               "Effective exchange rates and residential property prices from the Bank for "
               "International Settlements; the tables exist but nothing has been loaded.",
@@ -1095,12 +1132,13 @@ _DISPATCH: List[DatasetSpec] = [
               "dispatch:international_econ:bis_eer", "monthly", patterns=("intl_bis_*",),
               also=("dispatch:international_econ:bis_property",),
               primary_key=("country_code", "eer_type", "basket", "frequency", "period"),
-              coverage_sql=("SELECT max(CASE WHEN period ~ '^\\d{4}-\\d{2}$' THEN "
-                            "(to_date(period,'YYYY-MM') + interval '1 month - 1 day')::date "
-                            "WHEN period ~ '^\\d{4}-Q\\d$' THEN (make_date(left(period,4)::int, "
-                            "right(period,1)::int*3, 1) + interval '1 month - 1 day')::date "
-                            "END) FROM (SELECT period FROM intl_bis_eer UNION ALL SELECT period "
-                            "FROM intl_bis_property) p"),
+              coverage_sql=_least_of(*(
+                  "SELECT max(CASE WHEN period ~ '^\\d{4}-\\d{2}$' THEN "
+                  "(to_date(period,'YYYY-MM') + interval '1 month - 1 day')::date "
+                  "WHEN period ~ '^\\d{4}-Q\\d$' THEN (make_date(left(period,4)::int, "
+                  "right(period,1)::int*3, 1) + interval '1 month - 1 day')::date "
+                  f"END) FROM {t}"
+                  for t in ("intl_bis_eer", "intl_bis_property"))),
               coverage_basis="period",
               data_state="empty",
               limitations=(_EMPTY, "BUG-INTL-UNIQUE: no natural unique constraint.")),
@@ -1239,12 +1277,15 @@ _DISPATCH: List[DatasetSpec] = [
               also=("dispatch:usda:livestock", "dispatch:usda:annual_summary",
                     "dispatch:usda:all_major_crops"),
               primary_key=("commodity_desc", "year", "state_name", "statisticcat_desc", "reference_period_desc", "class_desc", "domain_desc"),
-              coverage_sql=("SELECT greatest((SELECT make_date(max(year),12,31) FROM "
-                            "usda_crop_production),(SELECT make_date(max(year),12,31) FROM "
-                            "usda_livestock))"),
+              # least() of the two programs, capped at today (SPEC_141 review): the
+              # 2026 rows are forward estimates and greatest() reported 2026-12-31
+              coverage_sql=_least_of(
+                  "SELECT make_date(max(year),12,31) FROM usda_crop_production",
+                  "SELECT make_date(max(year),12,31) FROM usda_livestock", cap_today=True),
               coverage_basis="period",
               coverage_from="2024-01-01",
-              limitations=("2026 rows are forward-looking estimates; 2025 is missing.",
+              limitations=("2026 rows are forward-looking estimates; 2025 is missing. Coverage "
+                           "is capped at today, so the estimates never report a future date.",
                            "Only 9 crop and 2 livestock commodities; no annual-summary table.")),
     # DUNL
     _dispatch("dunl_reference", "dunl", "DUNL reference data",
@@ -1367,7 +1408,7 @@ _CENSUS_EXTRA: List[DatasetSpec] = [
         primary_key=("year", "naics_code", "geo_level", "county_fips"),
         coverage_sql="SELECT make_date(max(year), 12, 31) FROM census_cbp",
         coverage_basis="period", coverage_from="2021-01-01",
-        spatial_coverage="US:county", verified_at="2026-09-26",
+        spatial_coverage="US:county", verified_at="2026-09-26", data_state="ok",
         limitations=("Only year 2021 and 3 NAICS codes are loaded (7,160 rows, fetched "
                      "2026-03-12).",),
         notes="Written by the census_cbp router; rollup_market_scores reads it as a cache."),
@@ -1387,9 +1428,28 @@ _CENSUS_EXTRA: List[DatasetSpec] = [
                       "FROM pg_class WHERE relkind = 'r' "
                       "AND relname ~ '^acs5_(county|tract)_\\d{4}_'"),
         coverage_basis="fixed_vintage", coverage_from="2019-01-01",
-        spatial_coverage="US:county", verified_at="2026-09-26",
+        spatial_coverage="US:county", verified_at="2026-09-26", data_state="ok",
         notes="scripts/ingest_acs_county_*.py and scripts/ingest_acs_tract_demand.py via "
               "app/sources/census/county_acs.py and tract_acs.py (SPEC_070/072)."),
+    # Verified read-only 2026-09-26 (SPEC_141 review): 1,119,027 rows; 2018-2021
+    # 3,244 county totals each, 2022 1,106,051 rows across 1,987 NAICS codes.
+    _ds("census_cbp_county_yearly", "census", "Census County Business Patterns by county and year",
+        "County Business Patterns establishments, employment and annual payroll by county and "
+        "NAICS code from the Census Bureau: all-industry totals for 2018 to 2021 and full NAICS "
+        "detail for 2022. Powers the Atlas establishments layer and competition lookup.",
+        "timeseries", "one row per year per county (geo_id) per NAICS code",
+        "script:ingest_cbp_county", "annual", tables=("census_cbp_county_yearly",),
+        also=("api:atlas",), status="archival",
+        primary_key=("year", "geo_id", "naics_code"),
+        coverage_sql="SELECT make_date(max(year), 12, 31) FROM census_cbp_county_yearly",
+        coverage_basis="period", coverage_from="2018-01-01",
+        spatial_coverage="US:county", verified_at="2026-09-26", data_state="ok",
+        limitations=("2018 to 2021 hold only the all-industry total (NAICS '00'); NAICS detail "
+                     "exists for 2022 only.",
+                     "The Atlas competition lookup upserts single cells on a cache miss "
+                     "(app/services/atlas/cbp_live.py), so 2022 detail grows with use."),
+        notes="scripts/ingest_cbp_county.py via app/sources/census/county_cbp.py (SPEC_075/100); "
+              "live fallback upserts from app/api/v1/atlas.py (SPEC_102)."),
 ]
 
 # ---------------------------------------------------------------------------
@@ -1833,6 +1893,9 @@ _SITE_INTEL: List[DatasetSpec] = [
         "seismic_hazard one row per latitude/longitude point; fault_line one row per recent "
         "significant earthquake place name",
         status="archival",
+        # the fabricated PGA rows make the table synthetic, not official
+        # (evidence si_seismic_hazard 'other'; SPEC_141 review)
+        origin="synthetic",
         primary_key=("latitude", "longitude"),
         coverage_sql="SELECT max(collected_at) FROM seismic_hazard",
         coverage_basis="as_of",
