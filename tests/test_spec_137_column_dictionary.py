@@ -23,7 +23,7 @@ REPO = Path(__file__).resolve().parents[1]
 # dataset pii_class below its max column PII, being raised by SPEC_141 (sec_13f)
 # or newly found here and reported (si_public_water_systems.admin_contact_phone,
 # glassdoor_companies.ceo_name). The live offender set must stay a subset: it can only shrink.
-PENDING_PII_RAISES = {"sec_13f", "si_public_water_systems", "glassdoor"}
+PENDING_PII_RAISES: set = set()  # all applied after the wave A merge
 
 # DDL section headers the old metadata regex attributed to the previous column (review finding)
 SECTION_HEADERS = {"Company identifiers", "Filing metadata", "Sub-scores (each 0-100)", "Metadata",
@@ -452,7 +452,7 @@ def _t137_spec(key, tables, **kw):
     from app.catalog.spec import DatasetSpec
 
     base = dict(
-        key=key, source="t137", display_name=key, description="A SPEC 137 test dataset for the dictionary.",
+        key=key, source="t137", display_name=key, description="A SPEC 137 test dataset for the column dictionary, schema and sample endpoints.",
         kind="reference", grain="one row per person", producer=f"api:{key}", cadence="ad_hoc",
         rerun="idempotent", license="public domain", redistribution="open", pii_class="business_contact",
         origin="official", status_public="internal", tables=tuple(tables), primary_key=("id",),

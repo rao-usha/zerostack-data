@@ -1,5 +1,5 @@
 {
- "dictionary_hash": "e1a4cfbe2007ed29",
+ "dictionary_hash": "336a32d0a9ebbf66",
  "format_version": 1,
  "package_columns": {
   "cms": {
@@ -1294,6 +1294,16 @@
    "origin": "ddl",
    "packages": []
   },
+  "bls_ces_employment": {
+   "columns": [],
+   "datasets": [
+    "bls_series"
+   ],
+   "origin": "none",
+   "packages": [
+    "bls"
+   ]
+  },
   "bls_cpi": {
    "columns": [],
    "datasets": [
@@ -1315,6 +1325,26 @@
    ]
   },
   "bls_jolts": {
+   "columns": [],
+   "datasets": [
+    "bls_series"
+   ],
+   "origin": "none",
+   "packages": [
+    "bls"
+   ]
+  },
+  "bls_oes": {
+   "columns": [],
+   "datasets": [
+    "bls_series"
+   ],
+   "origin": "none",
+   "packages": [
+    "bls"
+   ]
+  },
+  "bls_ppi": {
    "columns": [],
    "datasets": [
     "bls_series"
@@ -2474,11 +2504,106 @@
     }
    ],
    "datasets": [
-    "rollup_market_scores"
+    "census_cbp"
    ],
    "origin": "ddl",
    "packages": [
-    "rollup_intel"
+    "census"
+   ]
+  },
+  "census_cbp_county_yearly": {
+   "columns": [
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "annual_payroll_thousands",
+     "nullable": true,
+     "pg_type": "bigint",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": "low",
+     "description": "Number of employees.",
+     "example": null,
+     "name": "employees",
+     "nullable": true,
+     "pg_type": "integer",
+     "pii": "none",
+     "semantic_type": null,
+     "source": "glossary",
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "establishments",
+     "nullable": true,
+     "pg_type": "integer",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": "low",
+     "description": "Geographic identifier as published (FIPS / Census GEOID / area code, per table).",
+     "example": null,
+     "name": "geo_id",
+     "nullable": false,
+     "pg_type": "text",
+     "pii": "none",
+     "semantic_type": null,
+     "source": "glossary",
+     "unit": null
+    },
+    {
+     "confidence": "low",
+     "description": "Row audit timestamp: when Nexdata wrote or last touched this row (not an upstream date).",
+     "example": null,
+     "name": "ingested_at",
+     "nullable": true,
+     "pg_type": "timestamp",
+     "pii": "none",
+     "semantic_type": null,
+     "source": "glossary",
+     "unit": null
+    },
+    {
+     "confidence": "low",
+     "description": "NAICS industry classification code.",
+     "example": null,
+     "name": "naics_code",
+     "nullable": false,
+     "pg_type": "text",
+     "pii": "none",
+     "semantic_type": "naics",
+     "source": "glossary",
+     "unit": null
+    },
+    {
+     "confidence": "low",
+     "description": "Year the observation refers to.",
+     "example": null,
+     "name": "year",
+     "nullable": false,
+     "pg_type": "integer",
+     "pii": "none",
+     "semantic_type": null,
+     "source": "glossary",
+     "unit": null
+    }
+   ],
+   "datasets": [
+    "census_cbp_county_yearly"
+   ],
+   "origin": "ddl",
+   "packages": [
+    "census"
    ]
   },
   "cms_drug_pricing": {
@@ -7024,6 +7149,16 @@
    "origin": "model",
    "packages": [
     "site_intel"
+   ]
+  },
+  "fbi_crime_leoka_national": {
+   "columns": [],
+   "datasets": [
+    "fbi_crime_leoka"
+   ],
+   "origin": "none",
+   "packages": [
+    "fbi_crime"
    ]
   },
   "fda_device_registrations": {
@@ -13060,6 +13195,36 @@
     "site_intel"
    ]
   },
+  "intl_worldbank_countries": {
+   "columns": [],
+   "datasets": [
+    "intl_worldbank"
+   ],
+   "origin": "none",
+   "packages": [
+    "international_econ"
+   ]
+  },
+  "intl_worldbank_indicators": {
+   "columns": [],
+   "datasets": [
+    "intl_worldbank"
+   ],
+   "origin": "none",
+   "packages": [
+    "international_econ"
+   ]
+  },
+  "intl_worldbank_wdi": {
+   "columns": [],
+   "datasets": [
+    "intl_worldbank"
+   ],
+   "origin": "none",
+   "packages": [
+    "international_econ"
+   ]
+  },
   "irs_soi_business_income": {
    "columns": [],
    "datasets": [
@@ -14916,233 +15081,6 @@
     "public_lp_strategies"
    ]
   },
-  "lp_collection_runs": {
-   "columns": [
-    {
-     "confidence": null,
-     "description": null,
-     "example": null,
-     "name": "bytes_downloaded",
-     "nullable": false,
-     "pg_type": "integer",
-     "pii": "none",
-     "semantic_type": null,
-     "source": null,
-     "unit": null
-    },
-    {
-     "confidence": null,
-     "description": null,
-     "example": null,
-     "name": "completed_at",
-     "nullable": true,
-     "pg_type": "timestamp without time zone",
-     "pii": "none",
-     "semantic_type": null,
-     "source": null,
-     "unit": null
-    },
-    {
-     "confidence": "low",
-     "description": "Row audit timestamp: when Nexdata wrote or last touched this row (not an upstream date).",
-     "example": null,
-     "name": "created_at",
-     "nullable": false,
-     "pg_type": "timestamp without time zone",
-     "pii": "none",
-     "semantic_type": null,
-     "source": "glossary",
-     "unit": null
-    },
-    {
-     "confidence": null,
-     "description": null,
-     "example": null,
-     "name": "duration_seconds",
-     "nullable": true,
-     "pg_type": "integer",
-     "pii": "none",
-     "semantic_type": null,
-     "source": null,
-     "unit": null
-    },
-    {
-     "confidence": "medium",
-     "description": "Structured error info",
-     "example": null,
-     "name": "error_details",
-     "nullable": true,
-     "pg_type": "json",
-     "pii": "none",
-     "semantic_type": null,
-     "source": "model",
-     "unit": null
-    },
-    {
-     "confidence": null,
-     "description": null,
-     "example": null,
-     "name": "error_message",
-     "nullable": true,
-     "pg_type": "text",
-     "pii": "none",
-     "semantic_type": null,
-     "source": null,
-     "unit": null
-    },
-    {
-     "confidence": "low",
-     "description": "Surrogate row id assigned by the database; not stable across reloads.",
-     "example": null,
-     "name": "id",
-     "nullable": false,
-     "pg_type": "integer",
-     "pii": "none",
-     "semantic_type": null,
-     "source": "glossary",
-     "unit": null
-    },
-    {
-     "confidence": null,
-     "description": null,
-     "example": null,
-     "name": "items_found",
-     "nullable": false,
-     "pg_type": "integer",
-     "pii": "none",
-     "semantic_type": null,
-     "source": null,
-     "unit": null
-    },
-    {
-     "confidence": null,
-     "description": null,
-     "example": null,
-     "name": "items_inserted",
-     "nullable": false,
-     "pg_type": "integer",
-     "pii": "none",
-     "semantic_type": null,
-     "source": null,
-     "unit": null
-    },
-    {
-     "confidence": null,
-     "description": null,
-     "example": null,
-     "name": "items_skipped",
-     "nullable": false,
-     "pg_type": "integer",
-     "pii": "none",
-     "semantic_type": null,
-     "source": null,
-     "unit": null
-    },
-    {
-     "confidence": null,
-     "description": null,
-     "example": null,
-     "name": "items_updated",
-     "nullable": false,
-     "pg_type": "integer",
-     "pii": "none",
-     "semantic_type": null,
-     "source": null,
-     "unit": null
-    },
-    {
-     "confidence": "medium",
-     "description": "FK to ingestion_jobs.id (if part of batch)",
-     "example": null,
-     "name": "job_id",
-     "nullable": true,
-     "pg_type": "integer",
-     "pii": "none",
-     "semantic_type": null,
-     "source": "model",
-     "unit": null
-    },
-    {
-     "confidence": "medium",
-     "description": "FK to lp_fund.id",
-     "example": null,
-     "name": "lp_id",
-     "nullable": false,
-     "pg_type": "integer",
-     "pii": "none",
-     "semantic_type": null,
-     "source": "model",
-     "unit": null
-    },
-    {
-     "confidence": null,
-     "description": null,
-     "example": null,
-     "name": "requests_made",
-     "nullable": false,
-     "pg_type": "integer",
-     "pii": "none",
-     "semantic_type": null,
-     "source": null,
-     "unit": null
-    },
-    {
-     "confidence": null,
-     "description": null,
-     "example": null,
-     "name": "source_type",
-     "nullable": false,
-     "pg_type": "varchar(30)",
-     "pii": "none",
-     "semantic_type": null,
-     "source": null,
-     "unit": null
-    },
-    {
-     "confidence": null,
-     "description": null,
-     "example": null,
-     "name": "started_at",
-     "nullable": true,
-     "pg_type": "timestamp without time zone",
-     "pii": "none",
-     "semantic_type": null,
-     "source": null,
-     "unit": null
-    },
-    {
-     "confidence": "low",
-     "description": "Status as published by the source.",
-     "example": null,
-     "name": "status",
-     "nullable": false,
-     "pg_type": "varchar(20)",
-     "pii": "none",
-     "semantic_type": null,
-     "source": "glossary",
-     "unit": null
-    },
-    {
-     "confidence": "medium",
-     "description": "List of non-fatal warnings",
-     "example": null,
-     "name": "warnings",
-     "nullable": true,
-     "pg_type": "json",
-     "pii": "none",
-     "semantic_type": null,
-     "source": "model",
-     "unit": null
-    }
-   ],
-   "datasets": [
-    "lp_collection"
-   ],
-   "origin": "model",
-   "packages": [
-    "lp_collection"
-   ]
-  },
   "lp_document": {
    "columns": [
     {
@@ -15315,13 +15253,11 @@
     }
    ],
    "datasets": [
-    "lp_collection",
     "public_lp_strategies"
    ],
    "origin": "model",
    "packages": [
-    "public_lp_strategies",
-    "lp_collection"
+    "public_lp_strategies"
    ]
   },
   "lp_document_text_section": {
@@ -24772,6 +24708,16 @@
     "realestate"
    ]
   },
+  "realestate_osm_buildings": {
+   "columns": [],
+   "datasets": [
+    "realestate_osm_buildings"
+   ],
+   "origin": "none",
+   "packages": [
+    "realestate"
+   ]
+  },
   "realestate_redfin": {
    "columns": [],
    "datasets": [
@@ -25292,6 +25238,26 @@
    "origin": "none",
    "packages": [
     "sam_gov"
+   ]
+  },
+  "sec_10k": {
+   "columns": [],
+   "datasets": [
+    "sec_company_filings"
+   ],
+   "origin": "none",
+   "packages": [
+    "sec"
+   ]
+  },
+  "sec_10q": {
+   "columns": [],
+   "datasets": [
+    "sec_company_filings"
+   ],
+   "origin": "none",
+   "packages": [
+    "sec"
    ]
   },
   "sec_13f_filings": {
@@ -26160,6 +26126,16 @@
     "sec"
    ]
   },
+  "sec_8k": {
+   "columns": [],
+   "datasets": [
+    "sec_company_filings"
+   ],
+   "origin": "none",
+   "packages": [
+    "sec"
+   ]
+  },
   "sec_8k_index": {
    "columns": [
     {
@@ -26340,7 +26316,6 @@
     }
    ],
    "datasets": [
-    "sec_company_filings",
     "sec_edgar_submissions"
    ],
    "origin": "bulk",
@@ -28548,7 +28523,6 @@
     }
    ],
    "datasets": [
-    "sec_company_financials",
     "sec_companyfacts"
    ],
    "origin": "model",
@@ -28944,7 +28918,6 @@
     }
    ],
    "datasets": [
-    "sec_company_financials",
     "sec_companyfacts"
    ],
    "origin": "model",
@@ -29797,7 +29770,6 @@
     }
    ],
    "datasets": [
-    "sec_company_financials",
     "sec_companyfacts"
    ],
    "origin": "model",
@@ -30804,7 +30776,6 @@
     }
    ],
    "datasets": [
-    "sec_company_financials",
     "sec_companyfacts"
    ],
    "origin": "model",
@@ -32358,10 +32329,7 @@
     }
    ],
    "datasets": [
-    "si_3pl_companies",
-    "si_3pl_fmcsa_enrichment",
-    "si_3pl_sec_enrichment",
-    "si_3pl_website_enrichment"
+    "si_3pl_companies"
    ],
    "origin": "model",
    "packages": [

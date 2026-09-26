@@ -1139,7 +1139,8 @@ class TestRawValuePolicy:
 
         for t in ("people", "company_people", "family_office_contacts", "pe_people"):
             assert raw_values_restricted(t), t
-        assert not raw_values_restricted("substation")
+        # HIFLD substations: restricted since SPEC_141 (withdrawn from public release)
+        assert raw_values_restricted("substation")
         assert not raw_values_restricted("fdic_bank_financials")
 
     def test_personal_columns(self):

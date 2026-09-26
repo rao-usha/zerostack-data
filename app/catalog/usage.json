@@ -287,15 +287,6 @@
     ]
    }
   ],
-  "bls_laus_state": [
-   {
-    "kind": "api_router",
-    "path": "app/api/v1/bls.py",
-    "via": [
-     "sql"
-    ]
-   }
-  ],
   "bls_oes": [
    {
     "kind": "report",

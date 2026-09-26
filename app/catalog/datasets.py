@@ -1629,6 +1629,7 @@ _SITE_INTEL: List[DatasetSpec] = [
         coverage_sql=("SELECT max(collected_at)::date FROM public_water_system WHERE source = "
                       "'epa_sdwis'"),
         coverage_basis="as_of",
+        pii="business_contact",  # admin_contact_name / phone (SPEC_137 column PII)
         data_state="sample_mixed",
         limitations=("4 hand-written 'epa_sdwis_sample' rows are mixed in; coverage excludes "
                      "them. Flagged, not deleted.",
@@ -2038,6 +2039,7 @@ _API: List[DatasetSpec] = [
         "reference", "one row per company; salaries one row per role", "api:glassdoor", "ad_hoc",
         tables=("glassdoor_companies", "glassdoor_salaries", "glassdoor_review_summaries"),
         status="archival", origin="curated",
+        pii="business_contact",  # ceo_name (SPEC_137 column PII)
         primary_key=("company_name",),
         coverage_sql="SELECT max(retrieved_at) FROM glassdoor_companies",
         coverage_basis="as_of",
