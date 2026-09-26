@@ -38,7 +38,7 @@ def _spec(key, producer, cadence="monthly", slo=None, coverage=None, tables=("t1
         key=key,
         source=kw.pop("source", "t124"),
         display_name=key.replace("_", " "),
-        description="A test dataset for SPEC 124 status derivation.",
+        description="A test dataset for SPEC 124 status derivation (fixture only).",
         kind=kw.pop("kind", "filings"),
         grain="one row per thing",
         producer=producer,
@@ -51,6 +51,8 @@ def _spec(key, producer, cadence="monthly", slo=None, coverage=None, tables=("t1
         status_public=kw.pop("status_public", "internal"),
         tables=tuple(tables),
         coverage_sql=coverage,
+        # SPEC_141: coverage_sql needs a coverage_basis
+        coverage_basis=kw.pop("coverage_basis", "period" if coverage else None),
         slo_lag_hours=slo,
         **kw,
     )

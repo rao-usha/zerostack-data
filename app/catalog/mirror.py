@@ -40,7 +40,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence
 from sqlalchemy import insert, select, update
 from sqlalchemy.engine import Engine
 
-from app.catalog.live import claimed_tables, existing_tables, resolve_tables
+from app.catalog.live import KNOWN_VIEWS, claimed_tables, existing_tables, resolve_tables
 from app.catalog.registry import get_catalog
 from app.catalog.spec import DatasetSpec
 from app.catalog.tables import pattern_matches, split
@@ -54,7 +54,7 @@ _T = DatasetRegistry.__table__
 REDISTRIBUTION_RANK = ("open", "attribution", "internal_only", "restricted")
 PII_RANK = ("none", "business_contact", "personal")
 # origins a consumer must be warned about, most severe first
-ORIGIN_SEVERITY = ("synthetic", "llm_extracted", "scraped", "derived", "official")
+ORIGIN_SEVERITY = ("synthetic", "llm_extracted", "scraped", "curated", "derived", "official")
 _PUBLISHED = ("ga", "beta")
 
 
@@ -129,7 +129,7 @@ def desired_rows(specs: Iterable[DatasetSpec], existing: set) -> Dict[str, Datas
 
 def _writers_of(table: str, specs) -> List[DatasetSpec]:
     out = [s for s in specs if table in s.tables]
-    if out:
+    if out or table in KNOWN_VIEWS:  # a view is not any dataset's table (SPEC_141)
         return out
     return [s for s in specs if any(pattern_matches(p, table) for p in s.table_patterns)]
 

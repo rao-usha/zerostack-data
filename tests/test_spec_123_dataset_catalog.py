@@ -52,11 +52,11 @@ def _collectors():
 def _base(**over):
     kw = dict(
         key="demo_dataset", source="sec", display_name="Demo",
-        description="A demo dataset used only by the validation tests.",
+        description="A demo dataset used only by the SPEC 123 validation tests.",
         kind="filings", grain="one row per filing", producer="bulk:sec_form_d",
         cadence="monthly", rerun="idempotent", license="public domain",
         redistribution="open", pii_class="none", origin="official",
-        status_public="internal", tables=("form_d_filings",),
+        status_public="internal", tables=("form_d_filings",), data_state="ok",
     )
     kw.update(over)
     return kw
@@ -202,6 +202,7 @@ class TestProducerCoverage:
                     "collector": lambda: name in collectors,
                     "job": lambda: name in job_types,
                     "api": lambda: (REPO / "app" / "api" / "v1" / f"{name}.py").is_file(),
+                    "script": lambda: (REPO / "scripts" / f"{name}.py").is_file(),
                 }[kind]()
                 if not ok:
                     bad.append((spec.key, p))
@@ -238,6 +239,14 @@ class TestProducerCoverage:
 # ---------------------------------------------------------------------------
 
 
+def _generated_by_producer(spec, table):
+    """SPEC_141: an explicit table the producer's package names or generates."""
+    from app.catalog.tables import package_source, producer_module, table_generated_by
+
+    texts = [package_source(m) for m in filter(None, (producer_module(p) for p in spec.producers))]
+    return any(table_generated_by(table, t) for t in texts)
+
+
 @pytest.mark.unit
 class TestTables:
     def test_every_table_is_declared_in_code(self):
@@ -246,7 +255,9 @@ class TestTables:
         declared = declared_tables()
         # the scan must see all three kinds of declaration
         assert {"pe_firms", "sec_13f_holdings", "core.entity", "courtlistener_dockets"} <= declared
-        missing = sorted({(s.key, t) for s in _catalog() for t in s.tables if t not in declared})
+        missing = sorted({(s.key, t) for s in _catalog() for t in s.tables
+                          if t not in declared and not _generated_by_producer(s, t)
+                          and t not in s.missing_tables})
         assert not missing, f"DatasetSpec tables declared nowhere (model / DDL / ddl()): {missing}"
 
     def test_every_pattern_is_generated_by_its_producer(self):
@@ -371,7 +382,8 @@ class TestRightsAndStatus:
         assert get_spec("nppes_providers").pii_class == "personal"
         assert get_spec("pe_people_sec").pii_class == "personal"
         assert get_spec("people_org_charts").pii_class == "personal"
-        assert get_spec("sec_13f").pii_class == "none"
+        # SPEC_141: 13F filings carry the signatory's name, title and phone
+        assert get_spec("sec_13f").pii_class == "business_contact"
         assert get_spec("people_org_charts").origin == "llm_extracted"
         assert get_spec("pe_funds_sec").origin == "derived"
         for s in _catalog():
@@ -402,14 +414,22 @@ class TestRightsAndStatus:
         from app.catalog import get_spec
         from app.catalog.datasets import BATCH_SCHEDULED_DISPATCH
 
+        # SPEC_141: a dataset whose producer never produced usable data is
+        # archival even when scheduled (empty, phantom, unusable, seed-only)
+        unusable = ("empty", "missing_tables", "key_columns_null", "fabricated", "seeded",
+                    "placeholder", "demo")
+
+        def demoted(s):
+            return s.status_public == "archival" and s.data_state in unusable
+
         for s in _catalog():
             keys = {p.split(":", 1)[1] for p in s.producers if p.startswith("dispatch:")}
             if s.producer_kind == "dispatch":
                 expected = "internal" if keys & BATCH_SCHEDULED_DISPATCH else "archival"
-                assert s.status_public == expected, (s.key, s.status_public)
+                assert s.status_public == expected or demoted(s), (s.key, s.status_public)
             if s.producer_kind in ("bulk", "collector") or s.producer.startswith(
                     ("job:pe_mart_build", "job:entity_resolve")):
-                assert s.status_public == "internal", s.key
+                assert s.status_public == "internal" or demoted(s), s.key
         assert get_spec("yelp_businesses").status_public == "archival"
         assert get_spec("treasury_daily_balance").status_public == "internal"
         assert get_spec("github_analytics").status_public == "archival"
@@ -748,7 +768,8 @@ class TestPatternOverlap:
         existing = {"sec_8k", "sec_8k_a", "sec_8k_index", "sec_10k", "sec_10q", "sec_s1"}
         got = resolve_tables(get_spec("sec_company_filings"), existing)
         assert "sec_8k_index" not in got
-        assert set(got) == {"sec_8k", "sec_8k_a", "sec_10k", "sec_10q", "sec_s1"}
+        # SPEC_141: explicit tables instead of the sec_8k* / sec_s1* patterns
+        assert got == ["sec_10k", "sec_10q", "sec_8k"]
         # the bulk dataset still owns it
         assert "sec_8k_index" in resolve_tables(get_spec("sec_edgar_submissions"), existing)
 
@@ -783,14 +804,15 @@ class TestPatternOverlap:
                 bad.append((t, sorted(owners)))
         assert not bad, f"tables matched by several datasets' patterns: {bad}"
 
-    def test_only_sec_8k_index_needs_the_exclusion(self):
-        """Every other pattern is narrow enough on its own; keep it that way."""
+    def test_no_pattern_needs_the_exclusion(self):
+        """Every pattern is narrow enough on its own; keep it that way (SPEC_141
+        replaced sec_company_filings' sec_8k* pattern with explicit tables)."""
         from app.catalog.tables import pattern_matches
 
         claimed = {t: s.key for s in _catalog() for t in s.tables}
         hits = sorted({(s.key, t) for s in _catalog() for p in s.table_patterns
                        for t in claimed if pattern_matches(p, t) and t not in s.tables})
-        assert hits == [("sec_company_filings", "sec_8k_index")]
+        assert hits == []
 
 
 @pytest.mark.unit
@@ -816,13 +838,13 @@ class TestSharedTableRights:
             f"stale entries: {sorted(set(SHARED_TABLES) - shared)}")
 
     def test_three_pl_company_is_restricted_and_llm_flagged(self):
+        """SPEC_141 folded the three enrichers into si_3pl_companies (also_produced_by);
+        the one spec keeps the most restrictive of the four writers' blocks."""
         b = self._block("three_pl_company")
         assert b["redistribution"] == "restricted"
         assert b["pii_class"] == "business_contact"
         assert b["origin"] == "llm_extracted"
-        assert set(b["origins"]) == {"llm_extracted", "scraped", "derived"}
-        assert set(b["datasets"]) == {"si_3pl_fmcsa_enrichment", "si_3pl_sec_enrichment",
-                                      "si_3pl_website_enrichment", "si_3pl_companies"}
+        assert "datasets" not in b
 
     @pytest.mark.parametrize("table, origin, pii", [
         ("job_postings", "synthetic", "none"),
