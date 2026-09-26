@@ -111,9 +111,9 @@ class TestDataState:
         assert "b" in reasons[0]
 
     def test_states_are_closed(self):
-        from app.catalog.quality import DATA_STATES
+        from app.catalog.quality import LIVE_STATES
 
-        assert DATA_STATES == ("phantom", "empty", "populated", "defective", "seed_contaminated")
+        assert LIVE_STATES == ("phantom", "empty", "populated", "defective", "seed_contaminated")
 
 
 # ---------------------------------------------------------------------------
@@ -398,6 +398,8 @@ _TABLES = {
     "fred_t144": "CREATE TABLE fred_t144 (series_id TEXT, v NUMERIC)",
     "t144_gate": "CREATE TABLE t144_gate (id INT)",
     "t144_lock": "CREATE TABLE t144_lock (id INT)",
+    "t144_seed": "CREATE TABLE t144_seed (id INT, data_source TEXT, origin TEXT)",
+    "t144_contacts": "CREATE TABLE t144_contacts (id INT, full_name TEXT, email TEXT, city TEXT)",
 }
 _VIEWS = {
     "fred_observations_t144": "CREATE VIEW fred_observations_t144 AS SELECT * FROM fred_t144",
@@ -716,17 +718,17 @@ class TestQualityBlockPg:
             db.close()
 
         block = quality_block(pg_engine, _spec("usaspending_awards"), refresh=True)
-        assert block["data_state"] == "defective"
+        assert block["live_state"] == "defective"
         t = block["tables"][0]
         assert {"naics_code", "award_type"} <= set(t["key_null_columns"])
         assert t["key_null_pct"]["naics_code"] == 100.0
         assert t["rows"] == 2 and t["rows_exact"] is True
         assert block["profile"]["stale"] is False
 
-        assert quality_block(pg_engine, _spec("fbi_crime_estimates"), refresh=True)["data_state"] == "empty"
-        assert quality_block(pg_engine, _spec("eia_steo"), refresh=True)["data_state"] == "phantom"
+        assert quality_block(pg_engine, _spec("fbi_crime_estimates"), refresh=True)["live_state"] == "empty"
+        assert quality_block(pg_engine, _spec("eia_steo"), refresh=True)["live_state"] == "phantom"
         grid = quality_block(pg_engine, _spec("si_grid_infrastructure"), refresh=True)
-        assert grid["data_state"] == "seed_contaminated"
+        assert grid["live_state"] == "seed_contaminated"
         sub = [e for e in grid["tables"] if e["table"] == "substation"][0]
         assert sub["seed_rows"] == 1
 
@@ -764,7 +766,7 @@ class TestQualityBlockPg:
         assert block["rules"]["failing"] == ["fd not null"]
         assert block["open_anomalies"] == 1
         assert [p["rows"] for p in block["row_trend"]] == [1, 3]
-        assert block["data_state"] == "populated"
+        assert block["live_state"] == "populated"
         assert "metadata_completeness" in block
 
 
@@ -856,7 +858,7 @@ class TestCatalogApiPg:
 
     def test_detail_carries_quality_and_consumers(self, client):
         body = client.get("/api/v1/catalog/sec_form_d").json()
-        assert body["quality"]["data_state"] in ("populated", "empty")
+        assert body["quality"]["live_state"] in ("populated", "empty")
         assert body["quality"]["metadata_completeness"]["score"] >= 0
         paths = {e["path"] for e in body["consumers"]["code"]}
         assert "app/api/v1/form_d.py" in paths
@@ -874,3 +876,450 @@ class TestCatalogApiPg:
         assert client.post("/api/v1/catalog/admin/backfill-dataset-key").json()["applied"] is False
         client.role["role"] = "user"
         assert client.post("/api/v1/catalog/admin/backfill-dataset-key").status_code == 403
+
+
+# ===========================================================================
+# Review fixes (spec-144-fix)
+# ===========================================================================
+
+
+def _filtered_spec(base_key, key, table, predicate):
+    """A spec with SPEC_141's ``row_filters`` (the field lands with SPEC_141;
+    the quality code reads it with getattr, so set it on a copy)."""
+    import dataclasses
+
+    spec = dataclasses.replace(_spec(base_key), key=key, tables=(table,), table_patterns=(),
+                               primary_key=())
+    object.__setattr__(spec, "row_filters", ((table, predicate),))
+    return spec
+
+
+@pytest.mark.unit
+class TestGateTableSelection:
+    """Finding 1: the gate checks the table the job loaded, not the first N."""
+
+    def _pick(self, monkeypatch, job, catalog, base=None, registry=None):
+        from unittest.mock import MagicMock
+
+        import app.catalog.quality as q
+
+        base = set(base if base is not None else catalog)
+        monkeypatch.setattr(q, "relations", lambda engine, cached=False: {
+            t: {"kind": "table", "reltuples": 1, "n_live_tup": 1} for t in base})
+        monkeypatch.setattr(q, "dataset_tables_for_job", lambda db, job: list(catalog))
+        db = MagicMock()
+        db.query.return_value.filter.return_value.order_by.return_value.first.return_value = registry
+        return q.gate_tables_for_job(db, job, max_tables=6)
+
+    def test_census_job_gates_its_own_table(self, monkeypatch):
+        catalog = ["acs5_2015_b01001", "acs5_2015_b19013", "acs5_2020_b01001", "acs5_2021_b01001",
+                   "acs5_2022_b01001", "acs5_2022_b01003", "acs5_2022_b19013", "acs5_2023_b01001",
+                   "acs5_2023_b19013"]
+        job = SimpleNamespace(id=1, source="census", started_at=None, created_at=None, config={
+            "survey": "acs5", "year": 2023, "table_id": "B01001", "geo_level": "state"})
+        assert self._pick(monkeypatch, job, catalog) == ["acs5_2023_b01001"]
+
+    def test_bls_dataset_gates_bls_oes(self, monkeypatch):
+        catalog = ["bls_cpi", "bls_cps_labor_force", "bls_jolts", "bls_ces_employment",
+                   "bls_cpi_consumer_prices", "bls_cps_unemployment", "bls_oes"]
+        job = SimpleNamespace(id=1, source="bls", config={"dataset": "oes"})
+        assert self._pick(monkeypatch, job, catalog) == ["bls_oes"]
+
+    def test_dunl_source_suffix(self, monkeypatch):
+        catalog = ["dunl_currencies", "dunl_ports", "dunl_uom", "dunl_uom_conversions", "dunl_calendars"]
+        assert self._pick(monkeypatch, SimpleNamespace(id=1, source="dunl:ports", config={}),
+                          catalog) == ["dunl_ports"]
+        assert self._pick(monkeypatch, SimpleNamespace(id=1, source="dunl:uom_conversions", config={}),
+                          catalog) == ["dunl_uom_conversions"]
+
+    def test_registry_row_updated_by_the_job_comes_first(self, monkeypatch):
+        started = datetime(2026, 9, 26, 10)
+        reg = SimpleNamespace(table_name="fred_interest_rates", last_updated_at=started + timedelta(minutes=5))
+        job = SimpleNamespace(id=1, source="fred", config={}, started_at=started)
+        got = self._pick(monkeypatch, job, ["fred_gdp", "fred_interest_rates", "fred_cpi"], registry=reg)
+        assert got == ["fred_interest_rates"]
+
+    def test_config_named_table(self, monkeypatch):
+        job = SimpleNamespace(id=1, source="x", config={"table_name": "T_B"})
+        assert self._pick(monkeypatch, job, ["t_a", "t_b"]) == ["t_b"]
+
+    def test_nothing_specific_falls_back_to_registry_then_catalog(self, monkeypatch):
+        reg = SimpleNamespace(table_name="fred_cpi", last_updated_at=datetime(2026, 1, 1))
+        job = SimpleNamespace(id=1, source="fred", config={}, started_at=datetime(2026, 9, 26))
+        got = self._pick(monkeypatch, job, ["fred_gdp", "fred_interest_rates", "fred_cpi"], registry=reg)
+        assert got == ["fred_cpi", "fred_gdp", "fred_interest_rates"]
+
+
+@pytest.mark.unit
+class TestGateOffTheEventLoop:
+    """Finding 6: blocking gate work runs in a thread; large tables are not profiled."""
+
+    def test_gate_runs_in_a_worker_thread(self, monkeypatch):
+        import asyncio
+        import threading
+
+        from app.api.v1 import jobs
+
+        seen = []
+        monkeypatch.setattr(jobs, "_quality_gate_tables", lambda db, job: ["t1", "t2"])
+        monkeypatch.setattr(jobs, "_gate_table", lambda db, job, t: seen.append((t, threading.get_ident())))
+
+        async def main():
+            beats = []
+
+            async def heartbeat():
+                for _ in range(3):
+                    beats.append(1)
+                    await asyncio.sleep(0)
+
+            await asyncio.gather(jobs._run_quality_gate(SimpleNamespace(rollback=lambda: None),
+                                                        SimpleNamespace(id=1, source="x")), heartbeat())
+            return beats
+
+        loop_thread = threading.get_ident()
+        assert asyncio.run(main()) == [1, 1, 1]
+        assert [t for t, _ in seen] == ["t1", "t2"]
+        assert all(ident != loop_thread for _, ident in seen)
+
+    def test_gate_errors_still_swallowed(self, monkeypatch):
+        import asyncio
+
+        from app.api.v1 import jobs
+
+        def boom(db, job):
+            raise RuntimeError("x")
+
+        monkeypatch.setattr(jobs, "_quality_gate_tables", boom)
+        asyncio.run(jobs._run_quality_gate(SimpleNamespace(rollback=lambda: None),
+                                           SimpleNamespace(id=1, source="x")))
+
+    def test_large_table_is_left_to_the_scheduler(self, monkeypatch):
+        import app.core.data_profiling_service as dps
+        import app.core.data_quality_service as dqs
+        from app.api.v1 import jobs
+
+        profiled, seen = [], {}
+        monkeypatch.setattr(jobs, "_gate_row_estimate", lambda db, t: jobs.GATE_PROFILE_MAX_ROWS + 1)
+        monkeypatch.setattr(dqs, "previous_profile_count", lambda db, t: 10 ** 7)
+        monkeypatch.setattr(dqs, "evaluate_rules_for_job",
+                            lambda db, job, t: SimpleNamespace(overall_status="passed"))
+        monkeypatch.setattr(dps, "profile_table", lambda db, t, **kw: profiled.append(t))
+        monkeypatch.setattr(dqs, "check_row_count_delta",
+                            lambda db, job, t, current, previous_count=None: seen.update(current=current))
+        monkeypatch.setattr(dqs, "check_date_gaps", lambda *a, **k: [])
+        jobs._gate_table(SimpleNamespace(rollback=lambda: None), SimpleNamespace(id=1, source="x"), "big_t")
+        assert profiled == []
+        assert seen == {"current": jobs.GATE_PROFILE_MAX_ROWS + 1}  # the estimate, no count(*)
+
+    def test_gate_limit_matches_post_load(self):
+        from app.api.v1 import jobs
+        from app.catalog.quality import POST_LOAD_MAX_ROWS
+
+        assert jobs.GATE_PROFILE_MAX_ROWS == POST_LOAD_MAX_ROWS
+
+
+@pytest.mark.unit
+class TestUsageCoverage:
+    """Finding 2 and the usage scope gaps."""
+
+    def test_generic_ingestor_tables_have_readers(self):
+        from app.catalog.usage_build import load_usage
+
+        tables = load_usage()["tables"]
+        assert "app/services/atlas/layers.py" in {e["path"] for e in tables["fdic_bank_financials"]}
+        assert "app/api/v1/econ_snapshot.py" in {e["path"] for e in tables["bea_regional"]}
+        assert tables.get("fema_disaster_declarations")
+        assert tables.get("us_trade_exports_state")
+
+    def test_patterns_count_in_scan(self):
+        from app.catalog.usage_build import scan_file
+
+        src = "SQL = 'SELECT * FROM acs5_2023_b01001 JOIN cte_x ON 1=1'\n"
+        assert scan_file(src, set(), {}, patterns=("acs5_*",)) == {"acs5_2023_b01001": {"sql"}}
+        assert scan_file(src, set(), {}) == {}
+
+    def test_core_services_are_scanned_but_not_model_files(self):
+        from app.catalog.usage_build import load_usage
+
+        paths = {e["path"] for es in load_usage()["tables"].values() for e in es}
+        assert any(p.startswith("app/core/") for p in paths)
+        assert "app/core/models.py" not in paths and "app/core/pe_models.py" not in paths
+
+    def test_view_over_view_readers(self):
+        from app.catalog.usage_build import consumers_for
+
+        usage = {"tables": {"v_outer": [{"path": "app/api/v1/x.py", "kind": "api_router", "via": ["sql"]}]}}
+        deps = {"v_inner": ["form_d_filings"], "v_outer": ["v_inner"]}
+        out = consumers_for(_spec("sec_form_d"), deps=deps, usage=usage)
+        assert {"view": "v_outer", "reads": ["v_inner"]} in out["views"]
+        assert {"path": "app/api/v1/x.py", "kind": "api_router", "table": "v_outer",
+                "via": ["view:v_outer"]} in out["code"]
+
+
+@pytest.mark.unit
+class TestFlagsAndVocabulary:
+    """Findings 4 and 7: one vocabulary; verified states and seed rows are flags."""
+
+    def _classify(self, tables, verified=None):
+        from app.catalog.quality import classify_live_state
+
+        return classify_live_state(tables, verified)
+
+    def test_verified_fabricated_is_never_populated(self):
+        state, reasons, flags = self._classify(
+            [{"table": "seismic_hazard", "exists": True, "rows": 539, "seed_rows": 0}], "fabricated")
+        assert state == "seed_contaminated" and flags == ["fabricated"]
+        assert any("fabricated" in r for r in reasons)
+
+    def test_defective_keeps_the_seed_flag(self):
+        state, reasons, flags = self._classify([
+            {"table": "t", "exists": True, "rows": 10, "key_null_columns": ["k"], "seed_rows": 3}])
+        assert state == "defective"
+        assert set(flags) == {"key_columns_null", "seed_rows"}
+        assert any("3 seed" in r for r in reasons)
+
+    def test_verified_key_columns_null_is_defective(self):
+        state, _, flags = self._classify([{"table": "t", "exists": True, "rows": 5}], "key_columns_null")
+        assert state == "defective" and flags == ["key_columns_null"]
+
+    def test_skipped_seed_scan_is_a_reason(self):
+        state, reasons, _ = self._classify([
+            {"table": "big", "exists": True, "rows": 10 ** 7, "seed_rows": None, "seed_scan": "skipped"}])
+        assert state == "populated"
+        assert any("seed scan skipped" in r and "big" in r for r in reasons)
+
+    def test_unknown_rows_are_not_empty(self):
+        state, reasons, _ = self._classify([{"table": "shared", "exists": True, "rows": None}])
+        assert state == "populated" and any("row count unknown" in r for r in reasons)
+
+    def test_curated_states_match_the_spec_141_vocabulary(self):
+        from app.catalog import get_spec
+        from app.catalog.quality import CURATED_DATA_STATES, FLAG_STATES, static_flags
+
+        for key, state in CURATED_DATA_STATES.items():
+            assert get_spec(key) is not None, key
+            assert state in FLAG_STATES + ("key_columns_null",)
+        for key in ("si_seismic_hazard", "si_incentive_deals", "public_lp_strategies",
+                    "si_certified_sites", "si_opportunity_zones"):
+            assert static_flags(_spec(key)), key
+        assert static_flags(_spec("sec_form_d")) == []
+
+    def test_spec_data_state_wins_over_curated(self):
+        import dataclasses
+
+        from app.catalog.quality import verified_state
+
+        spec = dataclasses.replace(_spec("si_seismic_hazard"))
+        object.__setattr__(spec, "data_state", "ok")
+        assert verified_state(spec) == "ok"
+
+    def test_seed_markers_cover_demo_and_hand_typed_rows(self):
+        from app.catalog.quality import SEED_MARKER_COLUMNS, SEED_SOURCE_VALUES, seed_predicate
+
+        assert {"source", "data_source"} <= set(SEED_MARKER_COLUMNS)
+        assert {"demo_seeder", "gjf_expanded", "nrel_reference"} <= set(SEED_SOURCE_VALUES)
+        sql, params = seed_predicate(["source", "data_source"])
+        assert '"data_source"' in sql and "demo_seeder" in params.values()
+
+    def test_list_carries_static_flags(self):
+        from app.api.v1.catalog import list_catalog
+
+        body = list_catalog(kind=None, source=None, status_public=None, redistribution=None, q=None)
+        by = {d["key"]: d for d in body["datasets"]}
+        assert by["si_seismic_hazard"]["quality_flags"] == ["fabricated"]
+        assert by["sec_form_d"]["quality_flags"] == []
+
+
+@pytest.mark.unit
+class TestRawValuePolicy:
+    """Finding 5: no raw values from personal/contact or restricted datasets."""
+
+    def test_restricted_tables(self):
+        from app.catalog.quality import raw_values_restricted
+
+        for t in ("people", "company_people", "family_office_contacts", "pe_people"):
+            assert raw_values_restricted(t), t
+        assert not raw_values_restricted("substation")
+        assert not raw_values_restricted("fdic_bank_financials")
+
+    def test_personal_columns(self):
+        from app.core.data_profiling_service import is_personal_column
+
+        for c in ("email", "contact_email", "phone", "linkedin_url", "full_name", "first_name"):
+            assert is_personal_column(c), c
+        for c in ("city", "company_name", "source", "state"):
+            assert not is_personal_column(c), c
+
+    def test_policy_fails_closed(self, monkeypatch):
+        import app.catalog.quality as q
+        from app.core.data_profiling_service import raw_values_allowed
+
+        def boom(t):
+            raise RuntimeError("no catalog")
+
+        monkeypatch.setattr(q, "raw_values_restricted", boom)
+        assert raw_values_allowed("substation") is False
+
+
+@pg
+class TestReviewFixesPg:
+    def test_profile_of_a_personal_table_stores_no_raw_values(self, pg_engine, monkeypatch):
+        from sqlalchemy import text
+
+        import app.catalog.quality as q
+        from app.core.data_profiling_service import get_column_stats, profile_table
+
+        with pg_engine.begin() as conn:
+            conn.execute(text("DELETE FROM t144_contacts"))
+            conn.execute(text("INSERT INTO t144_contacts VALUES (1, 'Ann Lee', 'ann@x.com', 'Austin'), "
+                              "(2, 'Bo Diaz', 'bo@x.com', 'Austin')"))
+        # pii='personal' dataset
+        monkeypatch.setattr(q, "raw_values_restricted", lambda t, specs=None: t == "t144_contacts")
+        db = _session(pg_engine)
+        try:
+            snap = profile_table(db, "t144_contacts")
+            stats = {c.column_name: c.stats for c in get_column_stats(db, snap.id)}
+        finally:
+            db.close()
+        blob = json.dumps(stats)
+        assert "ann@x.com" not in blob and "Ann Lee" not in blob and "Austin" not in blob
+        assert stats["email"]["top_values_withheld"] is True
+
+        # a table the catalog allows still withholds name/email/phone columns
+        monkeypatch.setattr(q, "raw_values_restricted", lambda t, specs=None: False)
+        db = _session(pg_engine)
+        try:
+            snap = profile_table(db, "t144_contacts")
+            stats = {c.column_name: c.stats for c in get_column_stats(db, snap.id)}
+        finally:
+            db.close()
+        assert "top_values" not in stats["email"] and "top_values" not in stats["full_name"]
+        assert stats["city"]["top_values"][0]["value"] == "Austin"
+
+    def test_profile_columns_endpoint_strips_raw_values_for_non_admin(self, pg_engine, monkeypatch):
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from sqlalchemy.orm import sessionmaker
+
+        import app.catalog.quality as q
+        from app.api.v1 import data_quality
+        from app.core.authz import current_principal
+        from app.core.database import get_db
+        from app.core.models import DataProfileColumn, DataProfileSnapshot
+
+        db = _session(pg_engine)
+        try:
+            snap = DataProfileSnapshot(table_name="t144_contacts", row_count=2, column_count=1,
+                                       total_null_count=0, profiled_at=datetime.utcnow())
+            db.add(snap)
+            db.flush()
+            db.add(DataProfileColumn(snapshot_id=snap.id, column_name="city", null_count=0, null_pct=0,
+                                     stats={"top_values": [{"value": "Austin", "count": 2}]}))
+            db.commit()
+        finally:
+            db.close()
+        monkeypatch.setattr(q, "raw_values_restricted", lambda t, specs=None: t == "t144_contacts")
+        monkeypatch.setattr(data_quality, "_require_profilable", lambda db, t: None)
+        app = FastAPI()
+        app.include_router(data_quality.router, prefix="/api/v1")
+        Session = sessionmaker(bind=pg_engine)
+        role = {"role": "user"}
+
+        def _db():
+            s = Session()
+            try:
+                yield s
+            finally:
+                s.close()
+
+        app.dependency_overrides[get_db] = _db
+        app.dependency_overrides[current_principal] = lambda: role
+        c = TestClient(app)
+        user = c.get("/api/v1/data-quality/profiles/t144_contacts/columns").json()
+        assert "Austin" not in json.dumps(user) and user[0]["stats"]["top_values_withheld"] is True
+        role["role"] = "admin"
+        admin = c.get("/api/v1/data-quality/profiles/t144_contacts/columns").json()
+        assert admin[0]["stats"]["top_values"][0]["value"] == "Austin"
+
+    def test_seed_markers_in_data_source_and_origin(self, pg_engine):
+        from sqlalchemy import text
+
+        from app.catalog.quality import seed_rows
+
+        with pg_engine.begin() as conn:
+            conn.execute(text("DELETE FROM t144_seed"))
+            conn.execute(text("INSERT INTO t144_seed VALUES (1, 'demo_seeder', NULL), (2, 'sec', 'gjf_expanded'), "
+                              "(3, 'sec', 'official'), (4, 'eia_sample', NULL)"))
+        assert seed_rows(pg_engine, "t144_seed", 4) == 3
+        assert seed_rows(pg_engine, "t144_seed", 4, where="id <> 1") == 2
+
+    def test_profiler_stores_seed_rows_and_plain_get_does_not_scan(self, pg_engine, monkeypatch):
+        from sqlalchemy import text
+
+        import app.catalog.quality as q
+        from app.core.data_profiling_service import profile_table
+
+        _require_created(pg_engine, "substation")
+        with pg_engine.begin() as conn:
+            conn.execute(text("DELETE FROM substation"))
+            conn.execute(text("INSERT INTO substation (name, source) VALUES "
+                              "('s1', 'hifld'), ('s2', 'hifld_sample'), ('s3', 'hifld')"))
+        db = _session(pg_engine)
+        try:
+            assert profile_table(db, "substation", source="site_intel") is not None
+        finally:
+            db.close()
+
+        def no_scan(*a, **k):
+            raise AssertionError("a plain GET must not scan user tables")
+
+        monkeypatch.setattr(q, "_count", no_scan)
+        monkeypatch.setattr(q, "seed_rows", no_scan)
+        spec = _spec("si_grid_infrastructure")
+        live = {"tables": [{"table": "substation", "exists": True, "rows": 3, "rows_exact": True}]}
+        block = q.quality_block(pg_engine, spec, live=live)
+        sub = [e for e in block["tables"] if e["table"] == "substation"][0]
+        assert sub["rows"] == 3 and sub["rows_exact"] is True
+        assert sub["seed_rows"] == 1 and sub["seed_scan"] == "profile"
+        assert block["live_state"] == "seed_contaminated" and block["measured"] == "cached"
+        assert "seed_rows" in block["flags"] and "sample_mixed" in block["flags"]
+
+    def test_row_filtered_table_gets_filtered_counts_and_no_whole_table_quality(self, pg_engine):
+        from sqlalchemy import text
+
+        from app.catalog.quality import quality_block, row_trends
+
+        today = date.today()
+        with pg_engine.begin() as conn:
+            conn.execute(text("DELETE FROM form_d_filings"))
+            conn.execute(text("INSERT INTO form_d_filings VALUES ('a', now()), ('b', now()), ('c', now())"))
+            conn.execute(text(
+                "INSERT INTO dq_quality_snapshots (snapshot_date, source, table_name, quality_score, row_count, "
+                "created_at) VALUES (:d, 'sec', 'form_d_filings', 90, 3, now())"), {"d": today})
+        spec = _filtered_spec("sec_form_d", "t144_share", "form_d_filings", "accession_number = 'a'")
+        block = quality_block(pg_engine, spec, refresh=True)
+        t = block["tables"][0]
+        assert t["rows"] == 1 and t["rows_exact"] is True
+        assert t["row_filter"] == "accession_number = 'a'"
+        assert t["quality_score"] is None and t["rules"] is None
+        assert block["score"] is None and block["row_trend"] == []
+        # a plain read without live counts: unknown, not the whole-table estimate
+        from app.catalog import quality as q
+
+        q.clear_cache()
+        plain = quality_block(pg_engine, spec)
+        assert plain["tables"][0]["rows"] is None and plain["tables"][0]["seed_scan"] == "filtered"
+        assert "t144_share" not in row_trends(pg_engine, [spec, _spec("sec_form_d")], today=today)
+        assert "sec_form_d" in row_trends(pg_engine, [spec, _spec("sec_form_d")], today=today)
+
+    def test_dq_targets_mark_shared_tables(self, pg_engine):
+        from app.catalog.quality import dq_targets
+
+        db = _session(pg_engine)
+        try:
+            targets = {t["table"]: t for t in dq_targets(db)}
+        finally:
+            db.close()
+        assert len(targets["pe_firms"]["shared_by"]) > 1
+        assert targets["form_d_filings"]["shared_by"] == []
+        assert targets["form_d_filings"]["row_filtered"] is False

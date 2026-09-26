@@ -185,6 +185,8 @@
         .spark circle { fill: #818cf8; }
         .spark.down polyline { stroke: #f87171; }
         .spark.down circle { fill: #f87171; }
+        .qflag { display: inline-block; margin-left: 6px; padding: 0 5px; border-radius: 4px; font-size: 0.7rem;
+                 line-height: 1.4; color: #fbbf24; border: 1px solid rgba(251,191,36,0.5); vertical-align: middle; }
         .st-table td { overflow-wrap: anywhere; }
         .ds-row { cursor: pointer; }
         .ds-row:hover { background: rgba(99,102,241,0.08); }
@@ -531,6 +533,17 @@
                 '<circle cx="' + end[0] + '" cy="' + end[1] + '" r="1.6"/></svg>';
         }
 
+        // SPEC_144 data flags from the catalog list (quality_flags: fabricated,
+        // seeded, sample_mixed, placeholder, demo, key_columns_null). Escaped.
+        function flagChips(flags) {
+            if (!Array.isArray(flags)) return '';
+            return flags.filter(function (f) { return typeof f === 'string' && f; }).map(function (f) {
+                var label = f.replace(/_/g, ' ');
+                return '<span class="qflag" title="' + esc('flagged: ' + label + ' (rows kept, not real data)') +
+                    '">' + esc(label) + '</span>';
+            }).join('');
+        }
+
         window.StatusCore = {
             STATUS_ORDER: STATUS_ORDER,
             ATTENTION: ATTENTION,
@@ -555,6 +568,7 @@
             bulkSourceFor: bulkSourceFor,
             sparklinePoints: sparklinePoints,
             sparklineSvg: sparklineSvg,
+            flagChips: flagChips,
         };
     })();
     </script>
@@ -871,7 +885,7 @@
         function rowHtml(d) {
             const expanded = state.expanded.has(d.key);
             return `<tr class="ds-row${expanded ? ' expanded' : ''}" data-key="${esc(d.key)}" tabindex="0" aria-expanded="${expanded}">
-                <td class="c-name"><span class="caret">&#9656;</span><span class="ds-name">${esc(d.display_name)}</span>
+                <td class="c-name"><span class="caret">&#9656;</span><span class="ds-name">${esc(d.display_name)}</span>${C.flagChips((state.catalog.get(d.key) || {}).quality_flags)}
                     <span class="cell-sub mono ds-key">${esc(d.key)}</span></td>
                 <td class="c-kind">${esc(d.kind)}</td>
                 <td class="c-status" title="${esc(d.status_reason)}">${statusBadge(d.status)}${d.blockers && d.blockers.length ? `<span class="cell-sub">${d.blockers.length} blocker${d.blockers.length === 1 ? '' : 's'}</span>` : ''}</td>

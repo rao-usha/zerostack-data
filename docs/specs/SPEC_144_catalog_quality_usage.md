@@ -65,7 +65,7 @@
    `reltuples`, then the latest profile) taken daily for every catalog table.
    PLAN_088's `catalog_table_stats` table (migration 0018) is not built; this
    wave allows no migration for SPEC_144.
-8. **Quality block on `GET /catalog/{key}`** (`quality`): `data_state`
+8. **Quality block on `GET /catalog/{key}`** (`quality`): `live_state` (was `data_state`; see Review fixes 4)
    (`phantom | empty | populated | defective | seed_contaminated`, with reasons),
    latest DQ score and components, rule pass/fail (latest result per rule and
    table in 7 days, failing rule names), open anomalies, profile age and staleness
@@ -115,9 +115,61 @@ jobs, deleting or moving seed/fabricated rows.
 - selector includes `form_d_filings`, `pe_firms`, `core.entity`, never views
 - row delta uses the prior snapshot; lock blocks across connections; no `hash(`
 - freshness follows the verdict map
-- `data_state` fixtures: `eia_steo` phantom, `fbi_crime_*` empty,
+- `live_state` fixtures: `eia_steo` phantom, `fbi_crime_*` empty,
   `usaspending_awards` defective, `substation` (si_grid_infrastructure) seed_contaminated
 - completeness score deterministic
 - `usage.json` drift gate; view dependencies; `public_company_financials` consumers
 - backfill: dry run counts, apply, idempotent rerun, never overwrites
 - quality block / row-trends / usage endpoints; status.html sparkline helper under node
+
+## Review fixes (spec-144-fix)
+
+1. **Gate table choice** (`quality.gate_tables_for_job`): the gate checks the
+   table the job loaded. Order: the source's registry row updated since the job
+   started, tables the config names (`table`, `table_name`, `tables`), else the
+   dataset's tables whose name tokens best match the config values and the
+   source suffix (`acs5`+`2023`+`B01001` → `acs5_2023_b01001`; `dataset=oes` →
+   `bls_oes`; `dunl:ports` → `dunl_ports`). Only when nothing specific is known:
+   the latest-updated registry table, then the catalog order. Max 6.
+2. **Gate off the event loop**: `_run_quality_gate` runs the blocking work with
+   `asyncio.to_thread` (the session is handed over; the caller awaits), so the
+   worker heartbeat keeps running. Tables above `GATE_PROFILE_MAX_ROWS`
+   (= `POST_LOAD_MAX_ROWS`, 2M) are not profiled or counted by the gate; the row
+   delta uses the planner estimate and the scheduler profiles them.
+3. **Usage map**: SQL references also count when the name is a table a spec
+   declares or matches a spec's `table_patterns` (generic-ingestor tables such as
+   `fdic_bank_financials`, `bea_regional`, `acs5_*`); `app/core` is scanned
+   (kind `core_service`; model modules, `schemas.py`, `database.py`,
+   `migrate.py` excluded); `consumers_for` follows views over views.
+4. **One vocabulary**: the block's field is `live_state` (`LIVE_STATES`), not
+   `data_state` (SPEC_141 owns `DatasetSpec.data_state`). `verified_state` is
+   SPEC_141's `data_state` when present, else `CURATED_DATA_STATES` (the values
+   SPEC_141 sets). A verified `fabricated | seeded | sample_mixed | placeholder |
+   demo` makes the live state `seed_contaminated`; `key_columns_null` makes it
+   `defective`. `flags` lists every finding (verified state, `key_columns_null`,
+   `all_null_columns`, `seed_rows`), so defective does not hide seeded.
+5. **Seed markers**: `source`, `data_source` and `origin` columns;
+   `%sample%`, `%\_seed`, `nrel_reference`, `demo_seeder`, `gjf_expanded`. A
+   skipped (>5M rows) or failed scan is a reason. `quality_flags` (static) is on
+   every `GET /catalog` entry and the detail, and status.html shows them as
+   escaped chips next to the dataset name.
+6. **Shared tables** (SPEC_141 `row_filters`, read with `getattr` until it
+   merges): a filtered table gets filtered counts (None when not exact), filtered
+   seed scans, and no whole-table profile facts, score, rules or row trend;
+   `row_trends` leaves such datasets out; `dq_targets` marks `shared_by` and
+   `row_filtered`.
+7. **Raw values**: profiles of tables whose dataset has `pii_class != 'none'` or
+   `redistribution = 'restricted'` store no `top_values`
+   (`top_values_withheld: true`), nor do name/email/phone/linkedin/address columns
+   anywhere; the policy fails closed. `GET /data-quality/profiles/{t}/columns`
+   strips `top_values` for non-admins on those tables and columns (older profiles).
+8. **Cheap GET**: a plain `GET /catalog/{key}` quality block runs no count or
+   seed scan: rows come from the detail's `live` counts (or the estimate), seed
+   rows from the latest profile (the profiler stores `seed_rows` on the marker
+   column). `refresh=true` (admin) scans. The block says `measured: cached|scan`.
+
+Not done here: applying the `dataset_key` backfill on live (writes are out of
+bounds for this session; run `python -m app.catalog.backfill_dataset_key
+--apply` after SPEC_143's aliases); `catalog_table_stats` (no migration this
+wave); `column_doc_pct` wiring (SPEC_137); flags on each source's own data
+routers (dozens of routers other specs own).

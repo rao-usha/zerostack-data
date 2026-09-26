@@ -2,6 +2,7 @@
 Job management endpoints.
 """
 
+import asyncio
 import importlib
 import logging
 from datetime import datetime
@@ -610,6 +611,20 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 # SPEC_144: at most this many of a dataset's tables are gated per job
 GATE_MAX_TABLES = 6
 GATE_COUNT_TIMEOUT_MS = 30000
+# the same limit as the post-load hook (quality.POST_LOAD_MAX_ROWS): larger
+# tables are profiled by the scheduler, never inside a job's completion path
+GATE_PROFILE_MAX_ROWS = 2_000_000
+
+
+def _gate_row_estimate(db, table_name: str) -> Optional[int]:
+    """Planner estimate for one table (None off PostgreSQL or when unknown)."""
+    try:
+        from app.catalog.live import estimate_rows
+        from app.catalog.quality import engine_of
+
+        return estimate_rows(engine_of(db.get_bind()), table_name)
+    except Exception:
+        return None
 
 # Date gap check for tables with known date columns
 DATE_COLUMN_MAP = {
@@ -621,15 +636,16 @@ DATE_COLUMN_MAP = {
 
 
 def _quality_gate_tables(db, job) -> List[str]:
-    """SPEC_144: the job's dataset (``job.dataset_key``, else resolved from
-    source + config) -> its catalog tables that exist. Falls back to the
-    latest ingested registry row for the source (legacy tables)."""
+    """SPEC_144: the tables this job loaded, most specific first
+    (``quality.gate_tables_for_job``: the registry row it updated, tables its
+    config names, then its dataset's tables that match the config). Falls back
+    to the latest ingested registry row for the source (legacy tables)."""
     try:
-        from app.catalog.quality import dataset_tables_for_job
+        from app.catalog.quality import gate_tables_for_job
 
-        tables = dataset_tables_for_job(db, job)
+        tables = gate_tables_for_job(db, job, max_tables=GATE_MAX_TABLES)
         if tables:
-            return tables[:GATE_MAX_TABLES]
+            return tables
     except Exception as e:
         logger.debug(f"Quality gate: catalog resolution failed for job {job.id}: {e}")
         db.rollback()
@@ -671,11 +687,17 @@ def _gate_table(db, job, table_name: str) -> None:
             f"{getattr(report, 'errors', 0)} errors, {getattr(report, 'warnings', 0)} warnings"
         )
 
-    # Phase 1: Auto-profile table after ingestion
+    # Phase 1: Auto-profile table after ingestion. Tables above the post-load
+    # limit are left to the scheduled profiler (a profile of one is minutes of scans).
     snapshot = None
+    estimate = _gate_row_estimate(db, table_name)
+    large = estimate is not None and estimate > GATE_PROFILE_MAX_ROWS
     try:
         from app.core.data_profiling_service import profile_table
-        snapshot = profile_table(db, table_name, job_id=job.id, source=job.source)
+        if large:
+            logger.info(f"Quality gate: {table_name} (~{estimate} rows) left to the scheduled profiler")
+        else:
+            snapshot = profile_table(db, table_name, job_id=job.id, source=job.source)
         if snapshot:
             logger.info(f"Quality gate: profiled {table_name} ({snapshot.row_count} rows)")
 
@@ -698,6 +720,8 @@ def _gate_table(db, job, table_name: str) -> None:
 
         if snapshot is not None:
             current_count = snapshot.row_count
+        elif large:
+            current_count = estimate  # no full count on a table this size
         else:
             if db.get_bind().dialect.name == "postgresql":
                 db.execute(sa_text(f"SET LOCAL statement_timeout = {GATE_COUNT_TIMEOUT_MS}"))
@@ -728,10 +752,21 @@ async def _run_quality_gate(db, job: IngestionJob):
     Errors in the quality gate itself are swallowed so they never
     cause the ingestion job to appear failed.
 
-    SPEC_144: the tables are the job's catalog dataset tables (up to
-    ``GATE_MAX_TABLES``), each gated on its own; the registry row for the
-    source is only the fallback.
+    SPEC_144: the tables are the ones the job loaded (up to
+    ``GATE_MAX_TABLES``, see ``_quality_gate_tables``), each gated on its own.
+    The work is blocking database I/O (rules, profiles, counts), so it runs in
+    a worker thread: the event loop keeps serving the worker's heartbeat, and
+    a long gate can no longer get a finished job reset to PENDING and re-run.
+    The session is handed over, not shared: this coroutine awaits the thread
+    and nothing else uses ``db`` meanwhile.
     """
+    try:
+        await asyncio.to_thread(_run_quality_gate_sync, db, job)
+    except Exception as e:
+        logger.warning(f"Quality gate error for job {job.id}: {e}")
+
+
+def _run_quality_gate_sync(db, job: IngestionJob) -> None:
     try:
         tables = _quality_gate_tables(db, job)
         if not tables:

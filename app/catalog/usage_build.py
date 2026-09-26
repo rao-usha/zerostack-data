@@ -9,15 +9,18 @@ Static part, generated and checked in (``app/catalog/usage.json``)::
 It scans the string literals of the consumer packages (``SCAN_DIRS``) for
 ``FROM``/``JOIN`` table references and the code for ORM model class names.
 A SQL reference counts only when the name is a table or view declared in code
-(``tables.declared_tables()`` plus ``CREATE VIEW`` statements), which drops
-CTE names and English prose. The map is keyed by table, not by dataset, so it
+(``tables.declared_tables()`` plus ``CREATE VIEW`` statements), a table a
+catalog spec declares, or a name matching a spec's ``table_patterns`` (tables
+generic ingestors build from metadata), which drops CTE names and English
+prose. The map is keyed by table, not by dataset, so it
 changes only when the scanned code changes. It is a heuristic: dynamic names
 (``f"FROM {table}"``) are invisible.
 
 Runtime part: ``pg_depend`` gives view -> base table edges
 (``public_company_financials`` reads ``sec_financial_facts`` ...), cached for
 ``VIEW_DEPS_TTL_S``. ``consumers_for`` joins the two: code that reads a
-dataset's tables directly, the views over them, and code that reads those views.
+dataset's tables directly, the views over them (and views over those views),
+and code that reads those views.
 """
 
 from __future__ import annotations
@@ -51,9 +54,15 @@ SCAN_DIRS: Tuple[Tuple[str, str], ...] = (
     ("app/reports", "report"),
     ("app/marts", "mart"),
     ("app/entities", "entity"),
+    ("app/core", "core_service"),
 )
-# the catalog's own routers introspect every table; they are not consumers
+# the catalog's own routers introspect every table; they are not consumers.
+# Model modules define (not read) the ORM classes; the schema and migration
+# helpers create tables.
 EXCLUDE_PREFIXES = ("app/api/v1/catalog",)
+EXCLUDE_FILES = frozenset({
+    "app/core/schemas.py", "app/core/database.py", "app/core/migrate.py",
+})
 
 _SQL_REF = re.compile(
     r"\b(?:from|join)\s+((?:\"?[a-z_][a-z0-9_]*\"?\.)?\"?[a-z_][a-z0-9_]*\"?)", re.I)
@@ -94,10 +103,33 @@ def _declared_views() -> Set[str]:
     return out
 
 
+def catalog_tables() -> Tuple[Set[str], Tuple[str, ...]]:
+    """Every table a catalog spec declares, and every ``table_patterns`` glob.
+
+    Ingestors that build tables from metadata (``fdic_bank_financials``,
+    ``bea_regional``, ``acs5_*``) leave no model, DDL literal or
+    ``table_name=`` in code, so ``declared_tables()`` misses them; the specs
+    name them. Patterns keep this static (no database at build time)."""
+    from app.catalog.registry import get_catalog
+
+    tables: Set[str] = set()
+    patterns: List[str] = []
+    for s in get_catalog():
+        tables.update(s.tables)
+        patterns.extend(s.table_patterns)
+    return tables, tuple(sorted(set(patterns)))
+
+
 def known_relations() -> Set[str]:
     from app.catalog.tables import declared_tables
 
-    return set(declared_tables()) | _declared_views()
+    return set(declared_tables()) | _declared_views() | catalog_tables()[0]
+
+
+def _model_files() -> Set[str]:
+    from app.catalog.tables import MODEL_MODULES
+
+    return {m.replace(".", "/") + ".py" for m in MODEL_MODULES}
 
 
 def model_tables() -> Dict[str, Set[str]]:
@@ -125,8 +157,13 @@ def _tokens(source: str):
         return []
 
 
-def scan_file(source: str, known: Set[str], models: Dict[str, Set[str]]) -> Dict[str, Set[str]]:
-    """table -> {"sql", "orm"} for one module's source."""
+def scan_file(source: str, known: Set[str], models: Dict[str, Set[str]],
+              patterns: Iterable[str] = ()) -> Dict[str, Set[str]]:
+    """table -> {"sql", "orm"} for one module's source. A SQL reference counts
+    when the name is known or matches a catalog table pattern (public schema)."""
+    from app.catalog.tables import pattern_matches
+
+    patterns = tuple(patterns)
     found: Dict[str, Set[str]] = {}
     for tok in _tokens(source):
         if tok.type == tokenize.STRING:
@@ -134,7 +171,7 @@ def scan_file(source: str, known: Set[str], models: Dict[str, Set[str]]) -> Dict
                 name = ref.replace('"', "").lower()
                 schema, _, rel = name.rpartition(".")
                 key = normalize(schema or None, rel)
-                if key in known:
+                if key in known or ("." not in key and any(pattern_matches(p, key) for p in patterns)):
                     found.setdefault(key, set()).add("sql")
         elif tok.type == tokenize.NAME and tok.string in models:
             for t in models[tok.string]:
@@ -144,7 +181,9 @@ def scan_file(source: str, known: Set[str], models: Dict[str, Set[str]]) -> Dict
 
 def build_usage(root: Path = REPO_ROOT) -> Dict[str, Any]:
     known = known_relations()
+    patterns = catalog_tables()[1]
     models = model_tables()
+    skip = EXCLUDE_FILES | _model_files()
     tables: Dict[str, List[Dict[str, Any]]] = {}
     for rel_dir, kind in SCAN_DIRS:
         base = root / rel_dir
@@ -152,10 +191,10 @@ def build_usage(root: Path = REPO_ROOT) -> Dict[str, Any]:
             continue
         for path in sorted(base.rglob("*.py")):
             rel = path.relative_to(root).as_posix()
-            if rel.startswith(EXCLUDE_PREFIXES):
+            if rel.startswith(EXCLUDE_PREFIXES) or rel in skip:
                 continue
             source = path.read_text(encoding="utf-8", errors="ignore")
-            for table, via in scan_file(source, known, models).items():
+            for table, via in scan_file(source, known, models, patterns).items():
                 tables.setdefault(table, []).append({"path": rel, "kind": kind, "via": sorted(via)})
     return {
         "generated_by": "python -m app.catalog.usage_build",
@@ -242,7 +281,15 @@ def consumers_for(spec: DatasetSpec, deps: Optional[Dict[str, List[str]]] = None
     names = _names(usage, deps, existing)
     tables = [t for t in resolve_tables(spec, {n for n in names if "." not in n} | set(spec.tables))]
     tset = set(tables)
-    views = sorted({v for v, ts in deps.items() if tset & set(ts) and v not in tset})
+    # views over the tables, and views over those views (to a fixed point)
+    reached: Set[str] = set()
+    while True:
+        more = {v for v, ts in deps.items()
+                if v not in tset and v not in reached and (tset | reached) & set(ts)}
+        if not more:
+            break
+        reached |= more
+    views = sorted(reached)
     code: List[Dict[str, Any]] = []
     for t in tables:
         for e in usage.get("tables", {}).get(t, []):
@@ -253,7 +300,7 @@ def consumers_for(spec: DatasetSpec, deps: Optional[Dict[str, List[str]]] = None
     code.sort(key=lambda e: (e["path"], e["table"]))
     return {
         "tables": tables,
-        "views": [{"view": v, "reads": sorted(tset & set(deps[v]))} for v in views],
+        "views": [{"view": v, "reads": sorted((tset | reached) & set(deps[v]))} for v in views],
         "code": code,
         "count": len({e["path"] for e in code}) + len(views),
     }

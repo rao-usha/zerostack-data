@@ -13,6 +13,7 @@ the worker processes agree on it.
 """
 
 import logging
+import re
 import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -248,6 +249,53 @@ def _get_top_values(db: Session, table_name: str, col: str, from_clause: str, li
         return []
 
 
+# Column names that hold a person's contact details or name: their raw values
+# never go into a stored profile, whatever the dataset's pii_class says.
+_PERSONAL_COLUMN_RE = re.compile(
+    r"(^|_)(e?mail|email_address|phone|phone_number|telephone|mobile|fax|linkedin(_url)?|"
+    r"first_name|last_name|middle_name|full_name|person_name|contact_name|"
+    r"street|street_address|address_line\d*|home_address|ssn|date_of_birth|dob)$"
+)
+
+
+def is_personal_column(column: str) -> bool:
+    return bool(_PERSONAL_COLUMN_RE.search((column or "").lower()))
+
+
+def raw_values_allowed(table_name: str) -> bool:
+    """SPEC_144: stored profiles keep raw values (``top_values``) only for
+    tables of datasets with ``pii_class='none'`` that are not restricted.
+    Fails closed: if the catalog cannot be read, no raw values."""
+    try:
+        from app.catalog.quality import raw_values_restricted
+
+        return not raw_values_restricted(table_name)
+    except Exception as e:
+        logger.warning(f"Raw-value policy for {table_name} unavailable ({type(e).__name__}); withholding")
+        return False
+
+
+def _store_seed_rows(db: Session, table_name: str, columns: List[Dict[str, Any]],
+                     column_profiles: List[Dict[str, Any]], from_clause: str) -> None:
+    try:
+        from app.catalog.quality import SEED_MARKER_COLUMNS, seed_predicate
+
+        names = {c["name"] for c in columns}
+        markers = [c for c in SEED_MARKER_COLUMNS if c in names]
+        target = next((cp for cp in column_profiles if markers and cp["column_name"] == markers[0]), None)
+        if target is None:
+            return
+        pred, params = seed_predicate(markers)
+        n = _guarded(db, f"SELECT COUNT(*) FROM {from_clause} WHERE ({pred})", params).scalar()
+        stats = dict(target.get("stats") or {})
+        stats["seed_rows"] = int(n or 0)
+        stats["seed_rows_sampled"] = "TABLESAMPLE" in from_clause
+        target["stats"] = stats
+    except Exception as e:
+        db.rollback()
+        logger.info(f"Seed-row count for {table_name} skipped: {type(e).__name__}")
+
+
 def is_profilable(db: Session, table_name: str) -> bool:
     """SPEC_127: profiles store top_values of string columns, so they are a
     table reader like /export. Apply the same policy: auth, key, lead and
@@ -313,6 +361,9 @@ def profile_table(
         if not is_exportable(table_name, [c["name"] for c in columns]):
             logger.warning(f"Table {table_name} is not profilable (SPEC_127 policy), skipping")
             return None
+
+        # SPEC_144: no raw values from personal/contact or restricted datasets
+        raw_values_ok = raw_values_allowed(table_name)
 
         # Determine if sampling is needed
         estimated_rows = _get_table_row_count_estimate(db, table_name)
@@ -394,8 +445,11 @@ def profile_table(
                         "min_length": int(result[4]) if result[4] is not None else None,
                         "max_length": int(result[5]) if result[5] is not None else None,
                         "avg_length": float(result[6]) if result[6] is not None else None,
-                        "top_values": _get_top_values(db, table_name, col_name, from_clause),
                     }
+                    if raw_values_ok and not is_personal_column(col_name):
+                        stats["top_values"] = _get_top_values(db, table_name, col_name, from_clause)
+                    else:
+                        stats["top_values_withheld"] = True
                 elif col_type == "temporal" and len(result) >= 7:
                     stats = {
                         "min_date": str(result[4]) if result[4] is not None else None,
@@ -418,6 +472,10 @@ def profile_table(
                 db.rollback()  # Recover from failed SQL transaction
                 logger.warning(f"Error profiling column {col_name} in {table_name}: {e}")
                 continue
+
+        # SPEC_144: seeded/sample/demo rows by provenance marker, stored on the
+        # first marker column so the catalog's quality block needs no scan
+        _store_seed_rows(db, table_name, columns, column_profiles, from_clause)
 
         # Overall completeness: the mean of the column completeness (the same as
         # non-null cells / cells without sampling; still right when sampled,

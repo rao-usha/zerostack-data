@@ -12,7 +12,11 @@ The list is static (no database). The detail counts rows on the declared
 tables under a statement timeout and caches the result for a minute; only an
 admin may bypass the cache (``refresh=true``), since a refresh re-runs the
 counts on the largest tables. The quality block and consumers are best-effort:
-if they cannot be computed they are ``null``, never a 500.
+if they cannot be computed they are ``null``, never a 500. A plain GET's
+quality block scans no table (it reuses the live counts and the profiler's
+stored seed counts); ``refresh=true`` re-scans. Every list entry carries the
+static ``quality_flags`` (fabricated, seeded, sample_mixed ... from the
+verified state), so flagged data is visible without a detail call.
 """
 
 import logging
@@ -58,10 +62,12 @@ def list_catalog(
     _check("redistribution", redistribution, REDISTRIBUTION)
     specs = filter_specs(kind=kind, source=source, status_public=status_public,
                          redistribution=redistribution, q=q)
+    from app.catalog.quality import static_flags
+
     return {
         "count": len(specs),
         "total": len(get_catalog()),
-        "datasets": [s.to_dict() for s in specs],
+        "datasets": [dict(s.to_dict(), quality_flags=static_flags(s)) for s in specs],
     }
 
 
@@ -136,7 +142,10 @@ def get_catalog_entry(
         raise HTTPException(status_code=404, detail=f"unknown dataset {key!r}")
     if refresh and principal.get("role") != ROLE_ADMIN:
         raise HTTPException(status_code=403, detail="refresh=true requires the admin role")
+    from app.catalog.quality import static_flags
+
     body = spec.to_dict()
+    body["quality_flags"] = static_flags(spec)
     engine = db.get_bind()
     try:
         body["live"] = dataset_live(engine, spec, refresh=refresh)
@@ -146,7 +155,9 @@ def get_catalog_entry(
     try:
         from app.catalog.quality import quality_block
 
-        body["quality"] = quality_block(engine, spec, refresh=refresh)
+        # a plain GET reuses the counts above and the profiler's seed counts;
+        # only an admin refresh re-scans the tables (SPEC_144 review)
+        body["quality"] = quality_block(engine, spec, refresh=refresh, live=body["live"])
     except Exception as e:
         logger.warning(f"[catalog] quality block for {key} failed: {type(e).__name__}")
         body["quality"] = None

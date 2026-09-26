@@ -7,22 +7,35 @@ tables, the PE marts and ``core.*``. Here the catalog decides:
 
 - ``dq_targets``   the base tables catalog specs resolve to (never views), plus
                    the ingested registry rows the catalog does not cover.
-- ``quality_block`` the quality section of ``GET /catalog/{key}``: data state,
-                   latest DQ score, rule results, profile age, key-column nulls,
-                   row trend and a metadata completeness score.
+- ``quality_block`` the quality section of ``GET /catalog/{key}``: live state
+                   and flags, latest DQ score, rule results, profile age,
+                   key-column nulls, row trend and a metadata completeness score.
+                   A plain GET reuses the detail's live counts and the seed
+                   counts the profiler stored; only an admin ``refresh`` scans.
 - ``row_trends``   daily row counts per dataset from ``dq_quality_snapshots``.
 - ``post_load``    the advisory hook the bulk runner and the mart builds call.
 
 Everything that reads user tables runs under a short ``statement_timeout`` and
 uses the planner estimate above a size limit. Nothing here deletes or moves
-data: seeded or fabricated rows are flagged (``seed_contaminated``), never
-touched.
+data: seeded or fabricated rows are flagged (``seed_contaminated`` plus
+``flags``), never touched.
+
+Vocabulary: ``live_state`` is what this module measures now (``LIVE_STATES``).
+The verified state is SPEC_141's ``DatasetSpec.data_state`` (``fabricated``,
+``seeded`` ...); until that field exists the same verdicts come from
+``CURATED_DATA_STATES`` (PLAN_088 §1.3/§1.4). The verified state feeds the live
+one (a fabricated dataset is never ``populated``) and both land in ``flags``.
+Shared tables: SPEC_141's ``DatasetSpec.row_filters`` scope a dataset's rows
+in a table other datasets also declare; a filtered table gets filtered counts
+and no whole-table score, profile facts or row trend.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+import re
 import threading
 import time
 from datetime import date, datetime, timedelta
@@ -37,7 +50,36 @@ from app.core.safe_sql import qi
 
 logger = logging.getLogger(__name__)
 
-DATA_STATES = ("phantom", "empty", "populated", "defective", "seed_contaminated")
+LIVE_STATES = ("phantom", "empty", "populated", "defective", "seed_contaminated")
+
+# SPEC_141 DATA_STATES that mean "these rows are not real data" (flagged, never removed)
+FLAG_STATES = ("fabricated", "seeded", "sample_mixed", "placeholder", "demo")
+# Verified states until SPEC_141's DatasetSpec.data_state lands: the values
+# SPEC_141 sets (the spec field wins once it exists). PLAN_088 §1.3 and §1.4.
+CURATED_DATA_STATES: Dict[str, str] = {
+    "treasury_debt_outstanding": "key_columns_null",
+    "usaspending_awards": "key_columns_null",
+    "fema_pa_projects": "key_columns_null",
+    "cms_hospital_cost_reports": "key_columns_null",
+    "public_lp_strategies": "fabricated",
+    "si_seismic_hazard": "fabricated",
+    "si_incentive_deals": "fabricated",
+    "si_natural_gas_infra": "seeded",
+    "si_foreign_trade_zones": "seeded",
+    "si_incentive_programs": "seeded",
+    "si_certified_sites": "seeded",
+    "si_power_plants": "sample_mixed",
+    "si_public_water_systems": "sample_mixed",
+    "si_grid_infrastructure": "sample_mixed",
+    "si_renewable_resources": "sample_mixed",
+    "si_utility_rates": "sample_mixed",
+    "si_water_monitoring": "sample_mixed",
+    "si_intermodal_terminals": "placeholder",
+    "si_opportunity_zones": "placeholder",
+    "glassdoor": "demo",
+    "app_rankings": "demo",
+    "web_traffic": "demo",
+}
 
 CACHE_TTL_S = 60
 QUERY_TIMEOUT_MS = 3000
@@ -90,8 +132,14 @@ BOOKKEEPING_COLUMNS = frozenset({
     "job_id", "source", "collected_at", "last_updated", "last_updated_at", "loaded_at",
 })
 
-# A `source` value that marks a seeded, sample or reference row (PLAN_088 §1.4).
-SEED_SOURCE_PATTERNS = ("%sample%", "%\\_seed", "nrel_reference")
+# Provenance columns whose value can mark a seeded, sample, demo or hand-typed
+# row, and those values (PLAN_088 §1.4): ILIKE patterns, a LIKE suffix, exact values.
+SEED_MARKER_COLUMNS = ("source", "data_source", "origin")
+SEED_SOURCE_ILIKE = "%sample%"
+SEED_SOURCE_LIKE = "%\\_seed"
+SEED_SOURCE_VALUES = ("nrel_reference", "demo_seeder", "gjf_expanded")
+# pii_class / redistribution that keep raw column values out of stored profiles
+RAW_VALUE_SAFE_PII = ("none",)
 
 _cache: Dict[str, Tuple[float, Any]] = {}
 _lock = threading.Lock()
@@ -124,6 +172,74 @@ def engine_of(bind) -> Engine:
 
 def cadence_hours(cadence: Optional[str]) -> int:
     return CADENCE_HOURS.get(cadence or "", AD_HOC_HOURS)
+
+
+# =============================================================================
+# Static verdicts, shared tables, raw-value policy
+# =============================================================================
+
+
+def verified_state(spec: DatasetSpec) -> Optional[str]:
+    """SPEC_141's ``data_state`` when the spec carries one, else the curated
+    PLAN_088 verdict (None when neither says anything)."""
+    return getattr(spec, "data_state", None) or CURATED_DATA_STATES.get(spec.key)
+
+
+def static_flags(spec: DatasetSpec) -> List[str]:
+    """Flags known without touching the database (list view, status page)."""
+    state = verified_state(spec)
+    return [state] if state in FLAG_STATES + ("key_columns_null",) else []
+
+
+def row_filters(spec: DatasetSpec) -> Dict[str, str]:
+    """table -> read-only predicate (SPEC_141 ``row_filters``; {} before it)."""
+    return dict(getattr(spec, "row_filters", ()) or ())
+
+
+def shared_tables(specs: Iterable[DatasetSpec]) -> Dict[str, List[str]]:
+    """Declared table -> the dataset keys declaring it, for tables >1 declare."""
+    by: Dict[str, List[str]] = {}
+    for s in specs:
+        for t in s.tables:
+            by.setdefault(t, []).append(s.key)
+    return {t: ks for t, ks in by.items() if len(ks) > 1}
+
+
+def _sensitive(spec: DatasetSpec) -> bool:
+    return spec.pii_class not in RAW_VALUE_SAFE_PII or spec.redistribution == "restricted"
+
+
+def raw_values_restricted(table: str, specs: Optional[Iterable[DatasetSpec]] = None) -> bool:
+    """True when a dataset holding ``table`` carries personal/contact data or is
+    restricted: stored profiles then keep no raw column values (top_values)."""
+    from app.catalog.tables import pattern_matches
+
+    if specs is None:
+        from app.catalog.registry import get_catalog
+
+        specs = get_catalog()
+    for s in specs:
+        if not _sensitive(s):
+            continue
+        if table in s.tables or ("." not in table and any(pattern_matches(p, table)
+                                                          for p in s.table_patterns)):
+            return True
+    return False
+
+
+def seed_predicate(columns: Sequence[str], engine=None) -> Tuple[str, Dict[str, Any]]:
+    """``(sql, params)`` true for a row any marker column flags as seeded/sample."""
+    params: Dict[str, Any] = {"sp_i": SEED_SOURCE_ILIKE, "sp_l": SEED_SOURCE_LIKE}
+    values = []
+    for i, v in enumerate(SEED_SOURCE_VALUES):
+        params[f"sp_v{i}"] = v
+        values.append(f":sp_v{i}")
+    ilike = "ILIKE" if engine is None or _is_pg(engine) else "LIKE"
+    parts = []
+    for c in columns:
+        col = f"CAST({qi(c)} AS TEXT)"
+        parts.append(f"({col} {ilike} :sp_i OR {col} LIKE :sp_l OR {col} IN ({', '.join(values)}))")
+    return " OR ".join(parts) or "FALSE", params
 
 
 # =============================================================================
@@ -215,13 +331,19 @@ def dq_targets(db, specs: Optional[Iterable[DatasetSpec]] = None,
     engine = engine_of(db.get_bind())
     rels = relations(engine)
     base = base_tables(rels)
-    claimed = claimed_tables(get_catalog())
+    catalog = get_catalog()
+    claimed = claimed_tables(catalog)
+    shared = shared_tables(catalog)
+    filtered = {t for s in catalog for t in row_filters(s)}
     out: Dict[str, Dict[str, Any]] = {}
     for spec in specs:
         for t in spec_tables(spec, base, claimed):
             if t in base and t not in out:
+                # a shared table is one DQ target, attributed to the first
+                # dataset; the others read it through their row filters
                 out[t] = {"table": t, "dataset_key": spec.key, "source": spec.source,
-                          "domain": None, "rows_estimate": row_estimate(rels.get(t))}
+                          "domain": None, "rows_estimate": row_estimate(rels.get(t)),
+                          "shared_by": shared.get(t, []), "row_filtered": t in filtered}
     if include_registry:
         from app.core.models import DatasetRegistry
 
@@ -240,7 +362,8 @@ def dq_targets(db, specs: Optional[Iterable[DatasetSpec]] = None,
                 continue
             out[t] = {"table": t, "dataset_key": None, "source": reg.source,
                       "domain": getattr(reg, "domain", None),
-                      "rows_estimate": row_estimate(rels.get(t))}
+                      "rows_estimate": row_estimate(rels.get(t)),
+                      "shared_by": [], "row_filtered": False}
     return list(out.values())
 
 
@@ -259,40 +382,158 @@ def dataset_tables_for_job(db, job) -> List[str]:
     return [t for t in spec_tables(spec, base) if t in base]
 
 
+# config keys that name the table(s) a job loaded outright
+GATE_TABLE_KEYS = ("table", "table_name", "tables")
+
+
+def _job_tokens(job) -> Set[str]:
+    """Lower-case word tokens of the job's config values and of its source
+    suffix (``dunl:ports`` -> ``ports``); ``_``-prefixed keys are internal."""
+    tokens: Set[str] = set()
+
+    def add(v) -> None:
+        if isinstance(v, (list, tuple, set)):
+            for x in v:
+                add(x)
+        elif isinstance(v, (str, int)) and not isinstance(v, bool):
+            tokens.update(t for t in re.split(r"[^a-z0-9]+", str(v).lower()) if t)
+
+    config = getattr(job, "config", None)
+    if isinstance(config, dict):
+        for k, v in config.items():
+            if not str(k).startswith("_"):
+                add(v)
+    source = getattr(job, "source", None) or ""
+    if ":" in source:
+        add(source.split(":", 1)[1])
+    return tokens
+
+
+def _table_tokens(table: str) -> Set[str]:
+    return {t for t in re.split(r"[^a-z0-9]+", table.lower()) if t}
+
+
+def gate_tables_for_job(db, job, max_tables: int = 6) -> List[str]:
+    """The tables the quality gate checks for a finished job, most specific first.
+
+    1. the registry row for the job's source updated since the job started
+       (the table it just loaded), and tables the config names outright;
+    2. else the dataset's tables that best match the config values
+       (``acs5`` + ``2023`` + ``B01001`` -> ``acs5_2023_b01001``; ``oes`` -> ``bls_oes``);
+    3. only when nothing more specific is known: the source's latest-updated
+       registry table, then the dataset's tables in catalog order.
+    """
+    engine = engine_of(db.get_bind())
+    base = base_tables(relations(engine))
+    catalog = dataset_tables_for_job(db, job)
+
+    reg_table, reg_by_job = None, False
+    try:
+        from app.core.models import DatasetRegistry
+
+        reg = (db.query(DatasetRegistry)
+               .filter(DatasetRegistry.source == job.source, DatasetRegistry.ingested())
+               .order_by(DatasetRegistry.last_updated_at.desc())
+               .first())
+        if reg is not None and reg.table_name:
+            reg_table = reg.table_name
+            started = getattr(job, "started_at", None) or getattr(job, "created_at", None)
+            reg_by_job = bool(started and reg.last_updated_at and reg.last_updated_at >= started)
+    except Exception as e:
+        logger.debug(f"[catalog.quality] gate registry lookup failed: {type(e).__name__}")
+        db.rollback()
+
+    specific: List[str] = []
+    if reg_by_job:
+        specific.append(reg_table)
+    config = getattr(job, "config", None)
+    if isinstance(config, dict):
+        for k in GATE_TABLE_KEYS:
+            v = config.get(k)
+            for name in (v if isinstance(v, (list, tuple)) else [v]):
+                if isinstance(name, str) and name.lower() in base:
+                    specific.append(name.lower())
+    if not specific and catalog:
+        tokens = _job_tokens(job)
+        scored = [(len(_table_tokens(t) & tokens), t) for t in catalog]
+        top = max((s for s, _ in scored), default=0)
+        if top > 0:
+            specific = [t for s, t in scored if s == top]
+    if specific:
+        ordered = specific
+    else:
+        ordered = ([reg_table] if reg_table else []) + catalog
+    out = [t for t in dict.fromkeys(ordered) if t in base or t == reg_table]
+    return out[:max_tables]
+
+
 # =============================================================================
 # Data state
 # =============================================================================
 
 
-def classify_data_state(tables: Sequence[Mapping[str, Any]]) -> Tuple[str, List[str]]:
-    """``(state, reasons)`` from per-table facts.
+def classify_live_state(tables: Sequence[Mapping[str, Any]],
+                        verified: Optional[str] = None) -> Tuple[str, List[str], List[str]]:
+    """``(state, reasons, flags)`` from per-table facts and the verified state.
 
     Each table: ``{table, exists, rows, key_null_columns, all_null_share,
-    seed_rows}``. First match wins: phantom (no declared table exists) >
-    empty (none has rows) > defective > seed_contaminated > populated.
+    seed_rows, seed_scan}``; ``rows`` None means unknown (a filtered estimate),
+    not empty. The state is the worst finding: phantom (no declared table
+    exists) > empty (none has rows) > defective > seed_contaminated >
+    populated. ``flags`` lists every finding, so a defective dataset that is
+    also seeded says both. A verified ``key_columns_null`` makes it defective
+    and a verified fabricated/seeded/sample/placeholder/demo state makes it
+    seed_contaminated even when no row carries a marker.
     """
     existing = [t for t in tables if t.get("exists")]
     missing = [t["table"] for t in tables if not t.get("exists")]
+    static = [verified] if verified in FLAG_STATES + ("key_columns_null",) else []
     if not existing:
-        return "phantom", [f"no table exists ({', '.join(missing) or 'none declared'})"]
-    with_rows = [t for t in existing if (t.get("rows") or 0) > 0]
+        return "phantom", [f"no table exists ({', '.join(missing) or 'none declared'})"], static
+    with_rows = [t for t in existing if t.get("rows") is None or t["rows"] > 0]
     if not with_rows:
-        return "empty", [f"{len(existing)} table(s) exist with 0 rows"]
-    reasons: List[str] = []
+        return "empty", [f"{len(existing)} table(s) exist with 0 rows"], static
+    flags: List[str] = []
+    defects: List[str] = []
     for t in with_rows:
         cols = t.get("key_null_columns") or []
         if cols:
-            reasons.append(f"{t['table']}: key column(s) all NULL: {', '.join(cols)}")
+            defects.append(f"{t['table']}: key column(s) all NULL: {', '.join(cols)}")
+            flags.append("key_columns_null")
         share = t.get("all_null_share")
         if share is not None and share >= DEFECTIVE_ALL_NULL_SHARE:
-            reasons.append(f"{t['table']}: {round(share * 100)}% of data columns all NULL")
-    if reasons:
-        return "defective", reasons
+            defects.append(f"{t['table']}: {round(share * 100)}% of data columns all NULL")
+            flags.append("all_null_columns")
     seeded = [t for t in with_rows if (t.get("seed_rows") or 0) > 0]
+    seeds = [f"{t['table']}: {t['seed_rows']} seed/sample row(s)" for t in seeded]
     if seeded:
-        return "seed_contaminated", [f"{t['table']}: {t['seed_rows']} seed/sample row(s)" for t in seeded]
-    extra = [f"missing table(s): {', '.join(missing)}"] if missing else []
-    return "populated", extra
+        flags.append("seed_rows")
+    notes: List[str] = []
+    if verified == "key_columns_null" and not defects:
+        notes.append("verified: key columns NULL on every row (catalog truth pass)")
+    elif verified in FLAG_STATES:
+        notes.append(f"verified: {verified.replace('_', ' ')} data (catalog truth pass)")
+    skipped = [t["table"] for t in with_rows if t.get("seed_scan") in ("skipped", "failed")]
+    if skipped:
+        notes.append(f"seed scan skipped or failed: {', '.join(skipped)}")
+    if missing:
+        notes.append(f"missing table(s): {', '.join(missing)}")
+    unknown = [t["table"] for t in with_rows if t.get("rows") is None]
+    if unknown:
+        notes.append(f"row count unknown: {', '.join(unknown)}")
+    flags = list(dict.fromkeys(static + flags))
+    if defects or verified == "key_columns_null":
+        return "defective", defects + seeds + notes, flags
+    if seeds or verified in FLAG_STATES:
+        return "seed_contaminated", seeds + notes, flags
+    return "populated", notes, flags
+
+
+def classify_data_state(tables: Sequence[Mapping[str, Any]],
+                        verified: Optional[str] = None) -> Tuple[str, List[str]]:
+    """``(state, reasons)``: ``classify_live_state`` without the flags."""
+    state, reasons, _flags = classify_live_state(tables, verified)
+    return state, reasons
 
 
 def key_columns(spec: DatasetSpec) -> Tuple[str, ...]:
@@ -377,35 +618,46 @@ def _fq(table: str, engine) -> str:
     return f"{qi(schema)}.{qi(name)}" if _is_pg(engine) else qi(name)
 
 
-def _count(engine, table: str, estimate: Optional[int]) -> Tuple[Optional[int], bool]:
+def _count(engine, table: str, estimate: Optional[int],
+           where: Optional[str] = None) -> Tuple[Optional[int], bool]:
+    """Exact count up to ``EXACT_COUNT_MAX_ROWS``, else the estimate. With a
+    row filter (a validated catalog predicate) the whole-table estimate is
+    wrong, so a count that cannot be exact is None."""
     if estimate is None or estimate <= EXACT_COUNT_MAX_ROWS:
+        sql = f"SELECT count(*) FROM {_fq(table, engine)}" + (f" WHERE ({where})" if where else "")
         try:
-            return int(_run(engine, f"SELECT count(*) FROM {_fq(table, engine)}")[0][0]), True
+            return int(_run(engine, sql)[0][0]), True
         except Exception:
             pass
-    return estimate, False
+    return (None if where else estimate), False
 
 
-def _has_column(engine, table: str, column: str) -> bool:
+def marker_columns(engine, table: str) -> List[str]:
+    """The ``SEED_MARKER_COLUMNS`` the table has."""
     schema, name = split(table)
     if not _is_pg(engine):
-        return any(c["name"] == column for c in inspect(engine).get_columns(name))
-    rows = _run(engine, "SELECT 1 FROM information_schema.columns WHERE table_schema = :s "
-                        "AND table_name = :t AND column_name = :c", {"s": schema, "t": name, "c": column})
-    return bool(rows)
+        have = {c["name"] for c in inspect(engine).get_columns(name)}
+    else:
+        rows = _run(engine, "SELECT column_name FROM information_schema.columns "
+                            "WHERE table_schema = :s AND table_name = :t AND column_name IN :cs",
+                    {"s": schema, "t": name, "cs": list(SEED_MARKER_COLUMNS)}, expanding=("cs",))
+        have = {r[0] for r in rows}
+    return [c for c in SEED_MARKER_COLUMNS if c in have]
 
 
-def seed_rows(engine, table: str, estimate: Optional[int]) -> Optional[int]:
-    """Rows whose ``source`` marks them as seeded/sample; None when unknown."""
+def seed_rows(engine, table: str, estimate: Optional[int],
+              where: Optional[str] = None) -> Optional[int]:
+    """Rows a provenance column (``source``, ``data_source``, ``origin``)
+    marks as seeded, sample, demo or hand-typed; None when not scanned
+    (above ``SEED_SCAN_MAX_ROWS``)."""
     if estimate is not None and estimate > SEED_SCAN_MAX_ROWS:
         return None
-    if not _has_column(engine, table, "source"):
+    cols = marker_columns(engine, table)
+    if not cols:
         return 0
-    p = SEED_SOURCE_PATTERNS
-    rows = _run(engine, f"SELECT count(*) FROM {_fq(table, engine)} "
-                        f"WHERE source::text ILIKE :p0 OR source::text LIKE :p1 OR source::text = :p2",
-                {"p0": p[0], "p1": p[1], "p2": p[2]})
-    return int(rows[0][0])
+    pred, params = seed_predicate(cols, engine)
+    sql = f"SELECT count(*) FROM {_fq(table, engine)} WHERE ({pred})" + (f" AND ({where})" if where else "")
+    return int(_run(engine, sql, params)[0][0])
 
 
 def _latest_profiles(engine, tables: Sequence[str]) -> Dict[str, Dict[str, Any]]:
@@ -424,8 +676,23 @@ def _latest_profiles(engine, tables: Sequence[str]) -> Dict[str, Dict[str, Any]]
         by_id: Dict[int, List[Dict[str, Any]]] = {}
         for sid, name, pct in cols:
             by_id.setdefault(sid, []).append({"column_name": name, "null_pct": pct})
+        # the seed count the profiler stored on the marker column (no scan here)
+        seeds: Dict[int, int] = {}
+        for sid, stats in _run(engine, "SELECT snapshot_id, stats FROM data_profile_columns "
+                                       "WHERE snapshot_id IN :ids AND column_name IN :cs",
+                               {"ids": [p["id"] for p in out.values()],
+                                "cs": list(SEED_MARKER_COLUMNS)}, expanding=("ids", "cs")):
+            if isinstance(stats, str):
+                try:
+                    stats = json.loads(stats)
+                except ValueError:
+                    stats = None
+            n = stats.get("seed_rows") if isinstance(stats, dict) else None
+            if isinstance(n, int):
+                seeds[sid] = max(seeds.get(sid, 0), n)
         for p in out.values():
             p["columns"] = by_id.get(p["id"], [])
+            p["seed_rows"] = seeds.get(p["id"])
     return out
 
 
@@ -479,44 +746,92 @@ def _trend(points: Iterable[Tuple[Any, str, Optional[int]]]) -> List[Dict[str, A
 
 
 def quality_block(engine, spec: DatasetSpec, now: Optional[datetime] = None,
-                  refresh: bool = False, column_doc_pct: Optional[float] = None) -> Dict[str, Any]:
-    """The quality section of a catalog entry (cached ``CACHE_TTL_S``)."""
+                  refresh: bool = False, column_doc_pct: Optional[float] = None,
+                  live: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
+    """The quality section of a catalog entry (cached ``CACHE_TTL_S``).
+
+    A plain read (``refresh=False``) scans no user table: row counts come from
+    ``live`` (the detail's own ``dataset_live`` result) or the planner
+    estimate, and seed counts from the latest profile, where the profiler
+    stored them. ``refresh=True`` (admin only at the API) runs the exact
+    counts and the seed scans under ``QUERY_TIMEOUT_MS``.
+    """
     engine = engine_of(engine)
     if not refresh:
         with _lock:
             hit = _cache.get(f"block:{spec.key}")
         if hit and time.monotonic() - hit[0] < CACHE_TTL_S:
             return hit[1]
-    block = _compute_block(engine, spec, now or datetime.utcnow(), column_doc_pct)
+    block = _compute_block(engine, spec, now or datetime.utcnow(), column_doc_pct,
+                           scan=refresh, live=live)
     with _lock:
         _cache[f"block:{spec.key}"] = (time.monotonic(), block)
     return block
 
 
+def _live_rows(live: Optional[Mapping[str, Any]]) -> Dict[str, Tuple[Optional[int], bool]]:
+    out: Dict[str, Tuple[Optional[int], bool]] = {}
+    for t in (live or {}).get("tables") or []:
+        if isinstance(t, Mapping) and t.get("exists") and t.get("table"):
+            out[t["table"]] = (t.get("rows"), bool(t.get("rows_exact")))
+    return out
+
+
 def _compute_block(engine, spec: DatasetSpec, now: datetime,
-                   column_doc_pct: Optional[float]) -> Dict[str, Any]:
+                   column_doc_pct: Optional[float], scan: bool = True,
+                   live: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
+    from app.catalog.registry import get_catalog
+
     rels = relations(engine, cached=True)
     base = base_tables(rels)
     tables = spec_tables(spec, base)
     existing = [t for t in tables if t in base]
-    profiles = _safe("profiles", lambda: _latest_profiles(engine, existing), {}) if existing else {}
+    filters = row_filters(spec)
+    shared = shared_tables(get_catalog())
+    # whole-table signals (profile, score, rules, trend) describe a filtered
+    # table's other datasets too: they are not attributed to this one
+    whole = [t for t in existing if t not in filters]
+    profiles = _safe("profiles", lambda: _latest_profiles(engine, whole), {}) if whole else {}
     since = (now - timedelta(days=TREND_DAYS)).date()
-    snaps = _safe("snapshots", lambda: _snapshots(engine, existing, since), []) if existing else []
-    rules = _safe("rules", lambda: _rule_results(engine, existing, now - RULE_WINDOW), []) \
-        if existing else []
-    anomalies = _safe("anomalies", lambda: _open_anomalies(engine, existing), {}) if existing else {}
+    snaps = _safe("snapshots", lambda: _snapshots(engine, whole, since), []) if whole else []
+    rules = _safe("rules", lambda: _rule_results(engine, whole, now - RULE_WINDOW), []) \
+        if whole else []
+    anomalies = _safe("anomalies", lambda: _open_anomalies(engine, whole), {}) if whole else {}
+    live_rows = _live_rows(live)
 
     keys = key_columns(spec)
     stale_after = cadence_hours(spec.cadence) * STALE_PROFILE_FACTOR
     per_table: List[Dict[str, Any]] = []
     for t in tables:
         entry: Dict[str, Any] = {"table": t, "exists": t in base}
+        if t in shared:
+            entry["shared_with"] = [k for k in shared[t] if k != spec.key]
+        where = filters.get(t)
+        if where:
+            entry["row_filter"] = where
         if not entry["exists"]:
             per_table.append(entry)
             continue
         est = row_estimate(rels.get(t))
-        rows, exact = _safe("count", lambda: _count(engine, t, est), (est, False))
+        if scan:
+            rows, exact = _safe("count", lambda: _count(engine, t, est, where),
+                                (None if where else est, False))
+        elif t in live_rows:
+            rows, exact = live_rows[t]
+        else:
+            rows, exact = (None if where else est), False
         entry.update(rows=rows, rows_exact=exact)
+        if where:
+            # whole-table quality would be another dataset's numbers
+            entry.update(profiled_at=None, profile_stale=None, quality_score=None,
+                         open_anomalies=None, rules=None)
+            if scan and rows:
+                n = _safe("seed", lambda: seed_rows(engine, t, est, where), None)
+                entry.update(seed_rows=n, seed_scan="scan" if n is not None else "skipped")
+            else:
+                entry.update(seed_rows=None, seed_scan="filtered")
+            per_table.append(entry)
+            continue
         prof = profiles.get(t)
         if prof:
             age_h = (now - prof["profiled_at"]).total_seconds() / 3600 if prof["profiled_at"] else None
@@ -529,8 +844,16 @@ def _compute_block(engine, spec: DatasetSpec, now: datetime,
             )
         else:
             entry.update(profiled_at=None, profile_stale=True)
-        if rows:
-            entry["seed_rows"] = _safe("seed", lambda: seed_rows(engine, t, est), None)
+        if rows is None or rows > 0:
+            if scan:
+                too_big = est is not None and est > SEED_SCAN_MAX_ROWS
+                n = _safe("seed", lambda: seed_rows(engine, t, est), None)
+                entry.update(seed_rows=n, seed_scan="scan" if n is not None
+                             else ("skipped" if too_big else "failed"))
+            elif prof and prof.get("seed_rows") is not None:
+                entry.update(seed_rows=prof["seed_rows"], seed_scan="profile")
+            else:
+                entry.update(seed_rows=None, seed_scan="pending")
         latest = [s for s in snaps if s[1] == t]
         entry["quality_score"] = latest[-1][2] if latest else None
         entry["open_anomalies"] = anomalies.get(t, 0)
@@ -538,16 +861,20 @@ def _compute_block(engine, spec: DatasetSpec, now: datetime,
         entry["rules"] = {"passed": sum(1 for r in mine if r[1]), "failed": sum(1 for r in mine if not r[1])}
         per_table.append(entry)
 
-    state, reasons = classify_data_state(per_table)
+    verified = verified_state(spec)
+    state, reasons, flags = classify_live_state(per_table, verified)
     latest_date = max((s[0] for s in snaps), default=None)
     latest_snaps = [s for s in snaps if s[0] == latest_date]
     failed_rules = sorted({r[2] or "unnamed rule" for r in rules if not r[1]})
     profiled = [p["profiled_at"] for p in profiles.values() if p.get("profiled_at")]
     oldest = min(profiled) if profiled else None
-    trend = _trend((s[0], s[1], s[7]) for s in snaps)
+    # a trend over part of a dataset's tables would read as a drop or a jump
+    trend = _trend((s[0], s[1], s[7]) for s in snaps) if len(whole) == len(existing) else []
     return {
-        "data_state": state,
-        "data_state_reasons": reasons,
+        "live_state": state,
+        "live_state_reasons": reasons,
+        "flags": flags,
+        "verified_state": verified,
         "score": _mean(s[2] for s in latest_snaps),
         "components": {
             "completeness": _mean(s[3] for s in latest_snaps),
@@ -565,7 +892,7 @@ def _compute_block(engine, spec: DatasetSpec, now: datetime,
         "open_anomalies": sum(anomalies.values()),
         "profile": {
             "oldest_profiled_at": oldest.isoformat() if oldest else None,
-            "unprofiled_tables": [t for t in existing if t not in profiles],
+            "unprofiled_tables": [t for t in whole if t not in profiles],
             "stale": any(e.get("profile_stale") for e in per_table if e["exists"]),
             "stale_after_hours": stale_after,
         },
@@ -573,6 +900,7 @@ def _compute_block(engine, spec: DatasetSpec, now: datetime,
         "row_trend": trend,
         "tables": per_table,
         "metadata_completeness": metadata_completeness(spec, column_doc_pct),
+        "measured": "scan" if scan else "cached",
         "measured_at": now.isoformat() + "Z",
     }
 
@@ -585,7 +913,9 @@ def _compute_block(engine, spec: DatasetSpec, now: datetime,
 def row_trends(engine, specs: Sequence[DatasetSpec], days: int = TREND_DAYS,
                today: Optional[date] = None) -> Dict[str, List[Dict[str, Any]]]:
     """Dataset key -> daily row counts (summed over its tables) from the
-    daily quality snapshots. One query; datasets with no points are left out."""
+    daily quality snapshots. One query; datasets with no points are left out,
+    and so is any dataset with a row-filtered (shared) table: the snapshots
+    count the whole table, not the dataset's share of it."""
     engine = engine_of(engine)
     since = (today or date.today()) - timedelta(days=days)
     rows = _run(engine, """
@@ -600,6 +930,8 @@ def row_trends(engine, specs: Sequence[DatasetSpec], days: int = TREND_DAYS,
         by_table.setdefault(r[1], []).append((r[0], r[1], r[2]))
     out: Dict[str, List[Dict[str, Any]]] = {}
     for spec in specs:
+        if row_filters(spec):
+            continue
         pts = [p for t in spec_tables(spec, seen) if t in seen for p in by_table[t]]
         if pts:
             out[spec.key] = _trend(pts)

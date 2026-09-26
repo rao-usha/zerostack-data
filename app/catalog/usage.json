@@ -6,7 +6,8 @@
   "app/graphql",
   "app/reports",
   "app/marts",
-  "app/entities"
+  "app/entities",
+  "app/core"
  ],
  "tables": {
   "acquisition_target_scores": [
@@ -20,6 +21,58 @@
    {
     "kind": "service",
     "path": "app/services/capital_deployment_ranker.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "acs5_2023_b01003": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/econ_snapshot.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "acs5_2023_b19013": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/econ_snapshot.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "report",
+    "path": "app/reports/templates/market_intelligence_pack.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "acs5_county_2023_b19013": [
+   {
+    "kind": "service",
+    "path": "app/services/atlas/layers.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "acs5_county_2023_b28002": [
+   {
+    "kind": "service",
+    "path": "app/services/atlas/layers.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "acs5_tract_2023_demand": [
+   {
+    "kind": "service",
+    "path": "app/services/atlas/layers.py",
     "via": [
      "sql"
     ]
@@ -82,6 +135,15 @@
     ]
    }
   ],
+  "and": [
+   {
+    "kind": "core_service",
+    "path": "app/core/entity_resolver.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
   "app_store_apps": [
    {
     "kind": "api_router",
@@ -125,6 +187,13 @@
     "via": [
      "orm"
     ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/batch_service.py",
+    "via": [
+     "orm"
+    ]
    }
   ],
   "batch_tier_config": [
@@ -133,6 +202,40 @@
     "path": "app/api/v1/jobs.py",
     "via": [
      "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/batch_service.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "bea_gdp_industry": [
+   {
+    "kind": "service",
+    "path": "app/services/deal_environment_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "bea_regional": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/econ_snapshot.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "bls_ces_employment": [
+   {
+    "kind": "service",
+    "path": "app/services/deal_environment_scorer.py",
+    "via": [
+     "sql"
     ]
    }
   ],
@@ -179,6 +282,33 @@
    {
     "kind": "service",
     "path": "app/services/deal_environment_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "bls_laus_state": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/bls.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "bls_oes": [
+   {
+    "kind": "report",
+    "path": "app/reports/templates/medspa_market.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "bls_ppi": [
+   {
+    "kind": "api_router",
+    "path": "app/api/v1/macro_cascade.py",
     "via": [
      "sql"
     ]
@@ -473,10 +603,26 @@
     ]
    }
   ],
+  "collection_audit_log": [
+   {
+    "kind": "core_service",
+    "path": "app/core/audit_service.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
   "collection_groups": [
    {
     "kind": "api_router",
     "path": "app/api/v1/jobs.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/batch_service.py",
     "via": [
      "orm"
     ]
@@ -959,6 +1105,34 @@
     ]
    },
    {
+    "kind": "core_service",
+    "path": "app/core/anomaly_detection_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/data_profiling_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/dq_recommendation_engine.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/rule_seeder_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
     "kind": "report",
     "path": "app/reports/templates/data_quality_deep.py",
     "via": [
@@ -970,6 +1144,48 @@
    {
     "kind": "api_router",
     "path": "app/api/v1/data_quality.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/anomaly_detection_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/data_profiling_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/data_quality_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/dq_recommendation_engine.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/quality_trending_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/rule_seeder_service.py",
     "via": [
      "orm"
     ]
@@ -996,12 +1212,40 @@
     "via": [
      "sql"
     ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/data_quality_service.py",
+    "via": [
+     "orm"
+    ]
    }
   ],
   "data_quality_results": [
    {
     "kind": "api_router",
     "path": "app/api/v1/data_quality.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/data_quality_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/dq_recommendation_engine.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/quality_trending_service.py",
     "via": [
      "orm"
     ]
@@ -1018,6 +1262,34 @@
    {
     "kind": "api_router",
     "path": "app/api/v1/data_quality.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/data_quality_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/dq_recommendation_engine.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/rule_seeder_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/scheduler_service.py",
     "via": [
      "orm"
     ]
@@ -1064,6 +1336,13 @@
     ]
    },
    {
+    "kind": "core_service",
+    "path": "app/core/ingest_base.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
     "kind": "report",
     "path": "app/reports/templates/data_quality_deep.py",
     "via": [
@@ -1075,6 +1354,13 @@
    {
     "kind": "api_router",
     "path": "app/api/v1/lineage.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/lineage_service.py",
     "via": [
      "orm"
     ]
@@ -1121,6 +1407,34 @@
     ]
    },
    {
+    "kind": "core_service",
+    "path": "app/core/anomaly_detection_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/data_quality_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/dq_recommendation_engine.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/quality_trending_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
     "kind": "report",
     "path": "app/reports/templates/data_quality_deep.py",
     "via": [
@@ -1132,6 +1446,13 @@
    {
     "kind": "api_router",
     "path": "app/api/v1/data_quality.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/anomaly_detection_service.py",
     "via": [
      "orm"
     ]
@@ -1153,6 +1474,20 @@
     ]
    },
    {
+    "kind": "core_service",
+    "path": "app/core/cross_source_validation_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/quality_trending_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
     "kind": "report",
     "path": "app/reports/templates/data_quality_deep.py",
     "via": [
@@ -1164,6 +1499,20 @@
    {
     "kind": "api_router",
     "path": "app/api/v1/data_quality.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/cross_source_validation_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/quality_trending_service.py",
     "via": [
      "orm"
     ]
@@ -1192,6 +1541,20 @@
     ]
    },
    {
+    "kind": "core_service",
+    "path": "app/core/dq_recommendation_engine.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/quality_trending_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
     "kind": "report",
     "path": "app/reports/templates/data_quality_deep.py",
     "via": [
@@ -1213,12 +1576,26 @@
     "via": [
      "sql"
     ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/dq_recommendation_engine.py",
+    "via": [
+     "orm"
+    ]
    }
   ],
   "dq_sla_targets": [
    {
     "kind": "api_router",
     "path": "app/api/v1/data_quality.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/quality_trending_service.py",
     "via": [
      "orm"
     ]
@@ -1489,6 +1866,13 @@
     "via": [
      "orm"
     ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/export_service.py",
+    "via": [
+     "orm"
+    ]
    }
   ],
   "family_office_contacts": [
@@ -1581,6 +1965,22 @@
     ]
    }
   ],
+  "fcc_broadband_coverage": [
+   {
+    "kind": "service",
+    "path": "app/services/atlas/cards.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/atlas/layers.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
   "fda_device_registrations": [
    {
     "kind": "api_router",
@@ -1590,10 +1990,79 @@
     ]
    }
   ],
+  "fdic_bank_financials": [
+   {
+    "kind": "service",
+    "path": "app/services/atlas/layers.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/atlas/series.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/company_diligence_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "fdic_institutions": [
+   {
+    "kind": "service",
+    "path": "app/services/atlas/layers.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/atlas/series.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/company_diligence_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
   "fdic_summary_deposits": [
    {
     "kind": "report",
     "path": "app/reports/templates/medspa_market.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "fema_disaster_declarations": [
+   {
+    "kind": "report",
+    "path": "app/reports/templates/market_intelligence_pack.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/atlas/layers.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/atlas/series.py",
     "via": [
      "sql"
     ]
@@ -1759,6 +2228,24 @@
     ]
    }
   ],
+  "fred_commodities": [
+   {
+    "kind": "service",
+    "path": "app/services/deal_environment_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "fred_consumer_sentiment": [
+   {
+    "kind": "service",
+    "path": "app/services/deal_environment_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
   "fred_economic_indicators": [
    {
     "kind": "api_router",
@@ -1777,6 +2264,40 @@
    {
     "kind": "service",
     "path": "app/services/econ_dq_service.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "fred_housing_market": [
+   {
+    "kind": "service",
+    "path": "app/services/deal_environment_scorer.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "fred_industrial_production": [
+   {
+    "kind": "report",
+    "path": "app/reports/templates/market_intelligence_pack.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "fred_interest_rates": [
+   {
+    "kind": "report",
+    "path": "app/reports/templates/market_intelligence_pack.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/deal_environment_scorer.py",
     "via": [
      "sql"
     ]
@@ -1874,6 +2395,15 @@
     "path": "app/api/v1/job_postings_velocity.py",
     "via": [
      "sql"
+    ]
+   }
+  ],
+  "impact_analysis": [
+   {
+    "kind": "core_service",
+    "path": "app/core/lineage_service.py",
+    "via": [
+     "orm"
     ]
    }
   ],
@@ -2324,6 +2854,140 @@
     ]
    },
    {
+    "kind": "core_service",
+    "path": "app/core/backfill_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/batch_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/collection_recommender.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/data_quality_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/dependency_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/dq_post_ingestion_hook.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/dq_recommendation_engine.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/ingest_base.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/ingestion_job_sync.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/job_helpers.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/job_queue_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/job_splitter.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/lineage_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/monitoring.py",
+    "via": [
+     "orm",
+     "sql"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/quality_trending_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/retry_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/scheduler_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/source_health.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/template_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
     "kind": "report",
     "path": "app/reports/templates/data_quality.py",
     "via": [
@@ -2419,6 +3083,20 @@
     ]
    },
    {
+    "kind": "core_service",
+    "path": "app/core/monitoring.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/scheduler_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
     "kind": "service",
     "path": "app/services/data_watchdog.py",
     "via": [
@@ -2437,6 +3115,13 @@
    {
     "kind": "api_router",
     "path": "app/api/v1/templates.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/template_service.py",
     "via": [
      "orm"
     ]
@@ -2628,6 +3313,13 @@
     "via": [
      "orm"
     ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/dependency_service.py",
+    "via": [
+     "orm"
+    ]
    }
   ],
   "job_chains": [
@@ -2637,12 +3329,42 @@
     "via": [
      "orm"
     ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/dependency_service.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "job_dependencies": [
+   {
+    "kind": "core_service",
+    "path": "app/core/dependency_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/template_service.py",
+    "via": [
+     "orm"
+    ]
    }
   ],
   "job_events": [
    {
     "kind": "api_router",
     "path": "app/api/v1/job_stream.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pg_notify.py",
     "via": [
      "orm"
     ]
@@ -2724,6 +3446,27 @@
     "via": [
      "orm",
      "sql"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/batch_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/ingestion_job_sync.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/job_queue_service.py",
+    "via": [
+     "orm"
     ]
    },
    {
@@ -2861,6 +3604,13 @@
     "via": [
      "orm"
     ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/lineage_service.py",
+    "via": [
+     "orm"
+    ]
    }
   ],
   "lineage_events": [
@@ -2870,12 +3620,26 @@
     "via": [
      "orm"
     ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/lineage_service.py",
+    "via": [
+     "orm"
+    ]
    }
   ],
   "lineage_nodes": [
    {
     "kind": "api_router",
     "path": "app/api/v1/lineage.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/lineage_service.py",
     "via": [
      "orm"
     ]
@@ -2892,6 +3656,20 @@
    {
     "kind": "api_router",
     "path": "app/api/v1/llm_costs.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/batch_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/llm_cost_tracker.py",
     "via": [
      "orm"
     ]
@@ -3448,6 +4226,13 @@
     "via": [
      "orm"
     ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_alert_subscriptions.py",
+    "via": [
+     "orm"
+    ]
    }
   ],
   "pe_alerts": [
@@ -3457,12 +4242,40 @@
     "via": [
      "orm"
     ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_alert_subscriptions.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_company_360.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_portfolio_monitor.py",
+    "via": [
+     "orm"
+    ]
    }
   ],
   "pe_cash_flows": [
    {
     "kind": "api_router",
     "path": "app/api/v1/pe_benchmarks.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_fund_performance.py",
     "via": [
      "orm"
     ]
@@ -3495,6 +4308,69 @@
     "path": "app/api/v1/pe_companies.py",
     "via": [
      "sql"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_benchmarking.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_deal_scorer.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_deal_sourcing.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_exit_scoring.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_import.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_portfolio_monitor.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_rollup_screener.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_thesis_generator.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_valuation_comps.py",
+    "via": [
+     "orm"
     ]
    },
    {
@@ -3570,6 +4446,55 @@
     ]
    },
    {
+    "kind": "core_service",
+    "path": "app/core/pe_company_360.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_deal_scorer.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_exit_scoring.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_import.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_portfolio_analytics.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_portfolio_monitor.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_thesis_generator.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
     "kind": "report",
     "path": "app/reports/templates/pe_deal_memo.py",
     "via": [
@@ -3605,6 +4530,13 @@
     "via": [
      "sql"
     ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_market_scanner.py",
+    "via": [
+     "orm"
+    ]
    }
   ],
   "pe_company_valuations": [
@@ -3613,6 +4545,20 @@
     "path": "app/api/v1/pe_companies.py",
     "via": [
      "sql"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_exit_scoring.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_valuation_comps.py",
+    "via": [
+     "orm"
     ]
    }
   ],
@@ -3629,6 +4575,34 @@
     "path": "app/api/v1/pe_companies.py",
     "via": [
      "sql"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_company_360.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_deal_scorer.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_exit_scoring.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_thesis_generator.py",
+    "via": [
+     "orm"
     ]
    },
    {
@@ -3661,6 +4635,13 @@
     "path": "app/api/v1/pe_deals.py",
     "via": [
      "sql"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_deal_pipeline.py",
+    "via": [
+     "orm"
     ]
    },
    {
@@ -3706,6 +4687,62 @@
    {
     "kind": "api_router",
     "path": "app/api/v1/pe_people.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_company_360.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_comparable_transactions.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_deal_pipeline.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_deal_sourcing.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_exit_scoring.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_import.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_market_scanner.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/quarantine.py",
     "via": [
      "sql"
     ]
@@ -3923,6 +4960,48 @@
     ]
    },
    {
+    "kind": "core_service",
+    "path": "app/core/pe_alert_subscriptions.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_deal_pipeline.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_deal_sourcing.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_import.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_portfolio_analytics.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_portfolio_monitor.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
     "kind": "mart",
     "path": "app/marts/pe_firms_sec.py",
     "via": [
@@ -4060,6 +5139,48 @@
     ]
    },
    {
+    "kind": "core_service",
+    "path": "app/core/pe_benchmarking.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_company_360.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_deal_pipeline.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_exit_scoring.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_portfolio_analytics.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_portfolio_monitor.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
     "kind": "report",
     "path": "app/reports/templates/investor_profile.py",
     "via": [
@@ -4146,6 +5267,20 @@
     ]
    },
    {
+    "kind": "core_service",
+    "path": "app/core/pe_fund_performance.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_portfolio_analytics.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
     "kind": "report",
     "path": "app/reports/templates/pe_fund_tearsheet.py",
     "via": [
@@ -4208,6 +5343,55 @@
     "path": "app/api/v1/pe_marts.py",
     "via": [
      "sql"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_benchmarking.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_company_360.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_deal_pipeline.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_exit_scoring.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_fund_performance.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_portfolio_analytics.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_portfolio_monitor.py",
+    "via": [
+     "orm"
     ]
    },
    {
@@ -4311,7 +5495,30 @@
     ]
    }
   ],
+  "pe_investment_theses": [
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_company_360.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_thesis_generator.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
   "pe_market_signals": [
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_market_signals.py",
+    "via": [
+     "orm"
+    ]
+   },
    {
     "kind": "service",
     "path": "app/services/capital_deployment_ranker.py",
@@ -4382,6 +5589,34 @@
     "path": "app/api/v1/pe_people.py",
     "via": [
      "sql"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_company_360.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_import.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_portfolio_monitor.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_thesis_generator.py",
+    "via": [
+     "orm"
     ]
    },
    {
@@ -4507,6 +5742,104 @@
     "path": "app/api/v1/pe_people.py",
     "via": [
      "sql"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_benchmarking.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_company_360.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_comparable_transactions.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_deal_pipeline.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_deal_scorer.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_deal_sourcing.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_exit_scoring.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_import.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_market_scanner.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_portfolio_analytics.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_portfolio_monitor.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_rollup_screener.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_thesis_generator.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_valuation_comps.py",
+    "via": [
+     "orm"
     ]
    },
    {
@@ -4655,6 +5988,20 @@
    {
     "kind": "api_router",
     "path": "app/api/v1/pe_benchmarks.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_company_360.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/pe_portfolio_monitor.py",
     "via": [
      "orm"
     ]
@@ -5194,6 +6541,13 @@
     ]
    },
    {
+    "kind": "core_service",
+    "path": "app/core/quarantine.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
     "kind": "report",
     "path": "app/reports/pptx_renderer.py",
     "via": [
@@ -5275,6 +6629,24 @@
     ]
    }
   ],
+  "quarantine.manifest": [
+   {
+    "kind": "core_service",
+    "path": "app/core/quarantine.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "quarantine.set_null_backup": [
+   {
+    "kind": "core_service",
+    "path": "app/core/quarantine.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
   "rail_line": [
    {
     "kind": "api_router",
@@ -5287,6 +6659,16 @@
     "kind": "service",
     "path": "app/services/atlas/layers.py",
     "via": [
+     "sql"
+    ]
+   }
+  ],
+  "rate_limit_bucket": [
+   {
+    "kind": "core_service",
+    "path": "app/core/rate_limiter.py",
+    "via": [
+     "orm",
      "sql"
     ]
    }
@@ -5393,6 +6775,24 @@
    {
     "kind": "graphql",
     "path": "app/graphql/resolvers.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "sec_10k": [
+   {
+    "kind": "service",
+    "path": "app/services/atlas/series.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "sec_10q": [
+   {
+    "kind": "service",
+    "path": "app/services/atlas/series.py",
     "via": [
      "sql"
     ]
@@ -5580,6 +6980,13 @@
   ],
   "site_intel_collection_job": [
    {
+    "kind": "core_service",
+    "path": "app/core/monitoring.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
     "kind": "service",
     "path": "app/services/dataset_status.py",
     "via": [
@@ -5610,6 +7017,34 @@
     "via": [
      "orm"
     ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/batch_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/collection_recommender.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/source_config_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/source_health.py",
+    "via": [
+     "orm"
+    ]
    }
   ],
   "source_freshness_sla": [
@@ -5632,6 +7067,43 @@
    {
     "kind": "api_router",
     "path": "app/api/v1/rate_limits.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/rate_limiter.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
+  "source_watermarks": [
+   {
+    "kind": "core_service",
+    "path": "app/core/batch_service.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/collection_recommender.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/source_health.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/watermark_service.py",
     "via": [
      "orm"
     ]
@@ -5680,6 +7152,13 @@
    {
     "kind": "api_router",
     "path": "app/api/v1/templates.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/template_service.py",
     "via": [
      "orm"
     ]
@@ -5914,6 +7393,36 @@
     ]
    }
   ],
+  "us_trade_exports_state": [
+   {
+    "kind": "report",
+    "path": "app/reports/templates/market_intelligence_pack.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/atlas/layers.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/convergence_engine.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "service",
+    "path": "app/services/deal_radar_memo.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
   "usaspending_awards": [
    {
     "kind": "report",
@@ -6089,10 +7598,26 @@
     ]
    }
   ],
+  "webhook_deliveries": [
+   {
+    "kind": "core_service",
+    "path": "app/core/webhook_service.py",
+    "via": [
+     "orm"
+    ]
+   }
+  ],
   "webhooks": [
    {
     "kind": "api_router",
     "path": "app/api/v1/webhooks.py",
+    "via": [
+     "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/webhook_service.py",
     "via": [
      "orm"
     ]
@@ -6115,6 +7640,14 @@
    }
   ],
   "worker_heartbeats": [
+   {
+    "kind": "core_service",
+    "path": "app/core/job_queue_service.py",
+    "via": [
+     "orm",
+     "sql"
+    ]
+   },
    {
     "kind": "service",
     "path": "app/services/data_watchdog.py",
