@@ -3099,7 +3099,13 @@ class TemplateExecution(Base):
 
 
 # =============================================================================
-# Data Lineage Tracking
+# Data Lineage Tracking (LEGACY, unread since SPEC_143)
+#
+# lineage_service and the /lineage router were retired by SPEC_143: nothing
+# ever wrote these tables (lineage_nodes 2 rows / lineage_edges 1 from a hand
+# test, 2026-01-14). The models stay so the tables stay (user decision: leave
+# them, stop serving them); lineage is now computed on read by
+# app/catalog/lineage.py (GET /catalog/lineage, /catalog/{key}/lineage).
 # =============================================================================
 
 

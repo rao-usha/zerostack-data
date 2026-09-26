@@ -1341,22 +1341,6 @@
     ]
    }
   ],
-  "dataset_versions": [
-   {
-    "kind": "api_router",
-    "path": "app/api/v1/lineage.py",
-    "via": [
-     "orm"
-    ]
-   },
-   {
-    "kind": "core_service",
-    "path": "app/core/lineage_service.py",
-    "via": [
-     "orm"
-    ]
-   }
-  ],
   "diligence_orders": [
    {
     "kind": "service",
@@ -2389,15 +2373,6 @@
     ]
    }
   ],
-  "impact_analysis": [
-   {
-    "kind": "core_service",
-    "path": "app/core/lineage_service.py",
-    "via": [
-     "orm"
-    ]
-   }
-  ],
   "incentive_deal": [
    {
     "kind": "api_router",
@@ -2924,13 +2899,6 @@
    {
     "kind": "core_service",
     "path": "app/core/job_splitter.py",
-    "via": [
-     "orm"
-    ]
-   },
-   {
-    "kind": "core_service",
-    "path": "app/core/lineage_service.py",
     "via": [
      "orm"
     ]
@@ -3585,54 +3553,6 @@
     "path": "app/services/leads/lead_service.py",
     "via": [
      "sql"
-    ]
-   }
-  ],
-  "lineage_edges": [
-   {
-    "kind": "api_router",
-    "path": "app/api/v1/lineage.py",
-    "via": [
-     "orm"
-    ]
-   },
-   {
-    "kind": "core_service",
-    "path": "app/core/lineage_service.py",
-    "via": [
-     "orm"
-    ]
-   }
-  ],
-  "lineage_events": [
-   {
-    "kind": "api_router",
-    "path": "app/api/v1/lineage.py",
-    "via": [
-     "orm"
-    ]
-   },
-   {
-    "kind": "core_service",
-    "path": "app/core/lineage_service.py",
-    "via": [
-     "orm"
-    ]
-   }
-  ],
-  "lineage_nodes": [
-   {
-    "kind": "api_router",
-    "path": "app/api/v1/lineage.py",
-    "via": [
-     "orm"
-    ]
-   },
-   {
-    "kind": "core_service",
-    "path": "app/core/lineage_service.py",
-    "via": [
-     "orm"
     ]
    }
   ],

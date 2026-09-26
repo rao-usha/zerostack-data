@@ -67,7 +67,7 @@ from app.api.v1 import (
     data_quality,
     dq_review,
     templates,
-    lineage,
+    catalog_lineage,  # SPEC_143 (the legacy lineage router is retired)
     export,
     uspto,
     alerts,
@@ -1348,7 +1348,6 @@ Browse the endpoint sections below to see what's available:
         {"name": "data-quality", "description": "✅ **Data Quality Rules Engine** - Define and evaluate data quality rules with range, null, regex, freshness checks"},
         {"name": "dq-review", "description": "🔍 **DQ Review & Recommendations** - Unified review workflow with auto-generated recommendations from all DQ subsystems"},
         {"name": "templates", "description": "📋 **Bulk Ingestion Templates** - Reusable templates for multi-source data ingestion with variable substitution"},
-        {"name": "lineage", "description": "🔗 **Data Lineage Tracking** - Track data provenance, transformations, dataset versions, and impact analysis"},
         {"name": "export", "description": "📤 **Data Export** - Export table data to CSV, JSON, or Parquet files"},
         {"name": "import", "description": "📥 **Bulk Portfolio Import** - Upload CSV/Excel files to import portfolio data with validation, preview, and rollback"},
         {"name": "freshness", "description": "📊 **Data Freshness** - Monitor source staleness, auto-refresh status, and incremental loading"},
@@ -1633,6 +1632,7 @@ app.include_router(prediction_markets.router, prefix="/api/v1", dependencies=_au
 app.include_router(bulk.router, prefix="/api/v1", dependencies=_admin)
 app.include_router(catalog_rights.router, prefix="/api/v1", dependencies=_auth)  # SPEC_142 (before catalog: /catalog/{key})
 app.include_router(catalog_schema.router, prefix="/api/v1", dependencies=_auth)  # SPEC_137 (before catalog: /catalog/{key})
+app.include_router(catalog_lineage.router, prefix="/api/v1", dependencies=_auth)  # SPEC_143 (before catalog: /catalog/lineage)
 app.include_router(catalog.router, prefix="/api/v1", dependencies=_auth)  # SPEC_123
 app.include_router(dataset_status.router, prefix="/api/v1", dependencies=_auth)  # SPEC_124 (run: admin)
 app.include_router(entity_master.router, prefix="/api/v1", dependencies=_auth)
@@ -1645,7 +1645,6 @@ app.include_router(rate_limits.router, prefix="/api/v1", dependencies=_admin)
 app.include_router(data_quality.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(dq_review.router, prefix="/api/v1", dependencies=_admin)
 app.include_router(templates.router, prefix="/api/v1", dependencies=_admin)
-app.include_router(lineage.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(export.router, prefix="/api/v1", dependencies=_admin)
 app.include_router(uspto.router, prefix="/api/v1", dependencies=_auth)
 app.include_router(agentic_research.router, prefix="/api/v1", dependencies=_auth)

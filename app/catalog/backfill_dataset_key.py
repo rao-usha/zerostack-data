@@ -10,8 +10,9 @@ open decision 10 approved a backfill. There is no migration: this runs as
 
 or ``POST /api/v1/catalog/admin/backfill-dataset-key?apply=true`` (admin).
 
-Resolution is ``app.catalog.job_keys.dataset_key_for_job`` -- the same one the
-insert listener uses. Only NULL rows are touched and a value is never
+Resolution is ``ProducerMap.datasets_for_job`` (``dataset_key_for_job`` when it
+is one dataset) -- the same one the insert listener uses, SPEC_143 aliases
+included (``api:<source>``, ``JOB_SOURCE_DATASETS``, ``config["tables"]``). Only NULL rows are touched and a value is never
 overwritten, so a rerun is a no-op for rows already filled and picks up rows
 that a later alias (SPEC_143) makes resolvable. Rows whose producer maps to
 several datasets (``job:pe_mart_build``) stay NULL. Updates go in batches
@@ -72,7 +73,8 @@ def plan(engine, pmap=None) -> Dict[str, Any]:
             break
         for job_id, source, config in rows:
             total += 1
-            keys = pmap.datasets_for(pmap.producer_for_job(source, _parse_config(config)))
+            # the insert listener's resolver (SPEC_143 aliases included)
+            keys = pmap.datasets_for_job(source, _parse_config(config))
             if len(keys) == 1:
                 resolved.setdefault(keys[0], []).append(int(job_id))
             elif keys:

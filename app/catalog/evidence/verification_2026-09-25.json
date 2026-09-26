@@ -2141,7 +2141,7 @@
    "disposition": {
     "primary_key": "applied",
     "coverage_sql": "applied",
-    "inputs": "deferred:SPEC_143 (the SQL-reference test decides PE mart inputs; the evidence and PLAN_088 disagree)",
+    "inputs": "amended:SPEC_143 SQL-reference test: the firms stage reads sec_adv_roster_snapshots and core.identifier -> (sec_adv_roster, entity_master)",
     "grain": "applied",
     "pii": "applied"
    }
@@ -2179,7 +2179,7 @@
    "disposition": {
     "primary_key": "applied",
     "coverage_sql": "applied",
-    "inputs": "applied",
+    "inputs": "amended:SPEC_143 SQL-reference test adds sec_adv_schedule_d (sec_adv_filings) and sec_adv_roster (sec_adv_roster_snapshots)",
     "description": "applied",
     "grain": "applied",
     "pii": "applied"
@@ -2218,7 +2218,7 @@
     "primary_key": "applied",
     "coverage_sql": "applied",
     "coverage_from": "applied",
-    "inputs": "applied",
+    "inputs": "amended:SPEC_143 SQL-reference test adds sec_adv_roster (sec_adv_roster_snapshots)",
     "description": "applied",
     "grain": "applied",
     "pii": "applied"
@@ -2297,7 +2297,7 @@
    "disposition": {
     "primary_key": "applied",
     "coverage_sql": "applied",
-    "inputs": "applied",
+    "inputs": "amended:SPEC_143 SQL-reference test: the bridge reads sec_13f_*, sec_adv_roster_snapshots and sec_filers, not core.source_record",
     "grain": "applied",
     "pii": "applied"
    }
@@ -3389,7 +3389,7 @@
     "primary_key": "applied",
     "coverage_sql": "applied",
     "coverage_from": "applied",
-    "inputs": "applied",
+    "inputs": "amended:SPEC_143 SQL-reference test adds pe_collection (ownership_classifier reads pe_portfolio_companies); yelp_businesses stays as an API input (Yelp Fusion API, lineage.API_INPUTS)",
     "description": "applied",
     "grain": "applied",
     "pii": "applied"
@@ -3433,7 +3433,7 @@
    "disposition": {
     "primary_key": "applied",
     "coverage_sql": "waived:untested - the table does not exist in the live DB",
-    "inputs": "applied",
+    "inputs": "amended:SPEC_143 SQL-reference test adds nppes_providers (enrichment reads nppes_providers) and pe_collection (ownership_classifier reads pe_portfolio_companies); yelp_businesses stays as an API input (lineage.API_INPUTS)",
     "description": "applied",
     "grain": "waived:confirmed as declared (defects, if any, are in limitations)",
     "other.status": "waived:user decision (PLAN_088): phantom/empty entries stay archival with a limitation, not retired"

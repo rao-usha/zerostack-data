@@ -232,7 +232,10 @@ class TestProducerCoverage:
     def test_inputs_reference_catalog_datasets(self):
         from app.catalog import get_spec
 
-        assert get_spec("pe_funds_sec").inputs == ("sec_form_d", "sec_adv_private_funds", "pe_firms_sec")
+        # SPEC_143: inputs follow the SQL the funds stage runs
+        assert get_spec("pe_funds_sec").inputs == (
+            "sec_form_d", "sec_adv_private_funds", "sec_adv_schedule_d", "sec_adv_roster",
+            "pe_firms_sec")
         assert "sec_adv_schedule_d" in get_spec("sec_adv_private_funds").inputs
         for spec in _catalog():
             for i in spec.inputs:
