@@ -341,6 +341,11 @@ def run_source(
             except Exception as e:  # retention is housekeeping; never fail the run
                 logger.error(f"[bulk:{source.name}] retention failed: {type(e).__name__}: {e}")
                 summary["retention"] = {"error": f"{type(e).__name__}: {e}"}
+        if summary["loaded"]:
+            # SPEC_144 post-load DQ hook: advisory, never raises
+            from app.catalog.quality import post_load
+
+            summary["post_load"] = post_load(engine, f"bulk:{source.name}")
         summary["bytes_downloaded"] = _http_bytes(http) - bytes_at_start
         return summary
     finally:

@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.core.authz import ROLE_ADMIN, current_principal
 from app.core.database import get_db
 from app.core.models import (
     DataQualityRule,
@@ -1159,15 +1160,30 @@ def get_profile_history(
 
 @router.get("/profiles/{table_name}/columns", response_model=List[ProfileColumnResponse])
 def get_profile_columns(
-    table_name: str, db: Session = Depends(get_db)
+    table_name: str,
+    db: Session = Depends(get_db),
+    principal: Dict[str, Any] = Depends(current_principal),
 ) -> List[ProfileColumnResponse]:
-    """Get column-level stats for the latest profile of a table."""
+    """Get column-level stats for the latest profile of a table.
+
+    SPEC_144: raw values (``top_values``) of personal/contact or restricted
+    datasets, and of name/email/phone columns anywhere, are served to admins
+    only (profiles written before the policy may still hold them)."""
     _require_profilable(db, table_name)
     snapshot = data_profiling_service.get_latest_profile(db, table_name)
     if not snapshot:
         raise HTTPException(status_code=404, detail=f"No profile found for {table_name}")
     columns = data_profiling_service.get_column_stats(db, snapshot.id)
-    return [_column_to_response(c) for c in columns]
+    out = [_column_to_response(c) for c in columns]
+    if principal.get("role") != ROLE_ADMIN:
+        table_ok = data_profiling_service.raw_values_allowed(table_name)
+        for col in out:
+            stats = col.stats
+            if isinstance(stats, dict) and "top_values" in stats and (
+                    not table_ok or data_profiling_service.is_personal_column(col.column_name)):
+                col.stats = {k: v for k, v in stats.items() if k != "top_values"}
+                col.stats["top_values_withheld"] = True
+    return out
 
 
 # =============================================================================

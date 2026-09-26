@@ -27,6 +27,15 @@ from app.core.safe_sql import qi, safe_operator, safe_int
 logger = logging.getLogger(__name__)
 
 
+def qt(table_name: str) -> str:
+    """Quote a table name that may be schema-qualified ('core.entity'); the
+    catalog-driven DQ selector (SPEC_144) hands such names to the evaluators."""
+    if "." in table_name:
+        schema, name = table_name.split(".", 1)
+        return f"{qi(schema)}.{qi(name)}"
+    return qi(table_name)
+
+
 # =============================================================================
 # Rule Evaluation Results
 # =============================================================================
@@ -91,7 +100,7 @@ def evaluate_range_rule(
     query = text(f"""
         SELECT COUNT(*) as total,
                SUM(CASE WHEN {where_clause} THEN 1 ELSE 0 END) as violations
-        FROM {qi(table_name)}
+        FROM {qt(table_name)}
         WHERE {qi(column_name)} IS NOT NULL
     """)
 
@@ -113,7 +122,7 @@ def evaluate_range_rule(
         sample_failures = None
         if violations > 0:
             sample_query = text(f"""
-                SELECT {qi(column_name)} FROM {qi(table_name)}
+                SELECT {qi(column_name)} FROM {qt(table_name)}
                 WHERE {where_clause}
                 LIMIT 5
             """)
@@ -160,7 +169,7 @@ def evaluate_not_null_rule(
     query = text(f"""
         SELECT COUNT(*) as total,
                SUM(CASE WHEN {qi(column_name)} IS NULL THEN 1 ELSE 0 END) as nulls
-        FROM {qi(table_name)}
+        FROM {qt(table_name)}
     """)
 
     try:
@@ -209,7 +218,7 @@ def evaluate_unique_rule(
     query = text(f"""
         SELECT COUNT(*) as total,
                COUNT(DISTINCT {qi(column_name)}) as unique_count
-        FROM {qi(table_name)}
+        FROM {qt(table_name)}
         WHERE {qi(column_name)} IS NOT NULL
     """)
 
@@ -226,7 +235,7 @@ def evaluate_unique_rule(
         if duplicates > 0:
             dup_query = text(f"""
                 SELECT {qi(column_name)}, COUNT(*) as cnt
-                FROM {qi(table_name)}
+                FROM {qt(table_name)}
                 WHERE {qi(column_name)} IS NOT NULL
                 GROUP BY {qi(column_name)}
                 HAVING COUNT(*) > 1
@@ -279,7 +288,7 @@ def evaluate_row_count_rule(
     min_rows = params.get("min")
     max_rows = params.get("max")
 
-    query = text(f'SELECT COUNT(*) FROM {qi(table_name)}')
+    query = text(f'SELECT COUNT(*) FROM {qt(table_name)}')
 
     try:
         result = db.execute(query).fetchone()
@@ -352,7 +361,7 @@ def evaluate_enum_rule(
     query = text(f"""
         SELECT COUNT(*) as total,
                SUM(CASE WHEN {qi(column_name)} NOT IN ({placeholders}) THEN 1 ELSE 0 END) as violations
-        FROM {qi(table_name)}
+        FROM {qt(table_name)}
         WHERE {qi(column_name)} IS NOT NULL
     """)
 
@@ -368,7 +377,7 @@ def evaluate_enum_rule(
         sample_failures = None
         if violations > 0:
             sample_query = text(f"""
-                SELECT DISTINCT {qi(column_name)} FROM {qi(table_name)}
+                SELECT DISTINCT {qi(column_name)} FROM {qt(table_name)}
                 WHERE {qi(column_name)} IS NOT NULL
                   AND {qi(column_name)} NOT IN ({placeholders})
                 LIMIT 5
@@ -437,7 +446,7 @@ def evaluate_freshness_rule(
 
     query = text(f"""
         SELECT MAX({qi(column_name)}) as latest
-        FROM {qi(table_name)}
+        FROM {qt(table_name)}
     """)
 
     try:
@@ -513,7 +522,7 @@ def evaluate_regex_rule(
 
     # Fetch values and check with Python regex (more portable than DB-specific regex)
     query = text(f"""
-        SELECT {qi(column_name)} FROM {qi(table_name)}
+        SELECT {qi(column_name)} FROM {qt(table_name)}
         WHERE {qi(column_name)} IS NOT NULL
     """)
 
@@ -619,7 +628,7 @@ def evaluate_custom_sql_rule(
         )
 
     # Substitute {table} placeholder
-    sql = condition.replace("{table}", qi(table_name))
+    sql = condition.replace("{table}", qt(table_name))
 
     try:
         # Set statement timeout and read-only transaction
@@ -708,7 +717,7 @@ def evaluate_comparison_rule(
     query = text(f"""
         SELECT COUNT(*) as total,
                SUM(CASE WHEN NOT ({qi(column_name)} {safe_operator(operator)} {qi(compare_column)}) THEN 1 ELSE 0 END) as violations
-        FROM {qi(table_name)}
+        FROM {qt(table_name)}
         WHERE {qi(column_name)} IS NOT NULL AND {qi(compare_column)} IS NOT NULL
     """)
 
@@ -724,7 +733,7 @@ def evaluate_comparison_rule(
         if violations > 0:
             sample_query = text(f"""
                 SELECT {qi(column_name)}, {qi(compare_column)}
-                FROM {qi(table_name)}
+                FROM {qt(table_name)}
                 WHERE {qi(column_name)} IS NOT NULL AND {qi(compare_column)} IS NOT NULL
                   AND NOT ({qi(column_name)} {safe_operator(operator)} {qi(compare_column)})
                 LIMIT 5
@@ -1141,19 +1150,25 @@ def get_job_report(db: Session, job_id: int) -> Optional[DataQualityReport]:
 # Evaluate All Rules
 # =============================================================================
 
+# SPEC_144: catalog-only tables above this estimate are not rule-scanned nightly
+RULE_SCAN_MAX_ROWS = 5_000_000
+
 
 def evaluate_all_rules(db: Session) -> Dict[str, Any]:
     """
     Evaluate all enabled rules against their target tables.
 
-    For each rule, resolves target tables from DatasetRegistry
-    (by rule.source + rule.dataset_pattern regex), evaluates each
-    (rule, table) pair, stores results, and creates a DataQualityReport.
+    For each rule, resolves target tables (by rule.source + rule.dataset_pattern
+    regex) from the catalog-driven DQ selector (SPEC_144:
+    ``app.catalog.quality.dq_targets`` -- catalog tables that exist plus
+    ingested registry rows), evaluates each (rule, table) pair, stores results,
+    and creates a DataQualityReport. Catalog tables no ingestor registered are
+    skipped above ``RULE_SCAN_MAX_ROWS`` (the rules scan whole tables).
 
     Returns:
         Summary dict with total/passed/failed counts
     """
-    from app.core.models import DatasetRegistry
+    from app.catalog.quality import dq_targets
 
     start_time = time.time()
 
@@ -1175,14 +1190,20 @@ def evaluate_all_rules(db: Session) -> Dict[str, Any]:
             "execution_time_ms": int((time.time() - start_time) * 1000),
         }
 
-    # Get all registered tables
-    all_datasets = db.query(DatasetRegistry).filter(DatasetRegistry.ingested()).all()
+    # Tables in DQ scope: catalog tables that exist + ingested registry rows
     table_by_source: Dict[str, List[str]] = {}
-    for ds in all_datasets:
-        table_by_source.setdefault(ds.source, []).append(ds.table_name)
-
-    # All table names for rules without a source filter
-    all_table_names = [ds.table_name for ds in all_datasets]
+    all_table_names: List[str] = []
+    skipped_large: List[str] = []
+    for target in dq_targets(db):
+        est = target.get("rows_estimate")
+        if target["dataset_key"] and est is not None and est > RULE_SCAN_MAX_ROWS:
+            skipped_large.append(target["table"])
+            continue
+        table_by_source.setdefault(target["source"], []).append(target["table"])
+        all_table_names.append(target["table"])
+    if skipped_large:
+        logger.info(f"Evaluate-all: {len(skipped_large)} catalog tables above "
+                    f"{RULE_SCAN_MAX_ROWS} rows skipped")
 
     total_evaluations = 0
     total_passed = 0
@@ -1311,6 +1332,7 @@ def evaluate_all_rules(db: Session) -> Dict[str, Any]:
         "failed": total_failed,
         "errors": total_errors,
         "overall_status": overall_status,
+        "skipped_large_tables": len(skipped_large),
         "execution_time_ms": exec_ms,
     }
 
@@ -1338,13 +1360,11 @@ def scheduled_rule_evaluation():
 # =============================================================================
 
 
-def check_row_count_delta(db: Session, job, table_name: str, current_count: int):
-    """
-    Compare current row count against last DataProfileSnapshot.
-
-    Alert if count dropped >20% from previous snapshot. Advisory only.
-    """
-    from app.core.models import DataProfileSnapshot, DQAnomalyAlert, AnomalyAlertType
+def previous_profile_count(db: Session, table_name: str) -> Optional[int]:
+    """Row count of the latest profile snapshot, read BEFORE a new profile is
+    taken (SPEC_144: the gate used to read it after, comparing a snapshot with
+    itself)."""
+    from app.core.models import DataProfileSnapshot
 
     prev = (
         db.query(DataProfileSnapshot)
@@ -1352,18 +1372,34 @@ def check_row_count_delta(db: Session, job, table_name: str, current_count: int)
         .order_by(DataProfileSnapshot.profiled_at.desc())
         .first()
     )
-    if not prev or not prev.row_count:
+    return prev.row_count if prev else None
+
+
+def check_row_count_delta(db: Session, job, table_name: str, current_count: int,
+                          previous_count: Optional[int] = None):
+    """
+    Compare current row count against the previous DataProfileSnapshot.
+
+    Alert if count dropped >20% from previous snapshot. Advisory only.
+    ``previous_count``: the count read before the caller profiled the table
+    (``previous_profile_count``); without it the latest snapshot is used.
+    """
+    from app.core.models import DQAnomalyAlert, AnomalyAlertType
+
+    prev_count = previous_count if previous_count is not None \
+        else previous_profile_count(db, table_name)
+    if not prev_count:
         return None
 
-    delta_pct = (current_count - prev.row_count) / prev.row_count * 100
+    delta_pct = (current_count - prev_count) / prev_count * 100
     if delta_pct < -20:  # Dropped more than 20%
         alert = DQAnomalyAlert(
             table_name=table_name,
             alert_type=AnomalyAlertType.ROW_COUNT_DROP,
             severity="warning",
-            message=f"Row count dropped {abs(delta_pct):.1f}%: {prev.row_count} → {current_count}",
+            message=f"Row count dropped {abs(delta_pct):.1f}%: {prev_count} → {current_count}",
             details={
-                "previous": prev.row_count,
+                "previous": prev_count,
                 "current": current_count,
                 "delta_pct": round(delta_pct, 1),
             },
@@ -1373,7 +1409,7 @@ def check_row_count_delta(db: Session, job, table_name: str, current_count: int)
         db.commit()
         logger.warning(
             f"Row count drop alert for {table_name}: "
-            f"{prev.row_count} → {current_count} ({delta_pct:.1f}%)"
+            f"{prev_count} → {current_count} ({delta_pct:.1f}%)"
         )
         return alert
     return None
@@ -1391,7 +1427,7 @@ def check_date_gaps(db: Session, table_name: str, date_column: str, job_id: int)
         result = db.execute(text(f"""
             WITH months AS (
                 SELECT DISTINCT date_trunc('month', {qi(date_column)}::timestamp) as m
-                FROM {qi(table_name)}
+                FROM {qt(table_name)}
                 WHERE {qi(date_column)} IS NOT NULL
                 ORDER BY m
             ),

@@ -100,7 +100,11 @@ function boot(opts) {
                 let body = null, status = 200;
                 const headers = {};
                 if (u.pathname === '/api/v1/datasets/status') body = statusBody();
-                else if (u.pathname === '/api/v1/catalog') body = { datasets: [] };
+                else if (u.pathname === '/api/v1/catalog') body = { datasets: [
+                    { key: 'fred', quality_flags: ['fabricated', '<img src=y onerror=bad()>'] }] };
+                else if (u.pathname === '/api/v1/catalog/row-trends') body = { days: 30, datasets: {
+                    adv: [{ date: '<img src=x onerror=bad()>', rows: 10 }, { date: '2026-09-02', rows: 12 }, { date: '2026-09-03', rows: 15 }],
+                    fred: [{ date: '2026-09-01', rows: 9 }, { date: '2026-09-02', rows: 4 }] } };
                 else if (u.pathname === '/api/v1/bulk/releases') body = { releases: [] };
                 else if (u.pathname === '/api/v1/jobs') {
                     const producer = u.searchParams.get('producer');
@@ -149,6 +153,16 @@ const scenarios = {
         await sleep(300);
         check(doc.querySelectorAll('tr.ds-row').length === 5, 'five rows');
         check(!doc.body.innerHTML.includes('<img src="x"'), 'display names escaped');
+        // SPEC_144 row-count sparklines (escaped tooltip; a drop is flagged)
+        check(doc.querySelectorAll('tr.ds-row[data-key="adv"] svg.spark polyline').length === 1, 'adv sparkline drawn');
+        check(doc.querySelector('tr.ds-row[data-key="fred"] svg.spark.down') !== null, 'falling row count flagged');
+        check(doc.querySelector('tr.ds-row[data-key="tdb"] svg.spark') === null, 'no sparkline without a trend');
+        check(b.calls.some(c => c[0] === '/api/v1/catalog/row-trends'), 'row trends fetched');
+        // SPEC_144 review: catalog quality_flags shown on the row, escaped
+        check(doc.querySelectorAll('tr.ds-row[data-key="fred"] .qflag').length === 2, 'fred flags shown');
+        check(doc.querySelector('tr.ds-row[data-key="fred"] .qflag').textContent === 'fabricated', 'flag label');
+        check(!doc.body.innerHTML.includes('<img src="y"'), 'flags escaped');
+        check(doc.querySelector('tr.ds-row[data-key="adv"] .qflag') === null, 'no flag without quality_flags');
         check(b.esList.length === 1, 'SSE opened in worker mode');
         check(b.captured.some(c => c.kind === 'interval' && c.ms === 60000), 'slow tick registered');
         check(!b.captured.some(c => c.kind === 'interval' && c.ms === 90000), 'no fallback poll while SSE is up');

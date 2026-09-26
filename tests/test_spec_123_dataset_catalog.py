@@ -1087,9 +1087,44 @@ class TestMirrorScopePg:
             asyncio.run(_run_quality_gate(db, SimpleNamespace(id=1, source="fred")))
         finally:
             db.close()
-        assert seen == ["fred_interest_rates"]
+        # SPEC_144: the gate resolves the job's dataset (dispatch:fred -> fred_series)
+        # and gates each of its existing tables, catalog-only ones included
+        assert {"fred_gdp_x", "fred_interest_rates"} <= set(seen)
+        assert all(t.startswith("fred_") for t in seen)
+
+    def test_quality_gate_falls_back_to_ingested_registry_rows(self, pg_engine, monkeypatch):
+        """A job no catalog dataset resolves still uses the registry (legacy tables)."""
+        import asyncio
+        from types import SimpleNamespace
+
+        from sqlalchemy import text
+
+        import app.core.data_quality_service as dqs
+        from app.api.v1.jobs import _run_quality_gate
+
+        with pg_engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO dataset_registry (source, dataset_id, table_name, created_at, "
+                "last_updated_at) VALUES ('legacy_thing', 'legacy_thing', 'legacy_thing', "
+                "now() - interval '1 day', now() - interval '1 day')"))
+        seen = []
+
+        def _eval(db, job, table):
+            seen.append(table)
+            raise RuntimeError("stop")
+
+        monkeypatch.setattr(dqs, "evaluate_rules_for_job", _eval)
+        db = self._session(pg_engine)
+        try:
+            asyncio.run(_run_quality_gate(db, SimpleNamespace(id=1, source="legacy_thing")))
+        finally:
+            db.close()
+        assert seen == ["legacy_thing"]
 
     def test_profile_all_tables_skips_catalog_only_rows(self, pg_engine, monkeypatch):
+        """SPEC_144 supersedes SPEC_123 here: catalog tables that EXIST are
+        profiled (catalog-only registry rows included); declared tables that
+        do not exist are still skipped."""
         from sqlalchemy import text
 
         import app.core.data_profiling_service as dps
@@ -1109,7 +1144,8 @@ class TestMirrorScopePg:
             dps.profile_all_tables(db)
         finally:
             db.close()
-        assert profiled == ["fred_interest_rates"]
+        assert {"fred_interest_rates", "fred_gdp_x", "form_d_filings", "core.entity"} <= set(profiled)
+        assert "form_d_issuers" not in profiled  # declared, absent
 
     def test_plain_orm_replace_keeps_catalog_block(self, pg_engine):
         """Per-source ingestors (bea, bls, eia, ...) assign source_metadata directly."""

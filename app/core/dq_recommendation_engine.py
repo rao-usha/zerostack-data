@@ -19,7 +19,6 @@ from app.core.models import (
     DataProfileSnapshot,
     DataQualityResult,
     DataQualityRule,
-    DatasetRegistry,
     DQAnomalyAlert,
     DQQualitySnapshot,
     DQRecommendation,
@@ -303,17 +302,18 @@ def _analyze_completeness_gaps(db: Session) -> List[Recommendation]:
 
 
 def _analyze_missing_coverage(db: Session) -> List[Recommendation]:
-    """Find sources/tables with no DQ rules or no profiles."""
-    recs: List[Recommendation] = []
+    """Find sources/tables with no DQ rules or no profiles.
 
-    # Sources in registry
-    registry_sources = (
-        db.query(DatasetRegistry.source)
-        .filter(DatasetRegistry.ingested())
-        .distinct()
-        .all()
-    )
-    source_names = {r[0] for r in registry_sources}
+    SPEC_144: the tables in scope are the catalog-driven DQ targets (catalog
+    tables that exist + ingested registry rows), not the registry alone.
+    """
+    from app.catalog.quality import dq_targets
+
+    recs: List[Recommendation] = []
+    targets = dq_targets(db)
+
+    # Sources in scope
+    source_names = {t["source"] for t in targets}
 
     # Sources with at least one rule
     rule_sources = {
@@ -337,10 +337,7 @@ def _analyze_missing_coverage(db: Session) -> List[Recommendation]:
             ))
 
     # Tables never profiled
-    registry_tables = (
-        db.query(DatasetRegistry.table_name, DatasetRegistry.source)
-        .filter(DatasetRegistry.ingested()).all()
-    )
+    registry_tables = [(t["table"], t["source"]) for t in targets]
     profiled_tables = {
         r[0]
         for r in db.query(DataProfileSnapshot.table_name).distinct().all()

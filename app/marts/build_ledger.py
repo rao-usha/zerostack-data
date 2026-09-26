@@ -417,4 +417,13 @@ def run_guarded(
                              "dry_run": bool(dry_run)}
     logger.info(f"[mart_build:{mart}] #{build_id} success"
                 f"{' (dry run, rolled back)' if dry_run else ''}")
+    if not dry_run:
+        # SPEC_144 post-load DQ hook (pe_mart_build and entity_resolve): advisory, never raises
+        from app.catalog.job_keys import producer_for_mart
+        from app.catalog.quality import post_load
+
+        dq = post_load(engine, producer_for_mart(mart))
+        if dq.get("profiled") or dq.get("errors"):
+            logger.info(f"[mart_build:{mart}] #{build_id} post-load profile: "
+                        f"{len(dq.get('profiled', []))} tables, {dq.get('errors', 0)} errors")
     return summary
