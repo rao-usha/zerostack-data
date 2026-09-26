@@ -197,3 +197,100 @@ def sync_dataset_registry(engine: Engine, specs: Optional[Iterable[DatasetSpec]]
 
     logger.info(f"[catalog] dataset_registry mirror: {stats}")
     return stats
+
+
+# ---------------------------------------------------------------------------
+# Column comments (SPEC_137)
+# ---------------------------------------------------------------------------
+
+COMMENT_LOCK_TIMEOUT_MS = 2000
+COMMENT_STATEMENT_TIMEOUT_MS = 10000
+
+
+def _dollar_quote(value: str) -> str:
+    """A dollar-quoted SQL literal (COMMENT takes no bind parameters)."""
+    value = value.replace("\x00", "")
+    tag = "nxd"
+    while f"${tag}$" in value or value.endswith(f"${tag}"):
+        tag += "x"
+    return f"${tag}${value}${tag}$"
+
+
+def sync_column_comments(engine: Engine, specs: Optional[Iterable[DatasetSpec]] = None,
+                         dry_run: bool = False,
+                         lock_timeout_ms: int = COMMENT_LOCK_TIMEOUT_MS) -> Dict[str, Any]:
+    """Write the column dictionary to ``COMMENT ON COLUMN`` for existing catalog tables.
+
+    - only text from curated / upstream / bulk / metadata / model sources
+      (never glossary guesses);
+    - only where the column has no comment: an existing comment is adopted,
+      never overwritten, and a comment is never removed;
+    - one transaction per table under ``SET LOCAL lock_timeout`` (COMMENT
+      takes a SHARE UPDATE EXCLUSIVE lock); a table that fails is skipped
+      and reported;
+    - idempotent: a second run writes nothing.
+
+    Run on demand (admin endpoint / CLI), not at startup: the dictionary only
+    changes on deploy and a full sync touches thousands of columns.
+    """
+    from sqlalchemy import text
+
+    from app.catalog.columns import COMMENT_SOURCES
+    from app.catalog.dictionary import merge_columns, packages_for
+    from app.catalog.schema_live import table_facts
+    from app.core.safe_sql import qi
+
+    stats: Dict[str, Any] = {"dry_run": dry_run, "tables": 0, "written": 0, "would_write": 0,
+                             "adopted": 0, "unchanged": 0, "skipped_tables": []}
+    if engine.dialect.name != "postgresql":
+        stats["skipped"] = "not postgresql"
+        return stats
+    specs = list(specs if specs is not None else get_catalog())
+    schemas = {split(t)[0] for s in specs for t in s.tables}
+    existing = existing_tables(engine, schemas)
+    writers = table_writers(specs, existing)
+    tables = sorted(writers)
+    facts: Dict[str, Any] = {}
+    for i in range(0, len(tables), 200):
+        facts.update(table_facts(engine, tables[i:i + 200]))
+
+    for table in tables:
+        f = facts.get(table)
+        if not f:
+            continue
+        stats["tables"] += 1
+        pkgs: List[str] = []
+        for w in writers[table]:
+            pkgs += [p for p in packages_for(w) if p not in pkgs]
+        current = f["comments"]
+        todo = []
+        for c in merge_columns(table, f["columns"], pkgs):
+            if c.get("source") not in COMMENT_SOURCES or not c.get("description"):
+                continue
+            have = (current.get(c["name"]) or "").strip()
+            if have:
+                stats["unchanged" if have == c["description"].strip() else "adopted"] += 1
+                continue
+            todo.append((c["name"], c["description"].strip()))
+        if not todo:
+            continue
+        if dry_run:
+            stats["would_write"] += len(todo)
+            continue
+        schema, name = split(table)
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(f"SET LOCAL lock_timeout = {int(lock_timeout_ms)}"))
+                conn.execute(text(f"SET LOCAL statement_timeout = {int(COMMENT_STATEMENT_TIMEOUT_MS)}"))
+                for col, desc in todo:
+                    # exec_driver_sql: no bind-parameter parsing of the comment text
+                    conn.exec_driver_sql(
+                        f"COMMENT ON COLUMN {qi(schema)}.{qi(name)}.{qi(col)} IS {_dollar_quote(desc)}"
+                        .replace("%", "%%"))
+            stats["written"] += len(todo)
+        except Exception as e:  # lock timeout, permissions, dropped mid-flight
+            logger.info(f"[catalog] column comments on {table} skipped: {type(e).__name__}")
+            stats["skipped_tables"].append({"table": table, "error": type(e).__name__})
+    summary = {k: v for k, v in stats.items() if k != "skipped_tables"}
+    logger.info(f"[catalog] column comment sync: {summary}, skipped {len(stats['skipped_tables'])} tables")
+    return stats
