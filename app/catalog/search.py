@@ -25,7 +25,6 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from functools import lru_cache
 from typing import Any, Dict, FrozenSet, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from app.catalog.spec import DatasetSpec
@@ -144,13 +143,26 @@ def build_index(specs: Optional[Sequence[DatasetSpec]] = None,
     return Index(docs=docs, vocabulary=vocab)
 
 
-@lru_cache(maxsize=1)
+_INDEX_CACHE: Dict[str, Any] = {}
+
+
 def default_index() -> Index:
-    return build_index()
+    """The process index, rebuilt when its inputs change: the dictionary object
+    (``load_dictionary`` is itself cached, so clearing it or reloading the module
+    swaps it) or the catalog tuple. No file stat, no DB: an identity check per call."""
+    from app.catalog.dictionary import load_dictionary
+    from app.catalog.registry import get_catalog
+
+    body, specs = load_dictionary(), get_catalog()
+    stamp = (id(body), id(specs))
+    if _INDEX_CACHE.get("stamp") != stamp:
+        _INDEX_CACHE["index"] = build_index(specs, body)
+        _INDEX_CACHE["stamp"] = stamp
+    return _INDEX_CACHE["index"]
 
 
 def clear_index() -> None:
-    default_index.cache_clear()
+    _INDEX_CACHE.clear()
 
 
 # ---------------------------------------------------------------------------

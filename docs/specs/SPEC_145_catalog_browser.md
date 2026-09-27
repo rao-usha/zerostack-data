@@ -119,3 +119,17 @@ that returns escaped HTML.
 - Node: `catalog-core` helpers.
 - jsdom (when available): detail page with malicious description / name / limitation / column
   text — no script executes, text shows escaped, banner shows, every tab renders.
+
+## Fix round (spec-145-fix)
+
+- Access tab export example: the body is `ExportJobCreate` (`{"table_name": <first existing
+  concrete table>, "format": "csv"}`), built by `CatalogCore.exportCurl`. No example is shown for
+  pattern-only datasets or for datasets whose tables are missing. The test parses the curl body and
+  validates it against `ExportJobCreate`. Wording: the export router is mounted with
+  `require_admin`, so "admin-only" is correct. Gated JSON-LD is refused to everyone, admins included.
+- Sample tab: a table picker (`?table=`) for datasets with two or more existing tables.
+- status.html detail rows link to `catalog.html#/dataset/<key>`.
+- `CATALOG_PUBLIC_BASE_URL` setting: canonical base for JSON-LD `@id` and `contentUrl` (the proxy
+  drops the port). When unset, the request base URL is used.
+- The search index is rebuilt when the cached dictionary or catalog object changes (an identity
+  check, no file stat), instead of a bare `lru_cache`.

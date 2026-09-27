@@ -997,6 +997,7 @@
                 ['Producer', `<span class="mono">${esc(d.producer)}</span>`],
                 ['Grain', esc(d.grain)],
                 ['Published as', esc(d.status_public)],
+                ['Catalog', `<a class="catalog-link" href="/catalog.html#/dataset/${esc(encodeURIComponent(d.key))}">Open in catalog</a>`],
             ]);
             parts.push(sectionHtml('Status', why));
 

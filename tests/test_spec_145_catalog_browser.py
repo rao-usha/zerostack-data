@@ -121,6 +121,22 @@ class TestRanking:
             _search(q)
         assert (time.perf_counter() - t) / 5 < 0.25
 
+    def test_index_follows_dictionary_reload(self, monkeypatch):
+        """Fix round: the index is rebuilt when the cached dictionary is swapped, not only on restart."""
+        from app.catalog import dictionary as dict_mod
+        from app.catalog import search as search_mod
+
+        first = search_mod.default_index()
+        assert search_mod.default_index() is first      # cached: identity check only
+        real = dict_mod.load_dictionary()
+        fake = {**real, "tables": {"zz_new_table": {"datasets": [first.docs[0].spec.key], "columns": [
+            {"name": "zzqq_unique_col", "description": "x"}]}}}
+        monkeypatch.setattr(dict_mod, "load_dictionary", lambda: fake)
+        rebuilt = search_mod.default_index()
+        assert rebuilt is not first and "zzqq_unique_col" in rebuilt.vocabulary
+        monkeypatch.undo()
+        assert "zzqq_unique_col" not in search_mod.default_index().vocabulary
+
 
 @pytest.mark.unit
 class TestFiltersAndFacets:
@@ -532,6 +548,28 @@ class TestJsonLd:
         assert r.json()["detail"]["reasons"] == list(gated.rights_gate)
         assert c.get("/api/v1/catalog/no_such_ds/jsonld").status_code == 404
 
+    def test_route_public_base_url(self, monkeypatch):
+        """Fix round: behind a proxy the request base URL loses the port; a configured
+        CATALOG_PUBLIC_BASE_URL wins, and without it the request base URL is used."""
+        from app.core.config import reset_settings
+
+        ok = next(s for s in _ungated())
+        monkeypatch.setenv("DATABASE_URL", _DUMMY_DB)
+        monkeypatch.setenv("JWT_SECRET_KEY", JWT_SECRET)
+        monkeypatch.setenv("CATALOG_PUBLIC_BASE_URL", "https://data.example:3001/")
+        reset_settings()
+        try:
+            doc = _client(USER).get(f"/api/v1/catalog/{ok.key}/jsonld").json()
+            assert doc["@id"] == f"https://data.example:3001/api/v1/catalog/{ok.key}"
+            assert all(x["contentUrl"].startswith("https://data.example:3001/api/v1/")
+                       for x in doc["distribution"])
+            monkeypatch.delenv("CATALOG_PUBLIC_BASE_URL")
+            reset_settings()
+            doc = _client(USER).get(f"/api/v1/catalog/{ok.key}/jsonld").json()
+            assert doc["@id"] == f"http://testserver/api/v1/catalog/{ok.key}"
+        finally:
+            reset_settings()
+
 
 # =============================================================================
 # 4. catalog.html (static)
@@ -758,6 +796,7 @@ class TestCatalogPage:
 
         script = _script(page, "catalog-page")
         endpoints = dict(re.findall(r"^\s*(\w+):\s*'(/api/v1/[^']*)'", script, flags=re.M))
+        script += _script(page, "catalog-core")  # the export curl lives in catalog-core
         assert set(endpoints) >= {"search", "list", "status", "entry", "schema", "sample", "lineage",
                                   "rights", "jsonld"}
         for name, path in endpoints.items():
@@ -843,6 +882,26 @@ class TestCatalogPage:
             m2 = re.search(re.escape(token) + r":\s*([^;]+);", status)
             assert m1 and m2 and m1.group(1) == m2.group(1), token
 
+    def test_access_tab_wording(self, page):
+        """Export is admin-only (router-level require_admin); JSON-LD is refused to everyone when gated."""
+        script = _script(page, "catalog-page")
+        assert "refused to non-admins" not in script
+        assert "no JSON-LD is emitted for anyone" in script
+        assert "tables: (d.tables" not in script and "C.exportCurl(" in script
+        main = (Path(__file__).resolve().parents[1] / "app" / "main.py").read_text(encoding="utf-8")
+        assert 'app.include_router(export.router, prefix="/api/v1", dependencies=_admin)' in main
+
+    def test_sample_table_picker(self, page):
+        """Scope gap: multi-table datasets can sample any existing table (/sample?table=)."""
+        script = _script(page, "catalog-page")
+        assert "data-sample-table" in script and "sampleTables(d)" in script
+        assert "'&table=' + encodeURIComponent(x.sampleTable)" in script
+        assert "addEventListener('change'" in script and "x.sampleTable = sel.value" in script
+
+    def test_status_rows_link_to_catalog(self):
+        status = STATUS.read_text(encoding="utf-8")
+        assert 'href="/catalog.html#/dataset/${esc(encodeURIComponent(d.key))}"' in status
+
     def test_nav_links(self):
         index = INDEX.read_text(encoding="utf-8")
         status = STATUS.read_text(encoding="utf-8")
@@ -884,6 +943,9 @@ out.spark = C.sparkPoints([{rows: 1}, {rows: 3}], 10, 10);
 out.sparkShort = C.sparkPoints([{rows: 1}], 10, 10);
 out.safe = [C.safeUrl('https://a.b/c'), C.safeUrl('javascript:alert(1)'), C.safeUrl('http://x" onmouseover=1')];
 out.curl = C.curlFor('http://h', '/api/v1/catalog/x/sample');
+out.exportCurl = C.exportCurl('http://h', ['gone_t', 'sec_form_d', 'x'], ['gone_t']);
+out.exportNone = [C.exportCurl('http://h', [], []), C.exportCurl('http://h', ['a'], ['a']),
+                  C.exportCurl('http://h', null, null), C.exportCurl('http://h', ["x' ; rm"], [])];
 console.log(JSON.stringify(out));
 """
 
@@ -926,6 +988,18 @@ class TestCatalogCoreNode:
         assert out["spark"] == "1.0,9.0 9.0,1.0" and out["sparkShort"] == ""
         assert out["safe"] == ["https://a.b/c", "", ""]
         assert out["curl"] == 'curl -s -H "X-API-Key: $NEXDATA_API_KEY" "http://h/api/v1/catalog/x/sample"'
+
+    def test_export_curl_body_matches_export_api(self, out):
+        """Fix round: the example body must validate against ExportJobCreate (was {tables: [...]} -> 422)."""
+        from app.api.v1.export import ExportJobCreate
+
+        cmd = out["exportCurl"]
+        assert cmd.endswith('"http://h/api/v1/export/jobs"') and "-X POST" in cmd
+        body = json.loads(re.search(r"-d '([^']*)'", cmd).group(1))
+        job = ExportJobCreate(**body)
+        assert job.table_name == "sec_form_d" and job.format == "csv"
+        assert set(body) <= set(ExportJobCreate.model_fields)
+        assert out["exportNone"] == ["", "", "", ""]
 
 
 # =============================================================================

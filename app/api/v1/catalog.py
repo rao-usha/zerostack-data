@@ -242,6 +242,18 @@ def get_catalog_entry(
     return body
 
 
+def _public_base_url(request: Request) -> str:
+    """CATALOG_PUBLIC_BASE_URL when set (a proxy may drop the port or rewrite the host),
+    else the request's base URL."""
+    try:
+        from app.core.config import get_settings
+
+        configured = get_settings().catalog_public_base_url
+    except Exception:  # settings unavailable (tests without DATABASE_URL)
+        configured = None
+    return configured or str(request.base_url)
+
+
 @router.get("/{key}/jsonld")
 def get_catalog_jsonld(key: str, request: Request):
     """schema.org ``Dataset`` JSON-LD (with DCAT terms) for one dataset.
@@ -256,7 +268,7 @@ def get_catalog_jsonld(key: str, request: Request):
     if spec is None:
         raise HTTPException(status_code=404, detail=f"unknown dataset {key!r}")
     try:
-        doc = to_jsonld(spec, base_url=str(request.base_url))
+        doc = to_jsonld(spec, base_url=_public_base_url(request))
     except JsonLdRefused as e:
         raise HTTPException(status_code=403, detail={"error": "jsonld_refused", "reasons": list(e.reasons)})
     except ValueError as e:

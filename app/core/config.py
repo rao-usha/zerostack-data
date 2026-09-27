@@ -100,6 +100,11 @@ class Settings(BaseSettings):
         default=None,
         description="Public base URL of the playground, used to build magic links",
     )
+    catalog_public_base_url: Optional[str] = Field(
+        default=None,
+        description="Canonical public base URL for catalog JSON-LD @id / distribution URLs "
+        "(SPEC_145); unset = the request's base URL",
+    )
 
     # Synthetic Data Playground free-tier quotas (PLAN_063)
     playground_free_runs_per_day: int = Field(

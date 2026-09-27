@@ -386,11 +386,25 @@
             return 'curl -s -H "X-API-Key: $NEXDATA_API_KEY" "' + origin + path + '"';
         }
 
+        /** POST /api/v1/export/jobs example (body = ExportJobCreate: table_name + format) for the
+            first concrete, existing table; '' when the dataset has none (pattern-only or missing). */
+        function exportCurl(origin, tables, missing) {
+            var gone = missing || [];
+            var t = (tables || []).filter(function (x) {
+                return typeof x === 'string' && /^[a-z_][a-z0-9_]*$/.test(x) && gone.indexOf(x) < 0;
+            })[0];
+            if (!t) return '';
+            var body = JSON.stringify({ table_name: t, format: 'csv' });
+            return 'curl -s -X POST -H "X-API-Key: $NEXDATA_API_KEY" -H "Content-Type: application/json" \\\n  -d \'' +
+                body + '\' "' + origin + '/api/v1/export/jobs"';
+        }
+
         window.CatalogCore = {
             FACETS: FACETS, TABS: TABS, esc: esc, validKey: validKey, parseHash: parseHash,
             searchHash: searchHash, searchQuery: searchQuery, datasetHash: datasetHash,
             flagReasons: flagReasons, freshness: freshness, fmtRows: fmtRows, fmtPct: fmtPct,
-            coverageText: coverageText, sparkPoints: sparkPoints, safeUrl: safeUrl, curlFor: curlFor
+            coverageText: coverageText, sparkPoints: sparkPoints, safeUrl: safeUrl, curlFor: curlFor,
+            exportCurl: exportCurl
         };
     })();
     </script>
@@ -638,7 +652,21 @@
             if (v === null || v === undefined) return '<td class="masked">null</td>';
             return `<td>${esc(typeof v === 'object' ? JSON.stringify(v) : v)}</td>`;
         }
-        function sampleHtml(res) {
+        // Table picker for multi-table datasets (/sample takes ?table=).
+        function sampleTables(d) {
+            const gone = (d && d.missing_tables) || [];
+            return ((d && d.tables) || []).filter(t => gone.indexOf(t) < 0);
+        }
+        function samplePickerHtml(d, chosen) {
+            const tables = sampleTables(d);
+            if (tables.length < 2) return '';
+            const optsHtml = tables.map(t => `<option value="${esc(t)}"${t === chosen ? ' selected' : ''}>${esc(t)}</option>`).join('');
+            return `<label class="small muted" style="display:block;margin-bottom:0.5rem">Table <select data-sample-table="${esc(d.key)}">${optsHtml}</select></label>`;
+        }
+        function sampleHtml(res, d, chosen) {
+            return `${samplePickerHtml(d, chosen)}${sampleBodyHtml(res)}`;
+        }
+        function sampleBodyHtml(res) {
             if (!res) return '<div class="loading">Loading sample...</div>';
             if (res.error) {
                 const why = res.status === 403 ? 'Sample refused: ' : 'Sample unavailable: ';
@@ -763,10 +791,9 @@
                 ['JSON-LD (schema.org Dataset)', ep('jsonld', d.key)],
             ];
             const rowsHtml = paths.map(p => `<tr><td>${esc(p[0])}</td><td class="mono">${esc('GET ' + p[1])}</td></tr>`).join('');
-            const exportBody = JSON.stringify({ tables: (d.tables || []).slice(0, 1), format: 'csv' });
-            const exportCurl = 'curl -s -X POST -H "X-API-Key: $NEXDATA_API_KEY" -H "Content-Type: application/json" \\\n  -d \'' + exportBody + '\' "' + origin + '/api/v1/export/jobs"';
+            const exportCurl = C.exportCurl(origin, d.tables, d.missing_tables);
             return `<div class="dt-grid">
-                ${gated ? '<div class="notice error dt-section wide">The rights gate holds this dataset back: samples, export and JSON-LD are refused to non-admins.</div>' : ''}
+                ${gated ? '<div class="notice error dt-section wide">The rights gate holds this dataset back: samples are admin-only (flagged), admin exports are flagged, and no JSON-LD is emitted for anyone.</div>' : ''}
                 <section class="dt-section wide"><div class="dt-title">API endpoints</div>
                     <div class="scroll-x"><table class="mini-table"><tbody>${rowsHtml}</tbody></table></div></section>
                 <section class="dt-section wide"><div class="dt-title">curl</div>
@@ -774,8 +801,8 @@
                     <button class="btn btn-secondary" type="button" data-copy="curl-text">Copy</button>
                     <p class="small muted" style="margin-top:0.5rem">Outside /api/v1/public, X-API-Key must be an admin-scope key; signed-in users send their bearer token instead.</p></section>
                 <section class="dt-section wide"><div class="dt-title">Export (admin)</div>
-                    <p class="small muted" style="margin-bottom:0.4rem">${esc('Tables: ' + ((d.tables || []).join(', ') || 'none') + '. Export jobs are admin-only and follow the dataset\'s effective rights.')}</p>
-                    <pre class="code">${esc(exportCurl)}</pre></section>
+                    <p class="small muted" style="margin-bottom:0.4rem">${esc('Tables: ' + ((d.tables || []).join(', ') || 'none') + '. Export jobs take one table each and need an admin key; a rights-gated table is exported with a rights_gate flag.')}</p>
+                    ${exportCurl ? `<pre class="code">${esc(exportCurl)}</pre>` : '<p class="small muted">No example: this dataset has no concrete existing table (declared by table pattern, or its tables are missing).</p>'}</section>
                 <section class="dt-section wide"><div class="dt-title">JSON-LD</div>
                     <button class="btn btn-secondary" type="button" data-jsonld="${esc(d.key)}">Show JSON-LD</button>
                     <pre class="code" id="jsonld-out" hidden></pre></section>
@@ -787,7 +814,7 @@
             const x = state.extras[key] || {};
             const detail = state.detail[key];
             if (tab === 'schema') return schemaHtml(x.schema);
-            if (tab === 'sample') return sampleHtml(x.sample);
+            if (tab === 'sample') return sampleHtml(x.sample, d, x.sampleTable);
             if (tab === 'lineage') return lineageHtml(x.lineage);
             if (tab === 'quality') return qualityHtml(detail);
             if (tab === 'rights') return rightsHtml(x.rights, d);
@@ -829,7 +856,9 @@
             const want = TAB_FETCH[tab];
             if (want && x[want] === undefined) {
                 x[want] = null;
-                x[want] = await getJson(ep(want, key) + (want === 'sample' ? '?limit=20' : ''));
+                const q = want !== 'sample' ? '' :
+                    '?limit=20' + (x.sampleTable ? '&table=' + encodeURIComponent(x.sampleTable) : '');
+                x[want] = await getJson(ep(want, key) + q);
                 rerenderTab(key, tab);
             }
             if ((tab === 'overview' || tab === 'quality') && state.detail[key] === undefined) {
@@ -903,6 +932,16 @@
             if (t.dataset.jsonld) { showJsonLd(t.dataset.jsonld); return; }
             const src = document.getElementById(t.dataset.copy);
             if (src && navigator.clipboard) navigator.clipboard.writeText(src.textContent).catch(() => {});
+        });
+        document.getElementById('view-detail').addEventListener('change', (e) => {
+            const sel = e.target;
+            if (!sel || !sel.dataset || !sel.dataset.sampleTable) return;
+            const key = sel.dataset.sampleTable;
+            const x = state.extras[key] = state.extras[key] || {};
+            x.sampleTable = sel.value;
+            x.sample = undefined;
+            rerenderTab(key, 'sample');
+            loadTab(key, 'sample');
         });
         window.addEventListener('hashchange', route);
 
