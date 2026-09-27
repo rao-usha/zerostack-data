@@ -101,7 +101,10 @@ class TestSqlReference:
         assert "dental_prospects" in v["self"]
         assert {"nppes_providers", "pe_collection"} <= set(_spec("vertical_prospects").inputs)
         m = sql_inputs(_spec("medspa_prospects"), specs)
-        assert {"irs_soi", "nppes_providers", "pe_collection"} == set(m["inputs"])
+        # IRS SOI arrives via zip_medspa_scores, its own dataset since SPEC_142
+        assert {"zip_medspa_scores", "nppes_providers", "pe_collection"} == set(m["inputs"])
+        z = sql_inputs(_spec("zip_medspa_scores"), specs)
+        assert set(z["inputs"]) == {"irs_soi"}
         r = sql_inputs(_spec("rollup_market_scores"), specs)
         assert set(r["inputs"]) == {"census_cbp", "irs_soi"}
 

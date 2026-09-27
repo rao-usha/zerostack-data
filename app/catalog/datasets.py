@@ -2103,8 +2103,10 @@ _API: List[DatasetSpec] = [
         tables=("medspa_prospects", "medspa_prospect_snapshots"),
         pii="personal",
         # SPEC_143: the ownership classifier reads pe_portfolio_companies (pe_collection);
-        # yelp_businesses is the Yelp API the collector calls (lineage.API_INPUTS)
-        inputs=("irs_soi", "yelp_businesses", "nppes_providers", "pe_collection"),
+        # yelp_businesses is the Yelp API the collector calls (lineage.API_INPUTS);
+        # the collector and enrichment read zip_medspa_scores (its own dataset since SPEC_142),
+        # which carries the IRS SOI input
+        inputs=("yelp_businesses", "nppes_providers", "pe_collection", "zip_medspa_scores"),
         status="archival",
         primary_key=("yelp_id",),
         coverage_sql="SELECT max(updated_at) FROM medspa_prospects",

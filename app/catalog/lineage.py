@@ -82,9 +82,9 @@ PRODUCER_MODULES: Dict[str, Tuple[str, ...]] = {
         "app/sources/medspa_discovery/collector.py",
         "app/sources/medspa_discovery/enrichment.py",
         "app/sources/medspa_discovery/ownership_classifier.py",
-        # zip_medspa_scores (a table of medspa_prospects) is scored from IRS SOI here
-        "app/ml/zip_medspa_scorer.py",
     ),
+    # zip_medspa_scores became its own dataset in SPEC_142; scored from IRS SOI here
+    "api:zip_scores": ("app/ml/zip_medspa_scorer.py",),
     "api:vertical_discovery": (
         "app/sources/vertical_discovery/configs.py",   # the per-vertical table names
         "app/sources/vertical_discovery/collector.py",
