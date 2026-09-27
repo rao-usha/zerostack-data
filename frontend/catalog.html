@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dataset Catalog</title>
+    <!--
+      SPEC_145 — dataset catalog browser. Read-only. Search and facets come from
+      GET /api/v1/catalog/search (in-memory index over the catalog and the column
+      dictionary); the detail view reads the SPEC_123/137/142/143/144 routes.
+      Palette and classes follow status.html (dark only, like the console).
+      Every piece of catalog / database text is rendered through esc().
+    -->
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --primary: #6366f1;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --bg-input: #334155;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --accent: #06b6d4;
+            --orange: #f97316;
+            --violet: #a78bfa;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        a { color: var(--accent); }
+        .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+        .muted { color: var(--text-muted); }
+        .small { font-size: 0.75rem; }
+
+        .header {
+            display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;
+            gap: 0.75rem; padding: 1rem 2rem; background: var(--bg-card); border-bottom: 1px solid var(--border);
+        }
+        .logo { display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; }
+        .logo h1 {
+            font-size: 1.5rem;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .logo h1 a { text-decoration: none; color: inherit; }
+        .tagline { color: var(--text-muted); font-size: 0.875rem; }
+        .header-right { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; font-size: 0.8rem; color: var(--text-muted); }
+        .nav-link { color: var(--text-muted); text-decoration: none; border: 1px solid var(--border); padding: 0.35rem 0.75rem; border-radius: 6px; }
+        .nav-link:hover { color: var(--text); background: var(--bg-input); }
+
+        .content { padding: 2rem; max-width: 1400px; margin: 0 auto; padding-bottom: 5rem; }
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .card-title { font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; }
+        .card-sub { font-size: 0.8rem; color: var(--text-muted); margin: -0.6rem 0 1rem; }
+        .btn { padding: 0.45rem 0.9rem; background: var(--primary); border: none; border-radius: 8px; color: white; cursor: pointer; font-size: 0.8rem; }
+        .btn-secondary { background: var(--bg-input); border: 1px solid var(--border); color: var(--text); }
+        .btn-secondary:hover { background: var(--border); }
+        .loading { text-align: center; padding: 2rem; color: var(--text-muted); }
+        .empty { text-align: center; padding: 2rem; color: var(--text-muted); }
+
+        .notice { border-radius: 8px; padding: 0.65rem 0.9rem; font-size: 0.82rem; margin-bottom: 1rem; border: 1px solid var(--border); background: var(--bg-card); }
+        .notice.warn { border-color: rgba(245,158,11,0.5); color: var(--warning); }
+        .notice.error { border-color: rgba(239,68,68,0.5); color: var(--error); }
+        .notice.info { color: var(--text-muted); }
+
+        /* Flag banner: data_state not ok, rights gate, fabricated / seeded data */
+        .flag-banner { border-radius: 10px; padding: 0.8rem 1rem; margin-bottom: 1rem; border: 1px solid rgba(245,158,11,0.55); background: rgba(245,158,11,0.08); }
+        .flag-banner.error { border-color: rgba(239,68,68,0.6); background: rgba(239,68,68,0.08); }
+        .flag-banner .fb-title { font-weight: 600; font-size: 0.9rem; color: var(--warning); margin-bottom: 0.35rem; }
+        .flag-banner.error .fb-title { color: var(--error); }
+        .flag-banner ul { list-style: none; display: grid; gap: 0.25rem; font-size: 0.8rem; }
+        .flag-banner li { overflow-wrap: anywhere; }
+
+        /* Badges (status.html palette) */
+        .job-status-badge { padding: 0.15rem 0.55rem; border-radius: 10px; font-size: 0.7rem; font-weight: 600; white-space: nowrap; display: inline-block; }
+        .st-current, .ds-ok { background: rgba(34,197,94,0.15); color: var(--success); }
+        .st-failing, .ds-fabricated, .ds-missing_tables { background: rgba(239,68,68,0.15); color: var(--error); }
+        .st-awaiting_upstream { background: rgba(6,182,212,0.15); color: var(--accent); }
+        .st-dormant, .st-unknown, .ds-unverified { background: rgba(148,163,184,0.15); color: var(--text-muted); }
+        .st-never_run { background: transparent; color: var(--text-muted); border: 1px dashed rgba(148,163,184,0.6); }
+        .st-behind, .st-partial, .ds-stale, .ds-empty, .ds-key_columns_null { background: rgba(245,158,11,0.15); color: var(--warning); }
+        .st-stalled, .ds-seeded, .ds-sample_mixed, .ds-placeholder, .ds-demo { background: rgba(249,115,22,0.15); color: var(--orange); }
+        .st-blocked { background: rgba(167,139,250,0.15); color: var(--violet); }
+        .kind-badge { padding: 0.12rem 0.45rem; border-radius: 6px; font-size: 0.68rem; font-weight: 600; background: rgba(99,102,241,0.15); color: #a5b4fc; white-space: nowrap; display: inline-block; }
+        .rights { padding: 0.12rem 0.45rem; border-radius: 6px; font-size: 0.68rem; font-weight: 600; white-space: nowrap; border: 1px solid var(--border); color: var(--text-muted); display: inline-block; }
+        .rights.open { color: var(--success); border-color: rgba(34,197,94,0.4); }
+        .rights.attribution { color: var(--accent); border-color: rgba(6,182,212,0.4); }
+        .rights.restricted, .rights.gated { color: var(--error); border-color: rgba(239,68,68,0.45); }
+        .tag { display: inline-block; font-size: 0.66rem; padding: 0.05rem 0.4rem; border-radius: 6px; border: 1px solid var(--border); color: var(--text-muted); margin: 0 0.25rem 0.2rem 0; white-space: nowrap; }
+        .tag.pii { color: var(--orange); border-color: rgba(249,115,22,0.5); }
+        .tag.id { color: var(--accent); border-color: rgba(6,182,212,0.45); }
+        .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 0.3rem; vertical-align: middle; background: var(--text-muted); }
+        .dot.good { background: #4ade80; }
+        .dot.warn { background: var(--warning); }
+        .dot.bad { background: var(--error); }
+
+        /* Search layout */
+        .search-bar { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 1rem; }
+        .search-bar input {
+            flex: 1 1 16rem; min-width: 0; padding: 0.6rem 0.8rem; background: var(--bg-input);
+            border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.9rem;
+        }
+        .search-bar input:focus { outline: none; border-color: var(--primary); }
+        .layout { display: grid; grid-template-columns: 15rem minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+        .facets { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; }
+        .facet { margin-bottom: 1rem; }
+        .facet:last-child { margin-bottom: 0; }
+        .facet-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); font-weight: 600; margin-bottom: 0.4rem; }
+        .facet label { display: flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; padding: 0.12rem 0; cursor: pointer; overflow-wrap: anywhere; }
+        .facet label .n { margin-left: auto; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+        .facet label.zero { opacity: 0.45; }
+        .facet .more { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.72rem; padding: 0.2rem 0; }
+        .result-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; font-size: 0.8rem; color: var(--text-muted); }
+        .results { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(21rem, 100%), 1fr)); gap: 0.9rem; }
+        .ds-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 0.9rem 1rem; text-decoration: none; color: inherit; display: flex; flex-direction: column; gap: 0.45rem; min-width: 0; }
+        .ds-card:hover { border-color: var(--primary); }
+        .ds-card.flagged { border-left: 3px solid var(--warning); }
+        .ds-card .name { font-weight: 600; font-size: 0.95rem; overflow-wrap: anywhere; }
+        .ds-card .key { font-size: 0.7rem; color: var(--text-muted); }
+        .ds-card .sub { font-size: 0.8rem; color: var(--text-muted); overflow-wrap: anywhere; }
+        .ds-card .hl { font-size: 0.74rem; color: var(--text-muted); font-style: italic; overflow-wrap: anywhere; }
+        .badges { display: flex; gap: 0.35rem; flex-wrap: wrap; align-items: center; }
+        .meta { display: flex; gap: 0.9rem; flex-wrap: wrap; font-size: 0.72rem; color: var(--text-muted); }
+
+        /* Detail */
+        .crumbs { font-size: 0.8rem; margin-bottom: 0.9rem; }
+        .detail-head h2 { font-size: 1.4rem; overflow-wrap: anywhere; }
+        .detail-head .sub { color: var(--text-muted); margin: 0.25rem 0 0.6rem; overflow-wrap: anywhere; }
+        .tabs { display: flex; gap: 0.25rem; flex-wrap: wrap; border-bottom: 1px solid var(--border); margin: 1rem 0; }
+        .tabs a { padding: 0.55rem 0.9rem; color: var(--text-muted); text-decoration: none; font-size: 0.85rem; border-bottom: 2px solid transparent; }
+        .tabs a.active { color: var(--text); border-bottom-color: var(--primary); }
+        .dt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr)); gap: 1rem; }
+        .dt-section { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 0.8rem 0.9rem; min-width: 0; }
+        .dt-section.wide { grid-column: 1 / -1; }
+        .dt-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); font-weight: 600; margin-bottom: 0.5rem; }
+        .kv { display: grid; grid-template-columns: minmax(0, 10rem) minmax(0, 1fr); gap: 0.25rem 0.75rem; font-size: 0.8rem; }
+        .kv dt { color: var(--text-muted); }
+        .kv dd { overflow-wrap: anywhere; }
+        .prose { font-size: 0.88rem; line-height: 1.5; overflow-wrap: anywhere; }
+        .limits { border: 1px solid rgba(245,158,11,0.45); border-radius: 8px; padding: 0.7rem 0.9rem; background: rgba(245,158,11,0.06); }
+        .limits .dt-title { color: var(--warning); }
+        .reason-list { list-style: none; font-size: 0.8rem; display: grid; gap: 0.3rem; }
+        .reason-list li { padding-left: 0.9rem; position: relative; overflow-wrap: anywhere; }
+        .reason-list li::before { content: ''; position: absolute; left: 0; top: 0.45rem; width: 5px; height: 5px; border-radius: 50%; background: var(--warning); }
+        .scroll-x { overflow-x: auto; max-width: 100%; }
+        .mini-table { width: 100%; border-collapse: collapse; font-size: 0.76rem; }
+        .mini-table th { text-align: left; color: var(--text-muted); font-weight: 500; padding: 0.3rem 0.45rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
+        .mini-table td { padding: 0.3rem 0.45rem; border-bottom: 1px solid rgba(51,65,85,0.4); vertical-align: top; overflow-wrap: anywhere; }
+        .mini-table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .masked { color: var(--text-muted); font-style: italic; }
+        pre.code { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.7rem; font-size: 0.74rem; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+        .lin-list { list-style: none; font-size: 0.8rem; display: grid; gap: 0.25rem; }
+        .lineage-svg { width: 100%; height: auto; display: block; }
+        .lineage-svg text { fill: var(--text); font-size: 11px; }
+        .lineage-svg .edge { stroke: #64748b; stroke-width: 1.2; fill: none; }
+        .lineage-svg .node rect { fill: var(--bg-input); stroke: var(--border); }
+        .lineage-svg .node.focal rect { fill: rgba(99,102,241,0.25); stroke: var(--primary); }
+        .spark { display: block; overflow: visible; }
+        .spark polyline { fill: none; stroke: #818cf8; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+        .score { font-size: 2rem; font-weight: 700; color: var(--primary); }
+
+        @media (max-width: 900px) {
+            .content { padding: 1rem; }
+            .header { padding: 0.9rem 1rem; }
+            .layout { grid-template-columns: minmax(0, 1fr); }
+            .facets { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 0.75rem; }
+            .facet { margin-bottom: 0; }
+        }
+        @media (max-width: 640px) {
+            .card { padding: 1rem; }
+            .kv { grid-template-columns: minmax(0, 1fr); }
+            .kv dt { margin-top: 0.3rem; }
+            .mini-table .c-opt { display: none; }
+            .tabs a { padding: 0.45rem 0.6rem; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">
+            <h1><a href="#/">Dataset catalog</a></h1>
+            <span class="tagline">What each dataset is, what is really loaded, and what you may do with it</span>
+        </div>
+        <div class="header-right">
+            <a class="nav-link" href="/status.html">Status</a>
+            <a class="nav-link" href="/index.html">Console</a>
+        </div>
+    </header>
+
+    <main class="content">
+        <div id="notices"></div>
+
+        <section id="view-search">
+            <form class="search-bar" id="search-form" role="search">
+                <input id="q" type="search" placeholder="Search datasets, tables and columns (e.g. form d, cik, interest rates)" aria-label="Search the catalog" autocomplete="off">
+                <button class="btn" type="submit">Search</button>
+                <button class="btn btn-secondary" type="button" id="clear-btn">Clear</button>
+            </form>
+            <div class="layout">
+                <aside class="facets" id="facets" aria-label="Filters"><div class="loading">Loading...</div></aside>
+                <section>
+                    <div class="result-head"><span id="result-count"></span><span class="small">Internal preview: every catalog dataset is shown, none is ga/beta yet.</span></div>
+                    <div class="results" id="results"><div class="loading">Loading catalog...</div></div>
+                </section>
+            </div>
+        </section>
+
+        <section id="view-detail" hidden></section>
+    </main>
+
+    <script src="/js/auth.js"></script>
+
+    <script id="catalog-core">
+    /* Pure helpers, no DOM: exercised by tests/test_spec_145 under node. */
+    (function () {
+        'use strict';
+
+        var FACETS = ['kind', 'source', 'data_state', 'effective_redistribution', 'redistribution',
+                      'pii_class', 'status_public', 'identifier', 'origin', 'keyword'];
+        var FLAG_STATES = ['fabricated', 'seeded', 'sample_mixed', 'placeholder', 'demo'];
+        var GATE_TEXT = {
+            storage_forbidden: "The source's terms forbid storing this data.",
+            commercial_use_forbidden: "The source's terms forbid commercial use.",
+            agreement_required: 'Use needs a signed agreement with the source.'
+        };
+        var STATE_TEXT = {
+            stale: 'Data is stale: the last verified load is behind its cadence.',
+            empty: 'Tables exist but hold no rows.',
+            missing_tables: 'Declared tables do not exist.',
+            key_columns_null: 'Key columns are NULL in the loaded rows.',
+            seeded: 'Contains seed rows mixed with real data.',
+            fabricated: 'Contains fabricated (derived-by-formula) values presented as data.',
+            sample_mixed: 'Sample rows are mixed in with real rows.',
+            placeholder: 'Placeholder rows only.',
+            demo: 'Demo data, not a real load.'
+        };
+        var KEY_RE = /^[a-z][a-z0-9_]*$/;
+        var TABS = ['overview', 'schema', 'sample', 'lineage', 'quality', 'rights', 'access'];
+
+        function esc(value) {
+            if (value === null || value === undefined) return '';
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function validKey(key) { return typeof key === 'string' && KEY_RE.test(key); }
+
+        /** location.hash -> {view: 'search', params} | {view: 'dataset', key, tab}. */
+        function parseHash(hash) {
+            var h = String(hash || '').replace(/^#/, '');
+            var m = /^\/dataset\/([^/?]+)(?:\/([a-z]+))?/.exec(h);
+            if (m) {
+                var key = decodeURIComponent(m[1]);
+                if (validKey(key)) {
+                    return { view: 'dataset', key: key, tab: TABS.indexOf(m[2]) !== -1 ? m[2] : 'overview' };
+                }
+            }
+            var params = { q: '' };
+            FACETS.forEach(function (f) { params[f] = []; });
+            var qi = h.indexOf('?');
+            if (qi !== -1) {
+                h.slice(qi + 1).split('&').forEach(function (pair) {
+                    if (!pair) return;
+                    var eq = pair.indexOf('=');
+                    var k = decodeURIComponent(eq === -1 ? pair : pair.slice(0, eq));
+                    var v = eq === -1 ? '' : decodeURIComponent(pair.slice(eq + 1).replace(/\+/g, ' '));
+                    if (k === 'q') params.q = v;
+                    else if (FACETS.indexOf(k) !== -1) params[k] = v.split(',').filter(Boolean);
+                });
+            }
+            return { view: 'search', params: params };
+        }
+
+        /** params -> '#/?q=..&kind=a,b' (stable order; empty values dropped). */
+        function searchHash(params) {
+            var parts = [];
+            if (params && params.q) parts.push('q=' + encodeURIComponent(params.q));
+            FACETS.forEach(function (f) {
+                var v = (params && params[f]) || [];
+                if (v.length) parts.push(f + '=' + v.map(encodeURIComponent).join(','));
+            });
+            return '#/' + (parts.length ? '?' + parts.join('&') : '');
+        }
+
+        /** The same params as the /catalog/search query string. */
+        function searchQuery(params) {
+            var parts = [];
+            if (params && params.q) parts.push('q=' + encodeURIComponent(params.q));
+            FACETS.forEach(function (f) {
+                var v = (params && params[f]) || [];
+                if (v.length) parts.push(f + '=' + encodeURIComponent(v.join(',')));
+            });
+            return parts.join('&');
+        }
+
+        function datasetHash(key, tab) {
+            return '#/dataset/' + encodeURIComponent(key) + (tab && tab !== 'overview' ? '/' + tab : '');
+        }
+
+        /** Why a dataset needs a warning banner: [{level: 'error'|'warn', text}] (plain text).
+         *  Accepts a search result or a /catalog entry (rights nested). */
+        function flagReasons(d) {
+            if (!d) return [];
+            var out = [];
+            var rights = d.rights || {};
+            var gate = d.rights_gate || rights.gate || [];
+            gate.forEach(function (g) { out.push({ level: 'error', code: g, text: GATE_TEXT[g] || ('Rights gate: ' + g) }); });
+            var storage = d.storage !== undefined ? d.storage : rights.storage;
+            if (storage === 'forbidden' && gate.indexOf('storage_forbidden') === -1) {
+                out.push({ level: 'error', code: 'storage_forbidden', text: GATE_TEXT.storage_forbidden });
+            }
+            var state = d.data_state;
+            if (state && state !== 'ok' && state !== 'unverified') {
+                var fatal = state === 'fabricated' || state === 'missing_tables';
+                out.push({ level: fatal ? 'error' : 'warn', code: state, text: STATE_TEXT[state] || ('Data state: ' + state) });
+            }
+            (d.quality_flags || []).forEach(function (f) {
+                if (FLAG_STATES.indexOf(f) !== -1 && f !== state) {
+                    out.push({ level: f === 'fabricated' ? 'error' : 'warn', code: f, text: STATE_TEXT[f] || f });
+                }
+            });
+            if (d.origin === 'synthetic') out.push({ level: 'warn', code: 'synthetic', text: 'Synthetic data: generated, not observed.' });
+            return out;
+        }
+
+        /** /datasets/status row -> {cls: good|warn|bad|none, label}. */
+        function freshness(row) {
+            if (!row || !row.status) return { cls: 'none', label: 'status unknown' };
+            var s = row.status;
+            if (s === 'current' || s === 'awaiting_upstream') return { cls: 'good', label: s.replace(/_/g, ' ') };
+            if (s === 'failing' || s === 'blocked') return { cls: 'bad', label: s.replace(/_/g, ' ') };
+            if (s === 'behind' || s === 'stalled' || s === 'partial') return { cls: 'warn', label: s };
+            return { cls: 'none', label: s.replace(/_/g, ' ') };
+        }
+
+        function fmtRows(n) {
+            if (n === null || n === undefined || typeof n !== 'number' || !isFinite(n)) return '';
+            if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
+            if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+            if (n >= 1e4) return Math.round(n / 1e3) + 'k';
+            return String(Math.round(n));
+        }
+
+        function fmtPct(v) {
+            if (v === null || v === undefined || typeof v !== 'number' || !isFinite(v)) return '';
+            return (Math.round(v * 10) / 10) + '%';
+        }
+
+        /** Coverage range text: 'from … through …' (either side may be unknown). */
+        function coverageText(from, through) {
+            if (!from && !through) return '';
+            return (from || '?') + ' → ' + (through || '?');
+        }
+
+        /** [{date, rows}] -> 'x,y x,y' in w x h ('' with fewer than two points). */
+        function sparkPoints(points, w, h) {
+            var vals = (points || []).map(function (p) { return p && p.rows; })
+                .filter(function (v) { return typeof v === 'number' && isFinite(v); });
+            if (vals.length < 2) return '';
+            var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals), span = max - min;
+            return vals.map(function (v, i) {
+                var x = 1 + (w - 2) * i / (vals.length - 1);
+                var y = span === 0 ? h / 2 : 1 + (h - 2) * (1 - (v - min) / span);
+                return x.toFixed(1) + ',' + y.toFixed(1);
+            }).join(' ');
+        }
+
+        /** http(s) URLs only, else '' (never a javascript: link). */
+        function safeUrl(u) {
+            return typeof u === 'string' && /^https?:\/\/[^\s"'<>]+$/i.test(u) ? u : '';
+        }
+
+        function curlFor(origin, path) {
+            return 'curl -s -H "X-API-Key: $NEXDATA_API_KEY" "' + origin + path + '"';
+        }
+
+        window.CatalogCore = {
+            FACETS: FACETS, TABS: TABS, esc: esc, validKey: validKey, parseHash: parseHash,
+            searchHash: searchHash, searchQuery: searchQuery, datasetHash: datasetHash,
+            flagReasons: flagReasons, freshness: freshness, fmtRows: fmtRows, fmtPct: fmtPct,
+            coverageText: coverageText, sparkPoints: sparkPoints, safeUrl: safeUrl, curlFor: curlFor
+        };
+    })();
+    </script>
+
+    <script id="catalog-page">
+    /*
+     * Page script. XSS rule (enforced by tests/test_spec_145): every ${...} in a
+     * template literal is esc(...), a call to a *Html(...) helper (which obeys the
+     * same rule), a *Html variable, a ternary of those / string literals / checked
+     * templates, or list.map(x => `template` | fooHtml(x)).join(''). innerHTML is
+     * only ever assigned such an expression.
+     */
+    (function () {
+        'use strict';
+        const C = window.CatalogCore;
+        const esc = C.esc;
+
+        // Endpoint templates ({key} is filled with encodeURIComponent(key)).
+        const ENDPOINTS = {
+            search: '/api/v1/catalog/search',
+            list: '/api/v1/catalog',
+            status: '/api/v1/datasets/status',
+            entry: '/api/v1/catalog/{key}',
+            schema: '/api/v1/catalog/{key}/schema',
+            sample: '/api/v1/catalog/{key}/sample',
+            lineage: '/api/v1/catalog/{key}/lineage',
+            rights: '/api/v1/catalog/rights/{key}',
+            jsonld: '/api/v1/catalog/{key}/jsonld',
+        };
+        function ep(name, key) {
+            return ENDPOINTS[name].replace('{key}', encodeURIComponent(key || ''));
+        }
+
+        const FACET_LABELS = {
+            kind: 'Kind', source: 'Source', data_state: 'Data state', effective_redistribution: 'Rights today',
+            redistribution: 'Rights declared', pii_class: 'PII', status_public: 'Publication',
+            identifier: 'Identifiers', origin: 'Origin', keyword: 'Keywords',
+        };
+        const FACET_SHOW = 8;
+
+        const state = {
+            params: null, search: null, catalog: {}, status: {}, statusLoaded: false,
+            detail: {}, extras: {}, expanded: {},
+        };
+
+        // ---- fetch ---------------------------------------------------------
+        async function getJson(url) {
+            let resp;
+            try {
+                resp = await fetch(url);
+            } catch (e) {
+                return { error: 'network error' };
+            }
+            let body = null;
+            try { body = await resp.json(); } catch (e) { body = null; }
+            if (!resp.ok) {
+                return { error: 'HTTP ' + resp.status, status: resp.status, detail: body && body.detail };
+            }
+            return { data: body };
+        }
+
+        function detailText(detail) {
+            if (detail === null || detail === undefined) return '';
+            if (typeof detail === 'string') return detail;
+            if (detail.reasons) return (detail.error || 'refused') + ': ' + detail.reasons.join(', ');
+            try { return JSON.stringify(detail); } catch (e) { return String(detail); }
+        }
+
+        function setNotice(text, cls) {
+            const el = document.getElementById('notices');
+            el.innerHTML = text ? `<div class="notice ${esc(cls || 'info')}">${esc(text)}</div>` : '';
+        }
+
+        // ---- small HTML helpers (all return escaped HTML) --------------------
+        function stateBadgeHtml(ds) {
+            const s = ds || 'unverified';
+            return `<span class="job-status-badge ds-${esc(s)}" title="data state (last verification)">${esc(s.replace(/_/g, ' '))}</span>`;
+        }
+        function rightsBadgeHtml(d) {
+            const r = d.rights || {};
+            const gate = d.rights_gate || r.gate || [];
+            const eff = d.effective_redistribution || r.effective_redistribution || 'internal_only';
+            const decl = d.redistribution || r.redistribution || '';
+            if (gate.length) return `<span class="rights gated" title="${esc(gate.join(', '))}">rights gated</span>`;
+            const title = decl && decl !== eff ? 'declared ' + decl + '; ' + eff + ' until reviewed' : eff;
+            return `<span class="rights ${esc(eff)}" title="${esc(title)}">${esc(eff.replace(/_/g, ' '))}</span>`;
+        }
+        function kindBadgeHtml(kind) {
+            return `<span class="kind-badge">${esc(kind || 'other')}</span>`;
+        }
+        function freshnessHtml(key) {
+            if (!state.statusLoaded) return '';
+            const f = C.freshness(state.status[key]);
+            return `<span title="freshness (dataset status)"><span class="dot ${esc(f.cls)}"></span>${esc(f.label)}</span>`;
+        }
+        /** The warning banner for flagged datasets (data_state != ok, rights gate,
+         *  storage forbidden, fabricated / seeded / sample data). '' when clean. */
+        function bannerHtml(d) {
+            const reasons = C.flagReasons(d);
+            if (!reasons.length) return '';
+            const severe = reasons.some(r => r.level === 'error');
+            const itemsHtml = reasons.map(r => `<li>${esc(r.text)}</li>`).join('');
+            return `<div class="flag-banner ${severe ? 'error' : 'warn'}" role="alert" data-flags="${esc(reasons.map(r => r.code).join(','))}">
+                <div class="fb-title">${esc(severe ? 'Warning: do not rely on or share this data as is' : 'Check before use')}</div>
+                <ul>${itemsHtml}</ul></div>`;
+        }
+        function kvHtml(pairs) {
+            return `<dl class="kv">${pairs.filter(p => p[1] !== null && p[1] !== undefined && p[1] !== '').map(p => `<dt>${esc(p[0])}</dt><dd>${esc(p[1])}</dd>`).join('')}</dl>`;
+        }
+        function linkHtml(url, label) {
+            const u = C.safeUrl(url);
+            return u ? `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(label || u)}</a>` : esc(label || url || '');
+        }
+        function sparkHtml(points, w, h) {
+            const pts = C.sparkPoints(points, w, h);
+            if (!pts) return '<span class="muted small">not enough history for a trend</span>';
+            return `<svg class="spark" width="${esc(w)}" height="${esc(h)}" viewBox="0 0 ${esc(w)} ${esc(h)}" role="img" aria-label="row trend"><polyline points="${esc(pts)}"></polyline></svg>`;
+        }
+        function errorHtml(what, res) {
+            return `<div class="notice error">${esc(what + ' unavailable: ' + res.error + ' ' + detailText(res.detail))}</div>`;
+        }
+
+        // ---- search view ---------------------------------------------------
+        function coverageThrough(key) {
+            const row = state.status[key];
+            return row && row.clocks ? row.clocks.coverage_through : null;
+        }
+        function cardHtml(r) {
+            const flagged = C.flagReasons(r).length > 0;
+            const rows = C.fmtRows(r.row_estimate);
+            const cov = C.coverageText(r.coverage_from, coverageThrough(r.key));
+            return `<a class="ds-card${flagged ? ' flagged' : ''}" href="${esc(C.datasetHash(r.key))}" data-key="${esc(r.key)}">
+                <div><div class="name">${esc(r.display_name)}</div><div class="key mono">${esc(r.key)}</div></div>
+                ${r.subtitle ? `<div class="sub">${esc(r.subtitle)}</div>` : ''}
+                <div class="badges">${kindBadgeHtml(r.kind)}${stateBadgeHtml(r.data_state)}${rightsBadgeHtml(r)}${r.pii_class !== 'none' ? `<span class="tag pii">${esc('PII: ' + r.pii_class)}</span>` : ''}</div>
+                ${r.highlight ? `<div class="hl">${esc(r.highlight)}</div>` : ''}
+                <div class="meta">${cov ? `<span title="coverage">${esc(cov)}</span>` : ''}${rows ? `<span title="row estimate">${esc('~' + rows + ' rows')}</span>` : ''}${freshnessHtml(r.key)}</div>
+            </a>`;
+        }
+        function resultsHtml(body) {
+            if (!body.results.length) return '<div class="empty">No dataset matches. Try fewer words or clear a filter.</div>';
+            return body.results.map(cardHtml).join('');
+        }
+
+        function facetBoxHtml(name, value, n, selected) {
+            const checked = (selected || []).indexOf(value) !== -1;
+            return `<label class="${n ? '' : 'zero'}"><input type="checkbox" data-facet="${esc(name)}" value="${esc(value)}"${checked ? ' checked' : ''}><span>${esc(String(value).replace(/_/g, ' '))}</span><span class="n">${esc(n)}</span></label>`;
+        }
+        function facetHtml(name, counts, selected) {
+            const entries = Object.entries(counts || {});
+            (selected || []).forEach(v => { if (!(v in (counts || {}))) entries.push([v, 0]); });
+            if (!entries.length) return '';
+            const open = state.expanded[name];
+            const shown = open ? entries : entries.slice(0, FACET_SHOW);
+            const boxesHtml = shown.map(e => facetBoxHtml(name, e[0], e[1], selected)).join('');
+            const moreHtml = entries.length > FACET_SHOW
+                ? `<button type="button" class="more" data-more="${esc(name)}">${esc(open ? 'show fewer' : 'show all ' + entries.length)}</button>` : '';
+            return `<div class="facet"><div class="facet-title">${esc(FACET_LABELS[name] || name)}</div>${boxesHtml}${moreHtml}</div>`;
+        }
+        function facetsHtml(body, params) {
+            return C.FACETS.map(f => facetHtml(f, body.facets[f], params[f])).join('');
+        }
+
+        function renderSearch() {
+            const body = state.search;
+            if (!body) return;
+            document.getElementById('facets').innerHTML = facetsHtml(body, state.params);
+            document.getElementById('result-count').textContent =
+                body.count + ' of ' + body.total + ' datasets' + (body.q ? ' matching "' + body.q + '"' : '');
+            document.getElementById('results').innerHTML = resultsHtml(body);
+        }
+
+        async function runSearch(params) {
+            state.params = params;
+            document.getElementById('q').value = params.q || '';
+            const qs = C.searchQuery(params);
+            const res = await getJson(ENDPOINTS.search + (qs ? '?' + qs : ''));
+            if (res.error) {
+                setNotice('Search failed (' + res.error + '). ' + detailText(res.detail), 'error');
+                return;
+            }
+            setNotice('');
+            state.search = res.data;
+            renderSearch();
+        }
+
+        // ---- detail view ---------------------------------------------------
+        function entryOf(key) {
+            return state.catalog[key] || null;
+        }
+
+        function overviewHtml(d, live) {
+            const s = state.status[d.key] || {};
+            const clocks = s.clocks || {};
+            const through = clocks.coverage_through || (live && live.coverage_through) || null;
+            const limitsHtml = d.limitations && d.limitations.length
+                ? `<section class="dt-section limits" style="margin-bottom:1rem"><div class="dt-title">Known limitations</div><ul class="reason-list">${d.limitations.map(l => `<li>${esc(l)}</li>`).join('')}</ul></section>`
+                : '';
+            const rows = live ? C.fmtRows(live.rows_total) : '';
+            return `${limitsHtml}
+            <div class="dt-grid">
+                <section class="dt-section wide"><div class="dt-title">Description</div><p class="prose">${esc(d.description)}</p>
+                    ${d.notes ? `<p class="prose muted small" style="margin-top:0.5rem">${esc(d.notes)}</p>` : ''}</section>
+                <section class="dt-section"><div class="dt-title">What a row is</div>
+                    ${kvHtml([['Grain', d.grain], ['Primary key', (d.primary_key || []).join(', ')], ['Tables', (d.tables || []).concat(d.table_patterns || []).join(', ')],
+                              ['Spatial coverage', d.spatial_coverage], ['Keywords', (d.keywords || []).join(', ')]])}</section>
+                <section class="dt-section"><div class="dt-title">Coverage and freshness</div>
+                    ${kvHtml([['Coverage', C.coverageText(d.coverage_from, through)], ['Coverage basis', d.coverage_basis],
+                              ['Status', s.status ? s.status.replace(/_/g, ' ') : ''], ['Status reason', s.status_reason],
+                              ['Last success', clocks.last_success_at], ['Rows', rows ? (live.rows_exact ? rows : '~' + rows) : ''],
+                              ['Data state', d.data_state || 'unverified'], ['Verified', d.verified_at]])}</section>
+                <section class="dt-section"><div class="dt-title">Cadence and ownership</div>
+                    ${kvHtml([['Cadence', d.cadence], ['SLO lag', d.slo_lag_hours ? d.slo_lag_hours + ' h' : ''], ['Owner', d.owner],
+                              ['Producer', d.producer], ['Rerun policy', d.rerun], ['Origin', d.origin], ['Publication', d.status_public]])}
+                    ${d.upstream_url ? `<p class="small" style="margin-top:0.5rem">Upstream: ${linkHtml(d.upstream_url)}</p>` : ''}</section>
+            </div>`;
+        }
+
+        function columnRowHtml(c) {
+            return `<tr><td class="mono">${esc(c.name)}</td><td class="mono c-opt">${esc(c.pg_type || '')}</td>
+                <td>${esc(c.description || '')}${c.unit ? `<span class="muted small">${esc(' (' + c.unit + ')')}</span>` : ''}</td>
+                <td>${c.pii && c.pii !== 'none' ? `<span class="tag pii">${esc(c.pii)}</span>` : ''}${c.semantic_type ? `<span class="tag id">${esc(c.semantic_type)}</span>` : ''}</td>
+                <td class="num c-opt">${esc(C.fmtPct(c.null_pct))}</td></tr>`;
+        }
+        function schemaTableHtml(t) {
+            const rowsHtml = (t.columns || []).map(columnRowHtml).join('');
+            const facts = [t.primary_key && t.primary_key.length ? 'primary key: ' + t.primary_key.join(', ') : '',
+                           t.row_estimate !== null && t.row_estimate !== undefined ? '~' + C.fmtRows(t.row_estimate) + ' rows' : '',
+                           t.coverage && t.coverage.pct !== null && t.coverage.pct !== undefined ? t.coverage.pct + '% of columns described' : ''];
+            return `<section class="dt-section wide"><div class="dt-title">${esc(t.table + (t.exists ? '' : ' (does not exist)'))}</div>
+                <p class="small muted" style="margin-bottom:0.4rem">${esc(facts.filter(Boolean).join(' · '))}</p>
+                <div class="scroll-x"><table class="mini-table"><thead><tr><th>Column</th><th class="c-opt">Type</th><th>Description</th><th>Tags</th><th class="c-opt">Null %</th></tr></thead>
+                <tbody>${rowsHtml ? rowsHtml : '<tr><td colspan="5" class="muted">no columns</td></tr>'}</tbody></table></div></section>`;
+        }
+        function schemaHtml(res) {
+            if (!res) return '<div class="loading">Loading schema...</div>';
+            if (res.error) return errorHtml('Schema', res);
+            const s = res.data;
+            const tablesHtml = (s.tables || []).map(schemaTableHtml).join('');
+            const truncHtml = s.tables_truncated ? `<div class="notice info">${esc('Showing ' + s.tables.length + ' of ' + s.tables_total + ' tables.')}</div>` : '';
+            return `${truncHtml}<div class="dt-grid">${tablesHtml ? tablesHtml : '<div class="empty">No tables.</div>'}</div>`;
+        }
+
+        function cellHtml(v) {
+            if (v === null || v === undefined) return '<td class="masked">null</td>';
+            return `<td>${esc(typeof v === 'object' ? JSON.stringify(v) : v)}</td>`;
+        }
+        function sampleHtml(res) {
+            if (!res) return '<div class="loading">Loading sample...</div>';
+            if (res.error) {
+                const why = res.status === 403 ? 'Sample refused: ' : 'Sample unavailable: ';
+                return `<div class="notice warn" data-refusal="1">${esc(why + (detailText(res.detail) || res.error))}</div>`;
+            }
+            const s = res.data;
+            const cols = s.columns || [];
+            if (!cols.length) return `<div class="empty">${esc('No documented columns to show for ' + s.table + '.')}</div>`;
+            const headHtml = cols.map(c => `<th>${esc(c.name + (c.masked ? ' (masked)' : ''))}</th>`).join('');
+            const rowsHtml = (s.rows || []).map(r => `<tr>${cols.map(c => cellHtml(r[c.name])).join('')}</tr>`).join('');
+            const facts = [s.table, (s.rows || []).length + ' rows', s.masked ? 'PII masked' : 'unmasked (admin)',
+                           s.sampled ? 'random sample' : 'first rows by key',
+                           s.hidden_columns ? s.hidden_columns + ' undocumented or sensitive columns hidden' : ''];
+            return `<p class="small muted" style="margin-bottom:0.5rem">${esc(facts.filter(Boolean).join(' · '))}</p>
+                ${s.attribution ? `<p class="small" style="margin-bottom:0.5rem">${esc('Attribution: ' + s.attribution)}</p>` : ''}
+                <div class="scroll-x"><table class="mini-table"><thead><tr>${headHtml}</tr></thead><tbody>${rowsHtml}</tbody></table></div>`;
+        }
+
+        // Simple three-column lineage graph: direct upstream, the dataset, direct downstream.
+        const LIN = { rowH: 28, W: 720, boxW: 200 };
+        function nodeHtml(x, y, label, cls, key) {
+            return `<a href="${esc(C.datasetHash(key))}"><g class="node ${esc(cls)}"><rect x="${esc(x)}" y="${esc(y - 10)}" width="${esc(LIN.boxW)}" height="20" rx="5"></rect><text x="${esc(x + 8)}" y="${esc(y + 4)}">${esc(String(label).slice(0, 30))}</text></g></a>`;
+        }
+        function edgeHtml(x1, y1, x2, y2) {
+            const mx = (x1 + x2) / 2;
+            return `<path class="edge" d="${esc('M' + x1 + ',' + y1 + ' C' + mx + ',' + y1 + ' ' + mx + ',' + y2 + ' ' + x2 + ',' + y2)}"></path>`;
+        }
+        function lineageSvgHtml(w) {
+            const up = (w.upstream || []).filter(r => r.depth === 1).slice(0, 12);
+            const down = (w.downstream || []).filter(r => r.depth === 1).slice(0, 12);
+            const n = Math.max(up.length, down.length, 1);
+            const H = n * LIN.rowH + 12;
+            const cx = (LIN.W - LIN.boxW) / 2, cy = H / 2;
+            const yAt = (list, i) => 16 + i * LIN.rowH + (n - list.length) * LIN.rowH / 2;
+            const upHtml = up.map((r, i) => edgeHtml(LIN.boxW, yAt(up, i), cx, cy) + nodeHtml(0, yAt(up, i), r.key, '', r.key)).join('');
+            const downX = LIN.W - LIN.boxW;
+            const downHtml = down.map((r, i) => edgeHtml(cx + LIN.boxW, cy, downX, yAt(down, i)) + nodeHtml(downX, yAt(down, i), r.key, '', r.key)).join('');
+            return `<svg class="lineage-svg" viewBox="0 0 ${esc(LIN.W)} ${esc(H)}" role="img" aria-label="lineage graph">${upHtml}${downHtml}${nodeHtml(cx, cy, w.key, 'focal', w.key)}</svg>`;
+        }
+        function lineageListHtml(rows) {
+            if (!rows.length) return '<p class="muted small">none</p>';
+            return `<ul class="lin-list">${rows.map(r => `<li><a href="${esc(C.datasetHash(r.key))}">${esc(r.key)}</a> <span class="muted small">${esc('depth ' + r.depth + (r.via && r.via.length ? ' · ' + r.via.join(', ') : ''))}</span></li>`).join('')}</ul>`;
+        }
+        function lineageHtml(res) {
+            if (!res) return '<div class="loading">Loading lineage...</div>';
+            if (res.error) return errorHtml('Lineage', res);
+            const w = res.data;
+            const drift = w.drift || [];
+            return `<div class="dt-grid">
+                <section class="dt-section wide"><div class="dt-title">Graph (direct neighbours)</div><div class="scroll-x">${lineageSvgHtml(w)}</div></section>
+                <section class="dt-section"><div class="dt-title">Upstream (built from)</div>${lineageListHtml(w.upstream || [])}</section>
+                <section class="dt-section"><div class="dt-title">Downstream (feeds)</div>${lineageListHtml(w.downstream || [])}</section>
+                <section class="dt-section"><div class="dt-title">Producers, tables and views</div>
+                    ${kvHtml([['Producers', (w.producers || []).join(', ')], ['Tables', (w.tables || []).join(', ')], ['Views', (w.views || []).join(', ')]])}</section>
+                ${drift.length ? `<section class="dt-section wide"><div class="dt-title">Lineage drift</div><ul class="reason-list">${drift.map(x => `<li>${esc((x.type || x.kind || 'drift') + ': ' + (x.message || x.detail || JSON.stringify(x)))}</li>`).join('')}</ul></section>` : ''}
+            </div>`;
+        }
+
+        function qualityHtml(res) {
+            if (!res) return '<div class="loading">Loading quality (live counts may take a few seconds)...</div>';
+            if (res.error) return errorHtml('Quality', res);
+            const q = res.data.quality;
+            if (!q) return '<div class="notice info">No quality block for this dataset (it could not be computed).</div>';
+            const comp = q.components || {};
+            const nulls = [];
+            (q.tables || []).forEach(t => Object.entries(t.key_null_pct || {}).forEach(e => nulls.push([t.table, e[0], e[1]])));
+            const nullRowsHtml = nulls.map(x => `<tr><td class="mono">${esc(x[0])}</td><td class="mono">${esc(x[1])}</td><td class="num">${esc(C.fmtPct(x[2]))}</td></tr>`).join('');
+            const trend = q.row_trend || [];
+            const reasons = q.live_state_reasons || [];
+            return `<div class="dt-grid">
+                <section class="dt-section"><div class="dt-title">Quality score</div>
+                    <div class="score">${esc(q.score === null || q.score === undefined ? '—' : Math.round(q.score))}</div>
+                    ${kvHtml([['Completeness', comp.completeness], ['Freshness', comp.freshness], ['Validity', comp.validity], ['Consistency', comp.consistency], ['Scored on', q.scored_on]])}</section>
+                <section class="dt-section"><div class="dt-title">Live state</div>
+                    ${kvHtml([['State', q.live_state], ['Verified state', q.verified_state], ['Flags', (q.flags || []).join(', ')],
+                              ['Open anomalies', q.open_anomalies], ['Rules', q.rules ? q.rules.passed + ' passed, ' + q.rules.failed + ' failed' : ''],
+                              ['Oldest profile', q.profile ? q.profile.oldest_profiled_at : '']])}
+                    ${reasons.length ? `<ul class="reason-list" style="margin-top:0.5rem">${reasons.map(r => `<li>${esc(typeof r === 'string' ? r : (r.message || JSON.stringify(r)))}</li>`).join('')}</ul>` : ''}</section>
+                <section class="dt-section"><div class="dt-title">Row trend</div>${sparkHtml(trend, 260, 48)}
+                    <p class="small muted" style="margin-top:0.4rem">${esc(trend.length ? trend.length + ' daily snapshots, latest ' + C.fmtRows(trend[trend.length - 1].rows) + ' rows' : '')}</p></section>
+                <section class="dt-section wide"><div class="dt-title">Null % on key columns</div>
+                    ${nullRowsHtml ? `<div class="scroll-x"><table class="mini-table"><thead><tr><th>Table</th><th>Column</th><th>Null %</th></tr></thead><tbody>${nullRowsHtml}</tbody></table></div>` : '<p class="muted small">No profile of the key columns yet.</p>'}</section>
+            </div>`;
+        }
+
+        function rightsHtml(res, d) {
+            if (!res) return '<div class="loading">Loading rights...</div>';
+            if (res.error) return errorHtml('Rights', res);
+            const b = res.data;
+            const r = b.rights || {};
+            const citation = [d.display_name, r.attribution, r.license, r.citation_url || d.upstream_url].filter(Boolean).join('. ');
+            const prop = r.proposed;
+            return `<div class="dt-grid">
+                <section class="dt-section"><div class="dt-title">Licence</div>
+                    ${kvHtml([['Licence', r.license], ['Declared redistribution', r.redistribution], ['Effective today', r.effective_redistribution],
+                              ['Reviewed', r.reviewed ? 'yes' : 'no'], ['Review state', b.review_state], ['Confidence', r.confidence]])}
+                    ${r.license_url ? `<p class="small" style="margin-top:0.5rem">${linkHtml(r.license_url, 'Licence terms')}</p>` : ''}</section>
+                <section class="dt-section"><div class="dt-title">Storage and use</div>
+                    ${kvHtml([['Storage', r.storage || 'not assessed'], ['Max age', r.storage_max_age_days ? r.storage_max_age_days + ' days' : ''],
+                              ['Commercial use', r.commercial_use || 'not assessed'], ['Share-alike', r.share_alike ? 'yes' : 'no'],
+                              ['Rights gate', (r.gate || []).join(', ') || 'none'], ['PII class', b.pii_class], ['Origin', b.origin]])}</section>
+                <section class="dt-section wide"><div class="dt-title">Attribution and citation</div>
+                    ${r.attribution ? `<p class="prose">${esc(r.attribution)}</p>` : '<p class="muted small">No attribution text required or recorded.</p>'}
+                    ${r.citation_quote ? `<blockquote class="prose muted" style="margin-top:0.5rem">${esc('“' + r.citation_quote + '”')}</blockquote>` : ''}
+                    ${r.citation_url ? `<p class="small" style="margin-top:0.4rem">${linkHtml(r.citation_url, 'Terms page')}</p>` : ''}
+                    <pre class="code" id="citation-text">${esc(citation)}</pre>
+                    <button class="btn btn-secondary" type="button" data-copy="citation-text">Copy citation</button></section>
+                ${prop ? `<section class="dt-section wide"><div class="dt-title">Proposed change (not applied)</div>
+                    ${kvHtml([['Change', prop.change], ['Reason', prop.reason], ['Would set', Object.entries(prop.changes || {}).map(e => e[0] + '=' + e[1]).join(', ')], ['Confidence', prop.confidence]])}</section>` : ''}
+            </div>`;
+        }
+
+        function accessHtml(d) {
+            const origin = window.location.origin;
+            const gated = C.flagReasons(d).some(r => r.level === 'error' && /forbidden|agreement/.test(r.code));
+            const paths = [
+                ['Catalog entry (live counts, quality)', ep('entry', d.key)],
+                ['Schema', ep('schema', d.key)],
+                ['Sample (up to 20 rows, PII masked)', ep('sample', d.key) + '?limit=20'],
+                ['Lineage', ep('lineage', d.key)],
+                ['Rights', ep('rights', d.key)],
+                ['JSON-LD (schema.org Dataset)', ep('jsonld', d.key)],
+            ];
+            const rowsHtml = paths.map(p => `<tr><td>${esc(p[0])}</td><td class="mono">${esc('GET ' + p[1])}</td></tr>`).join('');
+            const exportBody = JSON.stringify({ tables: (d.tables || []).slice(0, 1), format: 'csv' });
+            const exportCurl = 'curl -s -X POST -H "X-API-Key: $NEXDATA_API_KEY" -H "Content-Type: application/json" \\\n  -d \'' + exportBody + '\' "' + origin + '/api/v1/export/jobs"';
+            return `<div class="dt-grid">
+                ${gated ? '<div class="notice error dt-section wide">The rights gate holds this dataset back: samples, export and JSON-LD are refused to non-admins.</div>' : ''}
+                <section class="dt-section wide"><div class="dt-title">API endpoints</div>
+                    <div class="scroll-x"><table class="mini-table"><tbody>${rowsHtml}</tbody></table></div></section>
+                <section class="dt-section wide"><div class="dt-title">curl</div>
+                    <pre class="code" id="curl-text">${esc(C.curlFor(origin, ep('sample', d.key) + '?limit=20'))}</pre>
+                    <button class="btn btn-secondary" type="button" data-copy="curl-text">Copy</button>
+                    <p class="small muted" style="margin-top:0.5rem">Outside /api/v1/public, X-API-Key must be an admin-scope key; signed-in users send their bearer token instead.</p></section>
+                <section class="dt-section wide"><div class="dt-title">Export (admin)</div>
+                    <p class="small muted" style="margin-bottom:0.4rem">${esc('Tables: ' + ((d.tables || []).join(', ') || 'none') + '. Export jobs are admin-only and follow the dataset\'s effective rights.')}</p>
+                    <pre class="code">${esc(exportCurl)}</pre></section>
+                <section class="dt-section wide"><div class="dt-title">JSON-LD</div>
+                    <button class="btn btn-secondary" type="button" data-jsonld="${esc(d.key)}">Show JSON-LD</button>
+                    <pre class="code" id="jsonld-out" hidden></pre></section>
+            </div>`;
+        }
+
+        function tabBodyHtml(key, tab) {
+            const d = entryOf(key);
+            const x = state.extras[key] || {};
+            const detail = state.detail[key];
+            if (tab === 'schema') return schemaHtml(x.schema);
+            if (tab === 'sample') return sampleHtml(x.sample);
+            if (tab === 'lineage') return lineageHtml(x.lineage);
+            if (tab === 'quality') return qualityHtml(detail);
+            if (tab === 'rights') return rightsHtml(x.rights, d);
+            if (tab === 'access') return accessHtml(d);
+            return overviewHtml(d, detail && detail.data ? detail.data.live : null);
+        }
+
+        function tabsHtml(key, tab) {
+            return C.TABS.map(t => `<a href="${esc(C.datasetHash(key, t))}" class="${t === tab ? 'active' : ''}" data-tab="${esc(t)}">${esc(t.charAt(0).toUpperCase() + t.slice(1))}</a>`).join('');
+        }
+
+        function detailHtml(key, tab) {
+            const d = entryOf(key);
+            if (!d) return `<div class="crumbs"><a href="#/">← Catalog</a></div><div class="empty">${esc('Unknown dataset ' + key)}</div>`;
+            return `<div class="crumbs"><a href="${esc(C.searchHash(state.params || {}))}">← Catalog</a></div>
+                ${bannerHtml(d)}
+                <div class="detail-head"><h2>${esc(d.display_name)}</h2>
+                    <div class="mono small muted">${esc(d.key)}</div>
+                    ${d.subtitle ? `<div class="sub">${esc(d.subtitle)}</div>` : ''}
+                    <div class="badges">${kindBadgeHtml(d.kind)}${stateBadgeHtml(d.data_state)}${rightsBadgeHtml(d)}${freshnessHtml(d.key)}</div></div>
+                <nav class="tabs" aria-label="Dataset sections">${tabsHtml(key, tab)}</nav>
+                <div id="tab-body">${tabBodyHtml(key, tab)}</div>`;
+        }
+
+        function renderDetail(key, tab) {
+            document.getElementById('view-detail').innerHTML = detailHtml(key, tab);
+        }
+
+        function rerenderTab(key, tab) {
+            const cur = C.parseHash(window.location.hash);
+            if (cur.view !== 'dataset' || cur.key !== key || cur.tab !== tab) return;
+            const body = document.getElementById('tab-body');
+            if (body) body.innerHTML = tabBodyHtml(key, tab);
+        }
+
+        const TAB_FETCH = { schema: 'schema', sample: 'sample', lineage: 'lineage', rights: 'rights' };
+        async function loadTab(key, tab) {
+            const x = state.extras[key] = state.extras[key] || {};
+            const want = TAB_FETCH[tab];
+            if (want && x[want] === undefined) {
+                x[want] = null;
+                x[want] = await getJson(ep(want, key) + (want === 'sample' ? '?limit=20' : ''));
+                rerenderTab(key, tab);
+            }
+            if ((tab === 'overview' || tab === 'quality') && state.detail[key] === undefined) {
+                state.detail[key] = null;
+                state.detail[key] = await getJson(ep('entry', key));
+                rerenderTab(key, tab);
+            }
+        }
+
+        async function showJsonLd(key) {
+            const out = document.getElementById('jsonld-out');
+            if (!out) return;
+            out.hidden = false;
+            out.textContent = 'Loading...';
+            const res = await getJson(ep('jsonld', key));
+            out.textContent = res.error ? ('Refused: ' + (detailText(res.detail) || res.error)) : JSON.stringify(res.data, null, 2);
+        }
+
+        // ---- routing -------------------------------------------------------
+        async function route() {
+            const r = C.parseHash(window.location.hash);
+            const searchView = document.getElementById('view-search');
+            const detailView = document.getElementById('view-detail');
+            if (r.view === 'dataset') {
+                searchView.hidden = true;
+                detailView.hidden = false;
+                renderDetail(r.key, r.tab);
+                if (window.scrollTo) { try { window.scrollTo(0, 0); } catch (e) { /* jsdom */ } }
+                if (entryOf(r.key)) await loadTab(r.key, r.tab);
+                return;
+            }
+            detailView.hidden = true;
+            searchView.hidden = false;
+            await runSearch(r.params);
+        }
+
+        function currentParams() {
+            const p = C.parseHash(window.location.hash);
+            return p.view === 'search' ? p.params : (state.params || C.parseHash('#/').params);
+        }
+
+        // ---- events --------------------------------------------------------
+        document.getElementById('search-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const p = currentParams();
+            p.q = document.getElementById('q').value.trim();
+            window.location.hash = C.searchHash(p);
+        });
+        document.getElementById('clear-btn').addEventListener('click', () => {
+            window.location.hash = '#/';
+        });
+        document.getElementById('facets').addEventListener('change', (e) => {
+            const box = e.target;
+            if (!box || !box.dataset || !box.dataset.facet) return;
+            const p = currentParams();
+            const f = box.dataset.facet;
+            const set = new Set(p[f] || []);
+            if (box.checked) set.add(box.value); else set.delete(box.value);
+            p[f] = Array.from(set);
+            window.location.hash = C.searchHash(p);
+        });
+        document.getElementById('facets').addEventListener('click', (e) => {
+            const btn = e.target && e.target.closest ? e.target.closest('[data-more]') : null;
+            if (!btn) return;
+            state.expanded[btn.dataset.more] = !state.expanded[btn.dataset.more];
+            renderSearch();
+        });
+        document.getElementById('view-detail').addEventListener('click', (e) => {
+            const t = e.target && e.target.closest ? e.target.closest('[data-copy],[data-jsonld]') : null;
+            if (!t) return;
+            if (t.dataset.jsonld) { showJsonLd(t.dataset.jsonld); return; }
+            const src = document.getElementById(t.dataset.copy);
+            if (src && navigator.clipboard) navigator.clipboard.writeText(src.textContent).catch(() => {});
+        });
+        window.addEventListener('hashchange', route);
+
+        async function loadStatus() {
+            const res = await getJson(ENDPOINTS.status);
+            if (!res.data || !res.data.datasets) return;
+            res.data.datasets.forEach(d => { state.status[d.key] = d; });
+            state.statusLoaded = true;
+            const r = C.parseHash(window.location.hash);
+            if (r.view === 'search') renderSearch();
+            else rerenderHead(r.key, r.tab);
+        }
+        function rerenderHead(key, tab) {
+            // status arrived after the detail view: redraw it, keeping the loaded tab data
+            if (entryOf(key)) renderDetail(key, tab);
+        }
+
+        async function init() {
+            const list = await getJson(ENDPOINTS.list);
+            if (list.data && list.data.datasets) {
+                list.data.datasets.forEach(d => { state.catalog[d.key] = d; });
+            } else if (list.error) {
+                setNotice('Could not load the catalog (' + list.error + ').', 'error');
+            }
+            const statusDone = loadStatus();
+            await route();
+            await statusDone;
+        }
+
+        window.CatalogPage = { state: state, route: route, ready: init() };
+    })();
+    </script>
+</body>
+</html>

@@ -2,11 +2,13 @@
 Dataset catalog endpoints (SPEC_123, SPEC_144).
 
     GET  /api/v1/catalog                  the declared datasets, filterable
+    GET  /api/v1/catalog/search           ranked full-text search + facet counts (SPEC_145)
     GET  /api/v1/catalog/row-trends       daily row counts per dataset (status page sparkline)
     GET  /api/v1/catalog/usage            consumers of every dataset + undeclared view inputs
     POST /api/v1/catalog/admin/backfill-dataset-key   ingestion_jobs.dataset_key backfill (admin)
     GET  /api/v1/catalog/{key}            one dataset + live row counts and coverage,
                                           quality block and consumers
+    GET  /api/v1/catalog/{key}/jsonld     schema.org Dataset JSON-LD, rights-gated (SPEC_145)
 
 The list is static (no database). The detail counts rows on the declared
 tables under a statement timeout and caches the result for a minute; only an
@@ -20,14 +22,16 @@ verified state), so flagged data is visible without a detail call.
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.catalog import filter_specs, get_catalog, get_spec
 from app.catalog.live import dataset_live
-from app.catalog.spec import KINDS, REDISTRIBUTION, STATUS_PUBLIC
+from app.catalog.spec import (DATA_STATES, KEYWORDS, KINDS, ORIGINS, PII_CLASSES, REDISTRIBUTION,
+                              STATUS_PUBLIC)
 from app.core.authz import ROLE_ADMIN, current_principal
 from app.core.database import get_db
 
@@ -69,6 +73,73 @@ def list_catalog(
         "total": len(get_catalog()),
         "datasets": [dict(s.to_dict(), quality_flags=static_flags(s)) for s in specs],
     }
+
+
+def _multi(name: str, raw: Optional[str], allowed=None) -> List[str]:
+    """Comma-separated filter values (OR within a facet), validated against ``allowed``."""
+    values = [v.strip() for v in (raw or "").split(",") if v.strip()]
+    if allowed is not None:
+        bad = [v for v in values if v not in allowed]
+        if bad:
+            raise HTTPException(status_code=422, detail=f"{name}: {bad} not in {list(allowed)}")
+    return values
+
+
+@router.get("/search")
+def search_catalog(
+    q: Optional[str] = Query(None, max_length=200,
+                             description="words; AND, prefix-matched over key, name, tables, "
+                                         "columns (dictionary), subtitle, description, keywords"),
+    kind: Optional[str] = Query(None, description="comma-separated kinds"),
+    source: Optional[str] = Query(None, description="comma-separated source families"),
+    status_public: Optional[str] = Query(None, description="comma-separated"),
+    data_state: Optional[str] = Query(None, description="comma-separated; 'unverified' = no state"),
+    redistribution: Optional[str] = Query(None, description="declared redistribution, comma-separated"),
+    effective_redistribution: Optional[str] = Query(None, description="what may leave today"),
+    pii_class: Optional[str] = Query(None, description="comma-separated"),
+    origin: Optional[str] = Query(None, description="comma-separated"),
+    identifier: Optional[str] = Query(None, description="join-key semantic types (cik, crd, lei ...)"),
+    keyword: Optional[str] = Query(None, description="comma-separated catalog keywords"),
+    limit: int = Query(200, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    rows: bool = Query(True, description="add row estimates (cached; never counts rows)"),
+    db: Session = Depends(get_db),
+):
+    """Ranked search over the catalog and its column dictionary, with facet counts.
+
+    In-memory: no table is read to search. Facets are disjunctive (a facet's counts
+    ignore its own filter). ``row_estimate`` comes from the live-count cache or the
+    planner's estimates, never from a count."""
+    from app.catalog.identifiers import join_types
+    from app.catalog.search import UNVERIFIED, row_estimates, search
+
+    filters = {
+        "kind": _multi("kind", kind, KINDS),
+        "source": _multi("source", source),
+        "status_public": _multi("status_public", status_public, STATUS_PUBLIC),
+        "data_state": _multi("data_state", data_state, DATA_STATES + (UNVERIFIED,)),
+        "redistribution": _multi("redistribution", redistribution, REDISTRIBUTION),
+        "effective_redistribution": _multi("effective_redistribution", effective_redistribution,
+                                           REDISTRIBUTION),
+        "pii_class": _multi("pii_class", pii_class, PII_CLASSES),
+        "origin": _multi("origin", origin, ORIGINS),
+        "identifier": _multi("identifier", identifier, tuple(join_types())),
+        "keyword": _multi("keyword", keyword, KEYWORDS),
+    }
+    body = search(q=q, filters=filters, limit=limit, offset=offset)
+    if rows and body["results"]:
+        try:
+            engine = db.get_bind()
+        except Exception:
+            engine = None
+        try:
+            est = row_estimates(engine, [get_spec(r["key"]) for r in body["results"]])
+        except Exception as e:
+            logger.info(f"[catalog] search row estimates failed: {type(e).__name__}")
+            est = {}
+        for r in body["results"]:
+            r.update(est.get(r["key"]) or {"row_estimate": None, "rows_exact": False, "rows_from": None})
+    return body
 
 
 @router.get("/row-trends")
@@ -169,3 +240,26 @@ def get_catalog_entry(
         logger.warning(f"[catalog] consumers for {key} failed: {type(e).__name__}")
         body["consumers"] = None
     return body
+
+
+@router.get("/{key}/jsonld")
+def get_catalog_jsonld(key: str, request: Request):
+    """schema.org ``Dataset`` JSON-LD (with DCAT terms) for one dataset.
+
+    403 when the rights gate holds the dataset back (storage or commercial use
+    forbidden, agreement required) or it is retired. Unreviewed or restricted rights
+    are never emitted as an open licence. ``X-JsonLd-Publishable: true`` only for a
+    reviewed ga/beta dataset; everything else is for signed-in users only."""
+    from app.catalog.jsonld import JsonLdRefused, publishable, to_jsonld
+
+    spec = get_spec(key)
+    if spec is None:
+        raise HTTPException(status_code=404, detail=f"unknown dataset {key!r}")
+    try:
+        doc = to_jsonld(spec, base_url=str(request.base_url))
+    except JsonLdRefused as e:
+        raise HTTPException(status_code=403, detail={"error": "jsonld_refused", "reasons": list(e.reasons)})
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return JSONResponse(doc, media_type="application/ld+json",
+                        headers={"X-JsonLd-Publishable": "true" if publishable(spec) else "false"})
