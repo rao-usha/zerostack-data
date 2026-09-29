@@ -36,6 +36,14 @@ def _catalog():
     return get_catalog()
 
 
+def _in_force(specs):
+    """Keys whose committed REVIEWED hash equals the spec's current rights_hash (SPEC_142)."""
+    from app.catalog.rights_reviewed import REVIEWED
+
+    by_key = {s.key: s for s in specs}
+    return {k for k, (h, _) in REVIEWED.items() if k in by_key and by_key[k].rights_hash == h}
+
+
 def _claims(producer):
     """Specs that name ``producer`` as primary or also_produced_by."""
     return [s.key for s in _catalog() if producer in s.producers]
@@ -369,18 +377,27 @@ class TestRightsAndStatus:
             assert get_spec(key).redistribution == "restricted", key
 
     def test_nothing_leaves_before_review(self):
-        for s in _catalog():
-            assert not s.reviewed, f"{s.key} marked reviewed without a human review"
-            assert s.effective_redistribution == "internal_only"
+        cat = _catalog()
+        in_force = _in_force(cat)
+        for s in cat:
+            assert s.reviewed == (s.key in in_force), f"{s.key}: reviewed only via a matching committed hash"
+            if s.reviewed:
+                assert s.effective_redistribution == s.redistribution, s.key
+            else:
+                assert s.effective_redistribution == "internal_only", s.key
             assert s.status_public in ("internal", "archival"), s.key
 
-    def test_us_government_data_is_open_but_unreviewed(self):
+    def test_us_government_data_is_open_and_reviewed_only_by_hash(self):
         from app.catalog import get_spec
 
+        in_force = _in_force(_catalog())
         for key in ("sec_form_d", "sec_13f", "treasury_daily_balance", "bls_series",
                     "si_flood_zones"):
             s = get_spec(key)
-            assert s.redistribution == "open" and s.origin == "official" and not s.reviewed, key
+            assert s.redistribution == "open" and s.origin == "official", key
+            assert s.reviewed == (key in in_force), key
+        # open terms alone never review anything
+        assert not get_spec("sec_form_d").reviewed and not get_spec("si_flood_zones").reviewed
 
     def test_pii_and_origin(self):
         from app.catalog import get_spec
@@ -489,7 +506,12 @@ class TestApi:
         assert body["count"] == body["total"] == len(_catalog())
         entry = next(d for d in body["datasets"] if d["key"] == "sec_13f")
         assert entry["kind"] == "holdings" and entry["producer"] == "bulk:sec_13f"
-        assert entry["rights"]["effective_redistribution"] == "internal_only"
+        # signed off (committed hash): its declared terms apply
+        assert entry["rights"]["reviewed"] is True and entry["rights"]["effective_redistribution"] == "open"
+        # open but not signed off: still internal only
+        form_d = next(d for d in body["datasets"] if d["key"] == "sec_form_d")
+        assert form_d["rights"]["reviewed"] is False
+        assert form_d["rights"]["effective_redistribution"] == "internal_only"
         assert "coverage_sql" not in entry  # SQL is internal
 
     @pytest.mark.parametrize("params, has, lacks", [

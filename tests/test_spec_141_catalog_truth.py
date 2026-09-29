@@ -32,6 +32,14 @@ def _catalog():
     return get_catalog()
 
 
+def _in_force(specs):
+    """Keys whose committed REVIEWED hash equals the spec's current rights_hash (SPEC_142)."""
+    from app.catalog.rights_reviewed import REVIEWED
+
+    by_key = {s.key: s for s in specs}
+    return {k for k, (h, _) in REVIEWED.items() if k in by_key and by_key[k].rights_hash == h}
+
+
 def _evidence():
     return json.loads(EVIDENCE.read_text(encoding="utf-8"))
 
@@ -365,9 +373,11 @@ class TestPiiAndRights:
         s = get_spec("si_grid_infrastructure")
         assert s.redistribution == "restricted" and s.origin == "scraped"
 
-    def test_nothing_published_or_reviewed(self):
-        for s in _catalog():
-            assert not s.reviewed and s.status_public not in ("ga", "beta"), s.key
+    def test_nothing_published_and_reviewed_only_by_hash(self):
+        cat = _catalog()
+        in_force = _in_force(cat)
+        assert {s.key for s in cat if s.reviewed} == in_force
+        assert all(s.status_public not in ("ga", "beta") for s in cat)
 
 
 # ---------------------------------------------------------------------------

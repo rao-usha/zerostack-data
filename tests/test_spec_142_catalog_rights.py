@@ -49,6 +49,19 @@ def _spec(key):
     return s
 
 
+# a dataset with no committed sign-off (FDIC was held in rights review batch 1), used
+# where a test needs "a dataset that is not reviewed"
+UNREVIEWED_KEY = "fdic_institutions"
+
+
+def _in_force(specs=None):
+    """Keys whose committed REVIEWED hash equals the spec's current rights_hash."""
+    from app.catalog.rights_reviewed import REVIEWED
+
+    by_key = {s.key: s for s in (specs if specs is not None else _catalog())}
+    return {k for k, (h, _) in REVIEWED.items() if k in by_key and by_key[k].rights_hash == h}
+
+
 def _base(**over):
     kw = dict(
         key="t142_ds", source="sec", display_name="T142 dataset",
@@ -288,11 +301,32 @@ class TestProposals:
 
 @pytest.mark.unit
 class TestReviewedHash:
-    def test_nothing_reviewed_and_reviewed_file_empty(self):
-        from app.catalog import rights_reviewed
+    def test_reviewed_set_is_the_committed_hash_set(self):
+        cat = _catalog()
+        in_force = _in_force(cat)
+        assert {s.key for s in cat if s.reviewed} == in_force
+        for s in cat:
+            assert s.status_public not in ("ga", "beta"), s.key
+            if s.key in in_force:
+                assert s.effective_redistribution == s.redistribution, s.key
+            else:
+                assert s.effective_redistribution == "internal_only", s.key
+        assert UNREVIEWED_KEY not in in_force
 
-        assert rights_reviewed.REVIEWED == {}
-        assert not any(s.reviewed for s in _catalog())
+    def test_every_committed_hash_matches_current_block(self):
+        """A stale committed hash silently drops a sign-off (the dataset goes back to
+        unreviewed). Fail loudly instead: the rights block changed since review."""
+        from app.catalog.rights_reviewed import REVIEWED
+
+        by_key = {s.key: s for s in _catalog()}
+        unknown = sorted(set(REVIEWED) - set(by_key))
+        assert not unknown, f"REVIEWED names datasets not in the catalog: {unknown}"
+        stale = sorted(k for k, (h, _) in REVIEWED.items() if by_key[k].rights_hash != h)
+        assert not stale, (
+            f"rights block changed after sign-off for {stale}: the committed hash no longer matches, "
+            "so the sign-off is not in force. Re-review the new block (POST "
+            "/api/v1/catalog/rights/{key}/review) and re-emit app/catalog/rights_reviewed.py "
+            "(python -m app.catalog.rights_review --emit), or revert the rights change.")
 
     def test_reviewed_file_is_what_emit_renders(self):
         from app.catalog import rights_reviewed
@@ -364,12 +398,22 @@ class TestQueueAndReport:
 
         q = build_queue(None, live=False)
         cands = [i["key"] for i in q["candidates"]]
-        for key in ("sec_13f", "sec_companyfacts", "treasury_daily_balance", "bls_series", "intl_worldbank",
-                    "intl_oecd", "si_frontier_datacenters", "si_utility_rates", "realestate_fhfa_hpi"):
+        for key in ("intl_worldbank", "intl_oecd", "si_frontier_datacenters", "si_utility_rates",
+                    "realestate_fhfa_hpi"):
             assert key in cands, key
-        # PE / entity pack first
-        pe = [k for k in cands if k in PE_ENTITY_PACK]
-        assert cands[:len(pe)] == pe and pe
+        # signed off and in force: out of every pending section
+        in_force = _in_force()
+        assert {"sec_13f", "sec_companyfacts", "treasury_daily_balance", "bls_series"} <= in_force
+        pending = {i["key"] for sec in ("candidates", "proposals", "pii_blocked", "awaiting_commit", "stale")
+                   for i in q[sec]}
+        assert not in_force & pending
+        # PE / entity pack first. The PE-pack candidates (SEC) are signed off now, so check
+        # the ordering on the same catalog with every sign-off cleared.
+        unsigned = [dataclasses.replace(s, reviewed=False) for s in _catalog()]
+        all_cands = [i["key"] for i in build_queue(None, live=False, specs=unsigned)["candidates"]]
+        pe = [k for k in all_cands if k in PE_ENTITY_PACK]
+        assert all_cands[:len(pe)] == pe and pe
+        assert [k for k in all_cands if k not in in_force] == cands
         # personal data waits on the PII policy; gated data is never a candidate
         blocked = {i["key"] for i in q["pii_blocked"]}
         assert {"nppes_providers", "sec_insider", "sec_form_d"} <= blocked
@@ -389,7 +433,7 @@ class TestQueueAndReport:
 
         rep = build_report(None, live=False)
         sm = rep["summary"]
-        assert sm["datasets"] == len(_catalog()) and sm["reviewed"] == 0
+        assert sm["datasets"] == len(_catalog()) and sm["reviewed"] == len(_in_force()) > 0
         assert sm["gated"] >= len(STORAGE_FLAGGED) and sm["proposals"] >= 4
         assert rep["live"] is False
         keys = {h["key"] for h in rep["storage_holdings"]}
@@ -556,11 +600,13 @@ class TestReviewWorkflowPg:
     def test_confirm_records_actor_and_never_flips(self, pg142):
         from app.catalog.rights_review import build_queue, reviewed_entries
 
+        key = UNREVIEWED_KEY  # no committed hash: a recorded confirm must not flip it
         c = _client(pg142)
-        s = _spec("bls_series")
-        r = c.post("/api/v1/catalog/rights/bls_series/review",
+        s = _spec(key)
+        assert not s.reviewed
+        r = c.post(f"/api/v1/catalog/rights/{key}/review",
                    json={"decision": "confirm_current", "rights_hash": s.rights_hash,
-                         "note": "Checked bls.gov copyright page 2026-09-26."})
+                         "note": "Checked the FDIC terms page 2026-09-26."})
         assert r.status_code == 201, r.text
         body = r.json()
         assert body["reviewer"] == "reviewer@nexdata.test" and body["reviewer_user_id"] == 42
@@ -568,15 +614,15 @@ class TestReviewWorkflowPg:
         assert body["rights_snapshot"]["redistribution"] == s.redistribution
         assert body["review_state"] == "awaiting_commit" and body["reviewed_now"] is False
         # nothing became reviewed
-        assert not _spec("bls_series").reviewed
-        detail = c.get("/api/v1/catalog/rights/bls_series").json()
+        assert not _spec(key).reviewed
+        detail = c.get(f"/api/v1/catalog/rights/{key}").json()
         assert detail["review_state"] == "awaiting_commit" and len(detail["reviews"]) == 1
         assert detail["rights"]["reviewed"] is False
         q = build_queue(pg142, live=False)
-        assert [i["key"] for i in q["awaiting_commit"]] == ["bls_series"]
+        assert [i["key"] for i in q["awaiting_commit"]] == [key]
         # --emit lists it; a later reject removes it
-        assert reviewed_entries(pg142) == {"bls_series": (s.rights_hash, body["id"])}
-        c.post("/api/v1/catalog/rights/bls_series/review",
+        assert reviewed_entries(pg142) == {key: (s.rights_hash, body["id"])}
+        c.post(f"/api/v1/catalog/rights/{key}/review",
                json={"decision": "reject", "rights_hash": s.rights_hash, "note": "Second look: not yet."})
         assert reviewed_entries(pg142) == {}
 
@@ -641,7 +687,7 @@ class TestReviewWorkflowPg:
         rep = c.get("/api/v1/catalog/rights/report", params={"format": "md"})
         assert rep.status_code == 200 and rep.headers["content-type"].startswith("text/markdown")
         j = c.get("/api/v1/catalog/rights/report").json()
-        assert j["live"] is True and j["summary"]["reviewed"] == 0
+        assert j["live"] is True and j["summary"]["reviewed"] == len(_in_force()) > 0
         # a storage-forbidden table that exists is counted exactly
         t = "yelp_businesses"  # declared as the pattern yelp_businesses*
         with pg142.begin() as conn:
@@ -703,7 +749,10 @@ class TestFixSignOffCanPromote:
             assert spec.reviewed and spec.status_public == status
             assert spec.effective_redistribution == spec.redistribution
 
-    def test_without_hash_ga_is_still_refused(self):
+    def test_without_hash_ga_is_still_refused(self, monkeypatch):
+        from app.catalog import rights_reviewed
+
+        monkeypatch.delitem(rights_reviewed.REVIEWED, "bls_series", raising=False)
         with pytest.raises(ValueError, match="reviewed rights block"):
             _bls_ds("ga")
 
@@ -717,7 +766,9 @@ class TestFixSignOffCanPromote:
     def test_other_statuses_keep_their_status(self):
         assert _bls_ds("archival").status_public == "archival"
         assert _bls_ds("internal").status_public == "internal"
-        assert all(not s.reviewed and s.status_public not in ("ga", "beta") for s in _catalog())
+        cat = _catalog()
+        assert {s.key for s in cat if s.reviewed} == _in_force(cat)
+        assert all(s.status_public not in ("ga", "beta") for s in cat)
 
 
 @pytest.mark.unit

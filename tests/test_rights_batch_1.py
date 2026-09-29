@@ -5,7 +5,8 @@ The reviewer of record approved items 1-3 of batch 1 and held FDIC. This file pi
 the code side: the 8 approved datasets carry a complete block (storage and commercial
 use assessed as ``allowed``, each backed by a verified citation), nothing else changed
 (``tests/fixtures/rights_batch_1_before.json`` is every spec's full rights block at
-ecb0d56), and nothing became ``reviewed`` — that only comes from a committed hash.
+ecb0d56), and exactly these 8 are ``reviewed`` — via the hashes committed in
+``app/catalog/rights_reviewed.py`` at 7a44563 (the sign-offs in force), never by hand.
 
 Monotonicity note: filling a not-assessed field (``None``) with ``allowed`` is an
 assessment, not a loosening, and only when the block carries a citation (URL, quote,
@@ -63,8 +64,13 @@ class TestApprovedBlocks:
         assert (s.storage, s.commercial_use) == ("allowed", "allowed"), key
         assert s.storage_max_age_days is None
         assert s.citation_url == url and s.citation_quote and s.rights_confidence == "high", key
-        assert s.redistribution == "open" and s.reviewed is False and s.status_public not in ("ga", "beta")
-        assert s.rights_gate == [] or not s.rights_gate
+        assert s.redistribution == "open" and s.status_public not in ("ga", "beta"), key
+        assert not s.rights_gate, key
+        # in force through the committed hash of exactly this block
+        from app.catalog.rights_reviewed import REVIEWED
+
+        assert REVIEWED[key][0] == s.rights_hash, key
+        assert s.reviewed is True and s.effective_redistribution == "open", key
 
     def test_citation_quotes_are_the_verified_sentences(self):
         cat = _catalog()
@@ -85,20 +91,29 @@ class TestApprovedBlocks:
             b, n = before[key], _now(cat[key])
             assert b["storage"] is None and b["commercial_use"] is None, key  # were not assessed
             for f in ("license", "license_url", "redistribution", "attribution", "share_alike",
-                      "storage_max_age_days", "proposed", "reviewed", "effective_redistribution"):
+                      "storage_max_age_days", "proposed"):
                 assert n[f] == b[f], (key, f)
             assert n["rights_hash"] != b["rights_hash"], key
+            # the sign-off is the only other change: unreviewed/internal_only -> reviewed/open
+            assert (b["reviewed"], b["effective_redistribution"]) == (False, "internal_only"), key
+            assert (n["reviewed"], n["effective_redistribution"]) == (True, b["redistribution"]), key
 
-    def test_nothing_reviewed(self):
+    def test_reviewed_is_exactly_the_approved_eight(self):
         from app.catalog.rights_reviewed import REVIEWED
 
-        assert all(not s.reviewed for s in _catalog().values())
-        assert not set(APPROVED) & set(REVIEWED)
+        cat = _catalog()
+        assert set(REVIEWED) == set(APPROVED)
+        assert {k for k, s in cat.items() if s.reviewed} == set(APPROVED)
+        assert not any(cat[k].reviewed for k in HELD_FDIC)
 
 
 @pytest.mark.unit
 class TestNothingElseChanged:
     def test_every_other_block_is_unchanged(self):
+        """Full block, ``reviewed`` and ``effective_redistribution`` included, for every
+        spec outside the 8: a sign-off or edit anywhere else fails here. The 8 are allowed
+        to differ; their diff is pinned field by field (sign-off included) in
+        ``test_only_deciding_terms_and_citations_changed``."""
         before, cat = _before(), _catalog()
         assert set(cat) == set(before)
         changed = sorted(k for k, s in cat.items() if _now(s) != before[k])
@@ -128,9 +143,3 @@ class TestNothingElseChanged:
                 if before[key][f] is None and getattr(s, f) is not None:
                     assert s.citation_url and s.citation_quote and s.rights_confidence, (key, f)
 
-
-def test_print_new_hashes(capsys):
-    cat = _catalog()
-    with capsys.disabled():
-        for key in sorted(APPROVED):
-            print(f"\n{key} {cat[key].rights_hash}", end="")
