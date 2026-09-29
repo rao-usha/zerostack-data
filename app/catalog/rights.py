@@ -113,6 +113,10 @@ _BLS = _cite("https://www.bls.gov/opub/copyright-information.htm",
              "everything that we publish, both in hard copy and electronically, is in the public domain, "
              "except for previously copyrighted photographs and illustrations ... we do ask that you cite "
              "the Bureau of Labor Statistics as the source.", "high")
+_TREASURY = _cite("https://fiscaldata.treasury.gov/about-us/",
+                  "The U.S. Department of the Treasury's Bureau of the Fiscal Service is committed to providing "
+                  "open data. The data on this site is available to copy, adapt, redistribute, or otherwise use "
+                  "for non-commercial and commercial purposes.", "high")
 _EIA = _cite("https://www.eia.gov/about/copyrights_reuse.php",
              "U.S. government publications are in the public domain and are not subject to copyright "
              "protection ... may contain ... information resources contributed or licensed by private "
@@ -145,6 +149,14 @@ _NREL_NOTE = ("NREL is a contractor-operated DOE laboratory: its data is free fo
               "but it is not a 17 U.S.C. §105 work (PLAN_088 §1.7). Terms page fetch failed (DNS); "
               "search excerpt: data 'can be used for any purpose whatsoever'.")
 
+# Rights review batch 1 (2026-09-29, approved by the reviewer of record): storage and
+# commercial use assessed as allowed on the cited terms. Applied only to the approved
+# datasets / families; the sign-off itself is the committed REVIEWED hash.
+_ALLOWED_TERMS: Dict[str, Any] = {"storage": "allowed", "commercial_use": "allowed"}
+_SEC_MARKS_NOTE = ("Do not use the SEC seal, logos or EDGAR trademarks (SEC, EDGAR, EDGARLink) in a trade name, "
+                   "trademark or domain; SEC asks for citation as the source. Filings are authored by filers "
+                   "but are public records.")
+
 _STORAGE_FORBIDDEN_NOTE = ("Flagged only (PLAN_088 decision 3): the rows are kept until the purge / "
                            "licence decision; samples are refused to non-admins.")
 
@@ -154,8 +166,7 @@ SOURCE_RIGHTS: Dict[str, SourceRights] = {
     "sec": _usg("U.S. Securities and Exchange Commission (EDGAR)", "business_contact",
                 "Filings name natural persons (insiders, related persons, signatories); "
                 "per-dataset pii_class overrides apply. Do not use the SEC seal or EDGAR marks.", **_SEC),
-    "treasury": _usg("U.S. Department of the Treasury, Fiscal Data",
-                     **_cite("https://fiscaldata.treasury.gov/", None, "medium-high")),
+    "treasury": _usg("U.S. Department of the Treasury, Fiscal Data", **_ALLOWED_TERMS, **_TREASURY),
     "usaspending": _usg("USAspending.gov", "business_contact", **_FEDERAL),
     "eia": _usg("U.S. Energy Information Administration",
                 notes="Excludes third-party items EIA licenses (none identified in the loaded series).", **_EIA),
@@ -170,7 +181,7 @@ SOURCE_RIGHTS: Dict[str, SourceRights] = {
     "afdc": SourceRights(_NREL_LICENSE, "attribution", "business_contact", "official",
                          attribution="Source: U.S. DOE Alternative Fuels Data Center (NREL)",
                          notes=_NREL_NOTE, **_NREL),
-    "bls": _usg("U.S. Bureau of Labor Statistics", **_BLS),
+    "bls": _usg("U.S. Bureau of Labor Statistics", **_ALLOWED_TERMS, **_BLS),
     "bea": _usg("U.S. Bureau of Economic Analysis", **_cite("https://www.bea.gov/", None, "medium-high")),
     "fema": _usg("FEMA (OpenFEMA)", attribution=f"Source: FEMA (OpenFEMA). {_OPENFEMA_NOTICE}",
                  notes="OpenFEMA terms also bind users not to re-identify individuals.", **_FEMA),
@@ -582,10 +593,13 @@ DATASET_RIGHTS: Dict[str, SourceRights] = {
     "sec_form_d": _usg("U.S. Securities and Exchange Commission (EDGAR)", "personal",
                        "Related persons are natural persons.", **_SEC),
     # SPEC_141: signature_name/title/phone/city name the natural person who signed.
+    # Rights review batch 1: only these two SEC datasets were approved; the "sec" family
+    # entry (IAPD / Form ADV / filings index) stays not assessed.
     "sec_13f": _usg("U.S. Securities and Exchange Commission (EDGAR)", "business_contact",
                     "Filings carry the signatory's name, title, phone and city and the "
-                    "manager's street address.", **_SEC),
-    "sec_companyfacts": _usg("U.S. Securities and Exchange Commission (EDGAR)", "none", **_SEC),
+                    "manager's street address. " + _SEC_MARKS_NOTE, **_ALLOWED_TERMS, **_SEC),
+    "sec_companyfacts": _usg("U.S. Securities and Exchange Commission (EDGAR)", "none", _SEC_MARKS_NOTE,
+                             **_ALLOWED_TERMS, **_SEC),
     "sec_company_financials": _usg("U.S. Securities and Exchange Commission (EDGAR)", "none", **_SEC),
     "entity_source_records": SourceRights(
         "Nexdata-derived from SEC EDGAR (public domain inputs)", "internal_only", "personal", "derived",

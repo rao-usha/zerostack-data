@@ -441,7 +441,9 @@ class TestEnforcement:
         ft = next(s for s in _catalog() if s.source == "foot_traffic")
         m2 = merge_rights([ft])
         assert m2["storage"] == "time_limited" and m2["storage_max_age_days"] == 30
-        assert merge_rights([_spec("sec_13f")])["storage"] is None
+        # rights review batch 1 assessed sec_13f (storage allowed, cited); FDIC is held, not assessed
+        assert merge_rights([_spec("sec_13f")])["storage"] == "allowed"
+        assert merge_rights([_spec("fdic_institutions")])["storage"] is None
 
 
 # ---------------------------------------------------------------------------
