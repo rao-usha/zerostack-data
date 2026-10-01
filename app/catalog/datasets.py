@@ -441,15 +441,31 @@ _DERIVED: List[DatasetSpec] = [
         slo_lag_hours=24 * 12),
     _ds("entity_source_records", "entity_master", "Entity source records",
         "Normalized organization records fed from the SEC ADV, EDGAR, 13F, Form D and IAPD "
-        "feeds into the entity resolver, one per source record with its identifiers.",
+        "feeds and DOL Form 5500 plan sponsors into the entity resolver, one per source "
+        "record with its identifiers.",
         "entity", "one row per source record (record_key)",
         "job:entity_resolve#feeds", "monthly",
         tables=("core.source_record",), primary_key=("record_key",),
-        inputs=("sec_edgar_submissions", "sec_form_d", "sec_13f", "sec_insider", "sec_iapd_feed", "sec_adv_roster"),
+        inputs=("sec_edgar_submissions", "sec_form_d", "sec_13f", "sec_insider", "sec_iapd_feed", "sec_adv_roster",
+                # SPEC_148 attach-only website feeds (collection jobs, not bulk: no input gate)
+                "pe_collection", "people_org_charts", "lp_collection", "family_offices",
+                "agentic_portfolios", "si_3pl_companies"),
         coverage_sql="SELECT max(observed_at)::date FROM core.source_record",
         coverage_basis="as_of",
+        limitations=("Form 5500 sponsors (source dol5500, SPEC_147) are read from "
+                     "workbench.dol5500_sponsor, loaded by the workbench, which the catalog does "
+                     "not model: lineage and the input gate cannot see that input.",
+                     "domain holds the registrable domain (eTLD+1, Public Suffix List) with social, "
+                     "site-builder, ATS, webmail and parking hosts dropped (SPEC_148).",
+                     "Attach-only sources (pefirm, industrial, peportco, portco, threepl, famoffice, "
+                     "lpfund; SPEC_148) are company tables fed for their website alone: their keys "
+                     "attach a domain claim, they never resolve into entities. Their datasets are "
+                     "collection jobs, not bulk releases, so the input gate does not check their "
+                     "freshness."),
         notes="There is no separate insider feed: insider owners enter as sec_filers rows in the "
-              "EDGAR feed; sec_insider scopes that CIK set."),
+              "EDGAR feed; sec_insider scopes that CIK set. The EDGAR feed also takes every "
+              "sec_filers CIK whose EIN is a Form 5500 sponsor EIN carried by no other sec_filers "
+              "CIK (SPEC_149: a shared EIN is reported, never expanded)."),
     _ds("entity_cik_crd_bridge", "entity_master", "CIK to CRD bridge",
         "Crosswalk between SEC filer CIKs and adviser CRD numbers, with the evidence "
         "tier for each link and the refused candidates.",
@@ -469,13 +485,25 @@ _DERIVED: List[DatasetSpec] = [
         "entity", "one row per resolved entity",
         "job:entity_resolve#resolve", "monthly",
         tables=("core.entity", "core.membership", "core.identifier", "core.alias",
-                "core.entity_merge", "core.resolve_run", "core.key_veto"),
+                "core.entity_merge", "core.resolve_run", "core.key_veto", "core.weak_match",
+                "core.domain_link", "core.domain_probe"),
         primary_key=("entity_id",),
         inputs=("entity_source_records", "entity_cik_crd_bridge"),
         coverage_sql="SELECT max(run_at) FROM core.resolve_run WHERE NOT dry_run",
         coverage_basis="as_of",
         limitations=("core.identifier stores CIK unpadded: join to sec_filers with "
-                     "lpad(value, 10, '0').",),
+                     "lpad(value, 10, '0').",
+                     "core.weak_match holds name+state candidates for Form 5500 sponsors: "
+                     "evidence with a status and its conflicts, never a merge (SPEC_147).",
+                     "A sponsor whose EIN no other record carries stays a keyed singleton "
+                     "in core.source_record, not an entity.",
+                     "Web domains (SPEC_148) never merge: core.domain_link holds every domain link "
+                     "with its claims; strong (two independent source families agree) links alone "
+                     "reach core.identifier (id_type 'domain') and core.entity.canonical_domain. "
+                     "Form ADV roster and IAPD are one family; EDGAR carries no website.",
+                     "core.domain_probe is written by the domain probe collector "
+                     "(python -m app.entities.domain_probe), not by entity_resolve; it requests "
+                     "only sites with a recorded terms review."),
         slo_lag_hours=24 * 12),
 ]
 

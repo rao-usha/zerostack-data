@@ -1,0 +1,38 @@
+[
+  {
+    "host": "gryphoninvestors.com",
+    "verdict": "allowed",
+    "citation": "Gryphon Investors' old domain; https://www.gryphoninvestors.com/ answers 301 to https://www.gryphon-inv.com/, whose Terms of Use (https://www.gryphon-inv.com/terms-of-use/, no date shown) carry disclaimers and liability limits only, with no clause on automated access, robots, scraping or copying. One homepage request; robots.txt still applies.",
+    "reviewed": "2026-09-30"
+  },
+  {
+    "host": "gryphon-inv.com",
+    "verdict": "allowed",
+    "citation": "Gryphon Investors Terms of Use (https://www.gryphon-inv.com/terms-of-use/, no date shown): disclaimers and liability limits only, no clause on automated access, robots, scraping or copying. robots.txt still applies.",
+    "reviewed": "2026-09-30"
+  },
+  {
+    "host": "angelogordon.com",
+    "verdict": "refused",
+    "citation": "Redirects to tpg.com (301). TPG Website Terms of Use June 2026 (https://cms.tpg.com/wp-content/uploads/2026/06/TPG-Website-Terms-of-Use-June-2026-vFinal.pdf): 'You agree not to ... (c) data mine, data scrape or otherwise attempt to use any software, device, tool or technique (including without limitation, browsers, spiders, robots ...) to navigate or search the Site to harvest, extract or collect information from the Site'.",
+    "reviewed": "2026-09-30"
+  },
+  {
+    "host": "tpg.com",
+    "verdict": "refused",
+    "citation": "TPG Website Terms of Use June 2026 (https://cms.tpg.com/wp-content/uploads/2026/06/TPG-Website-Terms-of-Use-June-2026-vFinal.pdf): no data mining / scraping / spiders or robots to harvest, extract or collect information from the Site.",
+    "reviewed": "2026-09-30"
+  },
+  {
+    "host": "bvp.com",
+    "verdict": "refused",
+    "citation": "Bessemer Venture Partners Legal / Terms of Use, effective 2023-05-08 (https://www.bvp.com/legal), Use of the Site: users may not 'engage in spidering, screen scraping, database scraping ... or any other automatic or unauthorized means of accessing' the Site.",
+    "reviewed": "2026-09-30"
+  },
+  {
+    "host": "frazierhealthcare.com",
+    "verdict": "refused",
+    "citation": "Frazier Healthcare Partners Terms of Use, last updated March 2024 (https://www.frazierhealthcare.com/terms-conditions/): 'Do not use automated means to access the Site' (search-engine indexing excepted).",
+    "reviewed": "2026-09-30"
+  }
+]

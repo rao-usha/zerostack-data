@@ -2260,7 +2260,7 @@
    "disposition": {
     "primary_key": "applied",
     "coverage_sql": "applied",
-    "inputs": "applied",
+    "inputs": "amended:SPEC_148 added six attach-only website inputs (pe_collection, people_org_charts, lp_collection, family_offices, agentic_portfolios, si_3pl_companies); the six verified SEC inputs stand",
     "description": "applied",
     "grain": "waived:confirmed as declared (defects, if any, are in limitations)",
     "pii": "applied"

@@ -9,6 +9,12 @@ two guarantees:
   over an unchanged corpus reports 0 entities and 0 memberships changed.
 - **Nothing is dropped silently.** Refusals (vetoed keys, fan-out caps,
   oversized components) are counted into the run ledger.
+
+SPEC_148: records of `ATTACH_ONLY_SOURCES` never reach `plan()` (nor the weak
+name+state tier); `domain_links()` sees every record and decides each domain ->
+subject link. Strong entity links become `core.identifier` rows
+(`id_type = 'domain'`) and the entity's `canonical_domain`; every link, with its
+claims and status, is written to `core.domain_link`.
 """
 
 from __future__ import annotations
@@ -16,17 +22,21 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 from sqlalchemy import text
 
 from app.core.copy_loader import copy_rows, create_staging, drop_staging, merge_staging
 from app.entities.resolve_core import (
+    ATTACH_ONLY_SOURCES,
     BRIDGE_TIERS_ACCEPTED,
     RESOLVER_VERSION,
     assign_ids,
     canonical_row,
+    domain_links,
     plan,
+    source_metrics,
+    weak_name_state,
 )
 
 logger = logging.getLogger(__name__)
@@ -85,6 +95,54 @@ def _load_bridge(conn) -> List[Tuple[str, str, str, str]]:
         {"tiers": list(BRIDGE_TIERS_ACCEPTED)},
     ).mappings()
     return [(r["cik"], r["crd"], r["tier"], r["matched_on"]) for r in rows]
+
+
+PROBE_TABLE = "core.domain_probe"
+
+
+def _load_probes(conn) -> Dict[str, Dict[str, Any]]:
+    """Latest probe per domain -> {redirect_to, names_found, evidence} (SPEC_148).
+    Only a cross-domain redirect or a fetched page is evidence; refusals are not."""
+    if not conn.execute(text("SELECT to_regclass(:t) IS NOT NULL"), {"t": PROBE_TABLE}).scalar():
+        return {}
+    rows = conn.execute(
+        text(
+            f"""
+            SELECT DISTINCT ON (domain) domain, probed_at, url, outcome, http_status, redirect_to,
+                   final_url, hops, names_found, user_agent, terms_citation
+            FROM {PROBE_TABLE}
+            ORDER BY domain, probed_at DESC
+            """
+        )
+    ).mappings()
+    out: Dict[str, Dict[str, Any]] = {}
+    for r in rows:
+        if r["outcome"] not in ("redirect_offsite", "fetched"):
+            continue
+        evidence = {
+            "probed_at": r["probed_at"].isoformat() if r["probed_at"] else None,
+            "url": r["url"], "outcome": r["outcome"], "http_status": r["http_status"],
+            "redirect_to": r["redirect_to"], "final_url": r["final_url"], "hops": r["hops"],
+            "names_found": r["names_found"], "user_agent": r["user_agent"],
+            "terms_citation": r["terms_citation"],
+        }
+        out[r["domain"]] = {
+            "redirect_to": r["redirect_to"] if r["outcome"] == "redirect_offsite" else None,
+            "names_found": list(r["names_found"] or []) if r["outcome"] == "fetched" else [],
+            "evidence": evidence,
+        }
+    return out
+
+
+def entity_domain_columns(strong: List[str]) -> Tuple[Any, Dict[str, Any]]:
+    """(canonical_domain, extra field_conflicts) from an entity's STRONG domains.
+    One strong domain is the canonical one; none or several leave it NULL."""
+    strong = sorted(set(strong or []))
+    if len(strong) == 1:
+        return strong[0], {}
+    if not strong:
+        return None, {}
+    return None, {"domain_strong": strong[:12]}
 
 
 def _load_prior(conn) -> Tuple[Dict[str, int], Dict[str, int]]:
@@ -155,6 +213,21 @@ ALIAS_COLUMNS = [
     ("source", "VARCHAR(32)"),
 ]
 
+# SPEC_147: flagged name+state candidates (evidence, never a merge)
+WEAK_TABLE = "core.weak_match"
+WEAK_COLUMNS = [
+    ("record_key", "TEXT"),
+    ("candidate_record_key", "TEXT"),
+    ("candidate_entity_id", "BIGINT"),
+    ("tier", "VARCHAR(16)"),
+    ("status", "VARCHAR(16)"),
+    ("conflicts", "JSONB"),
+    ("matched_on", "JSONB"),
+    ("resolver_version", "VARCHAR(16)"),
+    ("updated_at", "TIMESTAMP"),
+]
+WEAK_STG = "core_weak_match"
+
 STG = {
     "entity": "core_entity",
     "membership": "core_membership",
@@ -181,12 +254,21 @@ def _reserve_entity_ids(conn, count: int) -> List[int]:
     ]
 
 
-def _build_rows(comps, ids, by_key, rec_keys, now):
+def _build_rows(comps, ids, by_key, rec_keys, now, domain_plan=None):
     """Components -> (entity rows, membership rows, identifier rows, alias rows)."""
     reserved = _RESERVED
     entity_rows, membership_rows, identifier_rows, alias_rows = [], [], [], []
+    strong = (domain_plan or {}).get("entity_strong", {})
+    strong_sources = {
+        (r["candidate_comp"], r["domain"]): r["sources"]
+        for r in (domain_plan or {}).get("rows", [])
+        if r["status"] == "strong" and r["candidate_comp"] is not None
+    }
     for idx, comp in enumerate(comps):
         cols, conflicts = canonical_row(comp["members"], by_key)
+        # SPEC_148: canonical_domain is a STRONG link or nothing
+        cols["canonical_domain"], extra = entity_domain_columns(strong.get(idx, []))
+        conflicts.update(extra)
         entity_id = ids["assigned"].get(idx) or reserved.pop()
         entity_rows.append(
             (
@@ -212,6 +294,8 @@ def _build_rows(comps, ids, by_key, rec_keys, now):
                 )
         for key_type, key_value in comp["keys"]:
             identifier_rows.append((key_type, key_value, entity_id, _pg_array(sources), now))
+        for d in strong.get(idx, []):
+            identifier_rows.append(("domain", d, entity_id, _pg_array(strong_sources[(idx, d)]), now))
     return entity_rows, membership_rows, identifier_rows, alias_rows
 
 
@@ -222,6 +306,120 @@ def _stage_and_merge(conn, name, columns, rows, target, keys, update_columns=Non
     copy_rows(conn, name, names, rows)
     inserted, updated = merge_staging(conn, name, target, names, keys, update_columns)
     return inserted, updated
+
+
+def _flat(d: Dict[str, Any], prefix: str = "") -> Dict[str, Any]:
+    """Nested metrics -> one level of scalars ('a.b': 1, lists joined by ','), so
+    the job ledger's compact_summary keeps them (it drops nested blocks)."""
+    out: Dict[str, Any] = {}
+    for k, v in d.items():
+        key = f"{prefix}{k}"
+        if isinstance(v, dict):
+            out.update(_flat(v, key + "."))
+        elif isinstance(v, (list, tuple)):
+            out[key] = ",".join(str(x) for x in v)
+        else:
+            out[key] = v
+    return out
+
+
+def _dissolve(conn, absorbed: int, survivor: int) -> None:
+    """Forward an entity absorbed by a merge to its survivor (SPEC_147 T17).
+
+    Called on the merge path since SPEC_116 but never defined: no merge had
+    happened, so the NameError was latent. Setting superseded_by here, before
+    the orphan sweep, is what keeps `ent:<absorbed>` resolvable."""
+    conn.execute(
+        text(
+            "UPDATE core.entity SET dissolved_at = NOW(), superseded_by = :s, updated_at = NOW() "
+            "WHERE entity_id = :a AND dissolved_at IS NULL"
+        ),
+        {"a": absorbed, "s": survivor},
+    )
+
+
+def _write_weak(conn, rows, comp_entity, now) -> Dict[str, Any]:
+    """Merge the weak-tier rows into core.weak_match; drop rows no longer derived."""
+    if not conn.execute(text("SELECT to_regclass(:t) IS NOT NULL"), {"t": WEAK_TABLE}).scalar():
+        # migration 0016 not applied: report it in the ledger rather than fail the resolve
+        logger.warning(f"[entities:resolve] {WEAK_TABLE} missing: weak tier not written")
+        return {"table_missing": True, "rows_written": 0, "rows_removed": 0}
+    staged = [
+        (
+            r["record_key"], r["candidate_record_key"],
+            comp_entity[r["candidate_comp"]] if r["candidate_comp"] is not None else None,
+            r["tier"], r["status"], json.dumps(r["conflicts"]), json.dumps(r["matched_on"]),
+            RESOLVER_VERSION, now,
+        )
+        for r in rows
+    ]
+    inserted, updated = _stage_and_merge(
+        conn, WEAK_STG, WEAK_COLUMNS, staged, WEAK_TABLE, ["record_key", "candidate_record_key"]
+    )
+    removed = conn.execute(
+        text(
+            f"DELETE FROM {WEAK_TABLE} w WHERE NOT EXISTS "
+            f"(SELECT 1 FROM stg.{WEAK_STG} s WHERE s.record_key = w.record_key "
+            f" AND s.candidate_record_key = w.candidate_record_key)"
+        )
+    ).rowcount or 0
+    drop_staging(conn, WEAK_STG)
+    return {"rows_total": len(staged), "rows_written": inserted + updated, "rows_removed": removed}
+
+
+DOMAIN_TABLE = "core.domain_link"
+DOMAIN_STG = "core_domain_link"
+DOMAIN_COLUMNS = [
+    ("domain", "TEXT"),
+    ("subject", "TEXT"),
+    ("entity_id", "BIGINT"),
+    ("record_key", "TEXT"),
+    ("status", "VARCHAR(16)"),
+    ("families", "TEXT[]"),
+    ("sources", "TEXT[]"),
+    ("claims", "JSONB"),
+    ("claim_count", "INTEGER"),
+    ("conflicts", "JSONB"),
+    ("alias_of", "TEXT"),
+    ("evidence", "JSONB"),
+    ("resolver_version", "VARCHAR(16)"),
+    ("updated_at", "TIMESTAMP"),
+]
+
+
+def _domain_subject(row, comp_entity) -> Tuple[str, Any]:
+    if row["candidate_comp"] is not None:
+        eid = comp_entity[row["candidate_comp"]]
+        return f"ent:{eid}", eid
+    return row["subject"], None
+
+
+def _write_domains(conn, rows, comp_entity, now) -> Dict[str, Any]:
+    """Merge the domain links into core.domain_link; drop links no longer derived."""
+    if not conn.execute(text("SELECT to_regclass(:t) IS NOT NULL"), {"t": DOMAIN_TABLE}).scalar():
+        logger.warning(f"[entities:resolve] {DOMAIN_TABLE} missing: domain links not written")
+        return {"table_missing": True, "rows_written": 0, "rows_removed": 0}
+    staged = []
+    for r in rows:
+        subject, eid = _domain_subject(r, comp_entity)
+        staged.append((
+            r["domain"], subject, eid, r["record_key"], r["status"],
+            _pg_array(r["families"]), _pg_array(r["sources"]),
+            json.dumps(r["claims"]), r["claim_count"], json.dumps(r["conflicts"]),
+            r["alias_of"], json.dumps(r["evidence"]) if r["evidence"] is not None else None,
+            RESOLVER_VERSION, now,
+        ))
+    inserted, updated = _stage_and_merge(
+        conn, DOMAIN_STG, DOMAIN_COLUMNS, staged, DOMAIN_TABLE, ["domain", "subject"]
+    )
+    removed = conn.execute(
+        text(
+            f"DELETE FROM {DOMAIN_TABLE} d WHERE NOT EXISTS "
+            f"(SELECT 1 FROM stg.{DOMAIN_STG} s WHERE s.domain = d.domain AND s.subject = d.subject)"
+        )
+    ).rowcount or 0
+    drop_staging(conn, DOMAIN_STG)
+    return {"rows_total": len(staged), "rows_written": inserted + updated, "rows_removed": removed}
 
 
 def _ledger(conn, metrics: Dict[str, Any], started: datetime, dry_run: bool) -> None:
@@ -250,7 +448,9 @@ def _ledger(conn, metrics: Dict[str, Any], started: datetime, dry_run: bool) -> 
 def resolve(conn, dry_run: bool = False) -> Dict[str, Any]:
     """Re-derive core.entity / membership / identifier from core.source_record."""
     started = _now()
-    records = _load_records(conn)
+    all_records = _load_records(conn)
+    # SPEC_148: attach-only records carry domain claims; they never resolve
+    records = [r for r in all_records if r.get("source") not in ATTACH_ONLY_SOURCES]
     vetoes = _load_vetoes(conn)
     bridge = _load_bridge(conn)
     by_key = {r["record_key"]: r for r in records}
@@ -263,6 +463,15 @@ def resolve(conn, dry_run: bool = False) -> Dict[str, Any]:
 
     live, dissolved = _load_prior(conn)
     ids = assign_ids(comps, live, dissolved)
+    # SPEC_147: the weak tier reads the components, it never changes them
+    weak = weak_name_state(records, result["record_keys"], comps)
+    metrics["weak"] = _flat(weak["metrics"])
+    metrics["dol5500"] = _flat(source_metrics(
+        records, result["record_keys"], comps, weak, new_components=ids["new_entities"]
+    ))
+    domain_plan = domain_links(all_records, result["record_keys"], comps, _load_probes(conn))
+    metrics["domains"] = _flat(domain_plan["metrics"])
+    metrics["domains"]["attach_only_records"] = len(all_records) - len(records)
     metrics.update(
         {
             "entities_new": len(ids["new_entities"]),
@@ -282,7 +491,7 @@ def resolve(conn, dry_run: bool = False) -> Dict[str, Any]:
     global _RESERVED
     _RESERVED = _reserve_entity_ids(conn, len(ids["new_entities"]))
     entity_rows, membership_rows, identifier_rows, alias_rows = _build_rows(
-        comps, ids, by_key, result["record_keys"], now
+        comps, ids, by_key, result["record_keys"], now, domain_plan
     )
 
     # Set-based writes: four COPY + merge passes instead of ~1M statements.
@@ -318,6 +527,11 @@ def resolve(conn, dry_run: bool = False) -> Dict[str, Any]:
     )
     for stg_name in STG.values():
         drop_staging(conn, stg_name)
+
+    # component i was written as entity_rows[i] (same order as comps)
+    comp_entity = [row[0] for row in entity_rows]
+    metrics["weak"].update(_write_weak(conn, weak["rows"], comp_entity, now))
+    metrics["domains"].update(_write_domains(conn, domain_plan["rows"], comp_entity, now))
 
     metrics["memberships_removed"] = removed_memberships
     metrics["entities_updated"] = entities_updated

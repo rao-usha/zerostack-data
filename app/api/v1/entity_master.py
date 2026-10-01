@@ -17,7 +17,7 @@ from app.core.job_queue_service import submit_job
 
 router = APIRouter(prefix="/entities/master", tags=["Entity Master"])
 
-ID_TYPES = ("cik", "crd", "ein", "lei", "uei", "sei")
+ID_TYPES = ("cik", "crd", "ein", "lei", "uei", "sei", "domain")  # domain: SPEC_148, strong links only
 
 
 @router.post("/resolve", summary="Queue an entity master refresh (admin)")
@@ -86,6 +86,21 @@ def get_stats(db: Session = Depends(get_db)):
     }
 
 
+def _lookup_value(id_type: str, value: str) -> str:
+    if id_type in ("cik", "crd"):
+        return value.lstrip("0")
+    if id_type == "ein":
+        # SPEC_149: '12-3456789' is the printed form of the stored '123456789'
+        from app.entities.norm import clean_ein
+
+        return clean_ein(value) or value
+    if id_type == "domain":
+        from app.entities.domains import domain
+
+        return domain(value) or value
+    return value
+
+
 @router.get("/by-id/{id_type}/{value}", summary="Look up an entity by identifier")
 def get_by_identifier(id_type: str, value: str, db: Session = Depends(get_db)):
     if id_type not in ID_TYPES:
@@ -98,7 +113,7 @@ def get_by_identifier(id_type: str, value: str, db: Session = Depends(get_db)):
             WHERE i.id_type = :t AND i.id_value = :v
             """
         ),
-        {"t": id_type, "v": value.lstrip("0") if id_type in ("cik", "crd") else value},
+        {"t": id_type, "v": _lookup_value(id_type, value)},
     ).mappings().first()
     if not row:
         raise HTTPException(status_code=404, detail=f"No entity for {id_type}={value}")

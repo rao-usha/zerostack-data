@@ -897,6 +897,24 @@
     ]
    }
   ],
+  "core.domain_link": [
+   {
+    "kind": "entity",
+    "path": "app/entities/domain_probe.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
+  "core.domain_probe": [
+   {
+    "kind": "entity",
+    "path": "app/entities/resolve_core.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
   "core.entity": [
    {
     "kind": "api_router",
@@ -1004,6 +1022,20 @@
    {
     "kind": "api_router",
     "path": "app/api/v1/entity_master.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "entity",
+    "path": "app/entities/domain_probe.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "entity",
+    "path": "app/entities/feeds.py",
     "via": [
      "sql"
     ]
@@ -1910,6 +1942,13 @@
     ]
    },
    {
+    "kind": "entity",
+    "path": "app/entities/feeds.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
     "kind": "graphql",
     "path": "app/graphql/resolvers.py",
     "via": [
@@ -2528,6 +2567,13 @@
    {
     "kind": "api_router",
     "path": "app/api/v1/sec.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "entity",
+    "path": "app/entities/feeds.py",
     "via": [
      "sql"
     ]
@@ -3688,6 +3734,13 @@
    {
     "kind": "api_router",
     "path": "app/api/v1/search.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "entity",
+    "path": "app/entities/feeds.py",
     "via": [
      "sql"
     ]
@@ -4913,6 +4966,13 @@
     ]
    },
    {
+    "kind": "entity",
+    "path": "app/entities/feeds.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
     "kind": "mart",
     "path": "app/marts/pe_firms_sec.py",
     "via": [
@@ -5754,6 +5814,13 @@
     ]
    },
    {
+    "kind": "entity",
+    "path": "app/entities/feeds.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
     "kind": "report",
     "path": "app/reports/templates/investor_profile.py",
     "via": [
@@ -6367,6 +6434,13 @@
     ]
    },
    {
+    "kind": "entity",
+    "path": "app/entities/feeds.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
     "kind": "graphql",
     "path": "app/graphql/dataloaders.py",
     "via": [
@@ -6580,6 +6654,13 @@
     "path": "app/core/rate_limiter.py",
     "via": [
      "orm",
+     "sql"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/sec_gate.py",
+    "via": [
      "sql"
     ]
    }
@@ -7088,6 +7169,13 @@
     "path": "app/api/v1/site_intel_logistics.py",
     "via": [
      "orm"
+    ]
+   },
+   {
+    "kind": "entity",
+    "path": "app/entities/feeds.py",
+    "via": [
+     "sql"
     ]
    },
    {

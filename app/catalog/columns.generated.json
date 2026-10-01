@@ -1,5 +1,5 @@
 {
- "dictionary_hash": "5fd84b9a2d1c5b45",
+ "dictionary_hash": "c965ba4d45e8f90b",
  "format_version": 1,
  "package_columns": {
   "cms": {
@@ -3963,6 +3963,191 @@
    "origin": "ddl",
    "packages": []
   },
+  "core.domain_link": {
+   "columns": [],
+   "datasets": [
+    "entity_master"
+   ],
+   "origin": "none",
+   "packages": []
+  },
+  "core.domain_probe": {
+   "columns": [
+    {
+     "confidence": "low",
+     "description": "Web address as published by the source.",
+     "example": null,
+     "name": "domain",
+     "nullable": false,
+     "pg_type": "text",
+     "pii": "none",
+     "semantic_type": null,
+     "source": "glossary",
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "error",
+     "nullable": true,
+     "pg_type": "text",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": "low",
+     "description": "Web address as published by the source.",
+     "example": null,
+     "name": "final_url",
+     "nullable": true,
+     "pg_type": "text",
+     "pii": "none",
+     "semantic_type": null,
+     "source": "glossary",
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "hops",
+     "nullable": false,
+     "pg_type": "jsonb",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "http_status",
+     "nullable": true,
+     "pg_type": "integer",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "names_checked",
+     "nullable": false,
+     "pg_type": "jsonb",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "names_found",
+     "nullable": false,
+     "pg_type": "jsonb",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "outcome",
+     "nullable": false,
+     "pg_type": "varchar(32)",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "probed_at",
+     "nullable": false,
+     "pg_type": "timestamp",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "redirect_to",
+     "nullable": true,
+     "pg_type": "text",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "retry_after_seconds",
+     "nullable": true,
+     "pg_type": "double precision",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "terms_citation",
+     "nullable": true,
+     "pg_type": "text",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": "low",
+     "description": "Web address as published by the source.",
+     "example": null,
+     "name": "url",
+     "nullable": false,
+     "pg_type": "text",
+     "pii": "none",
+     "semantic_type": null,
+     "source": "glossary",
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "user_agent",
+     "nullable": false,
+     "pg_type": "text",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    }
+   ],
+   "datasets": [
+    "entity_master"
+   ],
+   "origin": "ddl",
+   "packages": []
+  },
   "core.entity": {
    "columns": [
     {
@@ -4838,6 +5023,123 @@
    ],
    "datasets": [
     "entity_source_records"
+   ],
+   "origin": "ddl",
+   "packages": []
+  },
+  "core.weak_match": {
+   "columns": [
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "candidate_entity_id",
+     "nullable": true,
+     "pg_type": "bigint",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "candidate_record_key",
+     "nullable": false,
+     "pg_type": "text",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "conflicts",
+     "nullable": false,
+     "pg_type": "jsonb",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "matched_on",
+     "nullable": true,
+     "pg_type": "jsonb",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "record_key",
+     "nullable": false,
+     "pg_type": "text",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "resolver_version",
+     "nullable": true,
+     "pg_type": "varchar(16)",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": "low",
+     "description": "Status as published by the source.",
+     "example": null,
+     "name": "status",
+     "nullable": false,
+     "pg_type": "varchar(16)",
+     "pii": "none",
+     "semantic_type": null,
+     "source": "glossary",
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "tier",
+     "nullable": false,
+     "pg_type": "varchar(16)",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": "low",
+     "description": "Row audit timestamp: when Nexdata wrote or last touched this row (not an upstream date).",
+     "example": null,
+     "name": "updated_at",
+     "nullable": false,
+     "pg_type": "timestamp",
+     "pii": "none",
+     "semantic_type": null,
+     "source": "glossary",
+     "unit": null
+    }
+   ],
+   "datasets": [
+    "entity_master"
    ],
    "origin": "ddl",
    "packages": []
