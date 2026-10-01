@@ -1,4 +1,6 @@
 x-api-keys: &api-keys
+  # SPEC_146: the one User-Agent for every SEC request; must name a monitored contact
+  SEC_USER_AGENT: ${SEC_USER_AGENT:-}
   CENSUS_SURVEY_API_KEY: ${CENSUS_SURVEY_API_KEY:-}
   FRED_API_KEY: ${FRED_API_KEY:-}
   BLS_API_KEY: ${BLS_API_KEY:-}

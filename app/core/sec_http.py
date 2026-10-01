@@ -1,12 +1,13 @@
 """
 Single SEC HTTP client for bulk downloads (SPEC_107).
 
-- One honest User-Agent with a monitored contact (SEC fair-access policy);
-  callers cannot override it.
-- One token bucket for every SEC host (www / data / efts / reports.adviserinfo)
-  at 8 req/s in-process, plus the distributed Postgres bucket ``sec.gov`` when
-  a session factory is supplied. The distributed limiter fails closed.
-- Retries 429/5xx/network errors with backoff, honouring Retry-After (capped).
+- Every request goes through the SEC fair-access gate (SPEC_146,
+  ``app/core/sec_gate.py``): one bucket for every SEC host shared by all
+  NexData processes, the single SEC_USER_AGENT, global Retry-After / backoff /
+  circuit breaker. A pause longer than the gate's max wait raises
+  ``SecRateLimited`` at once (never retried here).
+- Retries 5xx/network errors with backoff; a 429/403 is retried only after the
+  gate's global cooldown (which honours Retry-After in full).
 - ``stream_to_file`` streams to ``<dest>.part``, validates magic bytes, and
   renames atomically so a partial file never looks complete.
 
@@ -15,37 +16,31 @@ Synchronous on purpose: bulk loaders run in a worker thread (asyncio.to_thread).
 
 from __future__ import annotations
 
-import email.utils
 import hashlib
 import logging
 import os
-import threading
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
 from urllib.parse import urlparse
 
 import httpx
 
+from app.core.config import SEC_DEFAULT_USER_AGENT as DEFAULT_USER_AGENT  # noqa: F401 (re-export)
+from app.core.sec_gate import SecGatedTransport, SecRateLimited, is_sec_host, sec_user_agent
+
 logger = logging.getLogger(__name__)
 
-DEFAULT_USER_AGENT = "Nexdata research alexiusmichael@gmail.com"
 SEC_BUCKET_DOMAIN = "sec.gov"
 RETRY_STATUS = {429, 500, 502, 503, 504}
 BACKOFF_SECONDS = (2.0, 6.0, 15.0, 30.0)
-MAX_RETRY_AFTER = 60.0
-DISTRIBUTED_MAX_WAIT = 60.0
 CHUNK = 1024 * 256
 
 
 class PayloadError(RuntimeError):
     """Downloaded body is not what the URL promised (HTML error page, truncated, ...)."""
-
-
-class RateLimitTimeout(RuntimeError):
-    """Distributed SEC bucket could not be acquired in time (fail closed)."""
 
 
 @dataclass
@@ -79,79 +74,29 @@ def validate_payload(name: str, head: bytes, content_type: Optional[str], size: 
         raise PayloadError(f"{name}: HTML served for a data file ({ctype})")
 
 
-class _TokenBucket:
-    """Thread-safe process-wide token bucket."""
-
-    def __init__(self, rps: float):
-        self.rps = rps
-        self.capacity = max(1.0, rps)
-        self.tokens = self.capacity
-        self.updated = time.monotonic()
-        self.lock = threading.Lock()
-
-    def acquire(self, sleep: Callable[[float], None]) -> None:
-        while True:
-            with self.lock:
-                now = time.monotonic()
-                self.tokens = min(self.capacity, self.tokens + (now - self.updated) * self.rps)
-                self.updated = now
-                if self.tokens >= 1.0:
-                    self.tokens -= 1.0
-                    return
-                wait = (1.0 - self.tokens) / self.rps
-            sleep(wait)
-
-
-_BUCKETS: dict = {}
-_BUCKETS_LOCK = threading.Lock()
-
-
-def _shared_bucket(rps: float) -> _TokenBucket:
-    with _BUCKETS_LOCK:
-        if rps not in _BUCKETS:
-            _BUCKETS[rps] = _TokenBucket(rps)
-        return _BUCKETS[rps]
-
-
-def _retry_after_seconds(value: Optional[str]) -> Optional[float]:
-    if not value:
-        return None
-    try:
-        return max(0.0, float(value))
-    except ValueError:
-        try:
-            when = email.utils.parsedate_to_datetime(value)
-            return max(0.0, (when - datetime.now(timezone.utc)).total_seconds())
-        except (TypeError, ValueError):
-            return None
-
-
 class SecHttp:
-    """Polite, rate-limited SEC client. Use as a context manager or call close()."""
+    """Polite, rate-limited SEC client. Use as a context manager or call close().
+
+    ``user_agent``, ``rps`` and ``session_factory`` are accepted for backward
+    compatibility and ignored: the SEC gate (SPEC_146) owns the User-Agent
+    (SEC_USER_AGENT) and the one cross-process rate limit.
+    """
 
     def __init__(
         self,
         user_agent: Optional[str] = None,
-        rps: float = 8.0,
+        rps: Optional[float] = None,
         session_factory: Optional[Callable] = None,
         timeout: float = 120.0,
         transport: Optional[httpx.BaseTransport] = None,
     ):
-        if user_agent is None:
-            try:
-                from app.core.config import get_settings
-
-                user_agent = get_settings().sec_user_agent
-            except Exception:
-                user_agent = DEFAULT_USER_AGENT
-        self.user_agent = user_agent
-        self._bucket = _shared_bucket(rps)
-        self._session_factory = session_factory
+        self.user_agent = sec_user_agent()
+        inner = transport if transport is not None else httpx.HTTPTransport()
         self._client = httpx.Client(
-            headers={"User-Agent": user_agent, "Accept-Encoding": "gzip, deflate"},
+            headers={"User-Agent": self.user_agent, "Accept-Encoding": "gzip, deflate"},
             timeout=httpx.Timeout(timeout, connect=30.0),
             follow_redirects=True,
-            transport=transport,
+            transport=SecGatedTransport(inner),
         )
         self._sleep = time.sleep
         self.requests = 0
@@ -169,25 +114,10 @@ class SecHttp:
 
     # -- rate limiting ----------------------------------------------------
     def _throttle(self, url: str) -> None:
+        """Host check only; the gate in the transport does the limiting."""
         host = urlparse(url).hostname or ""
-        if not host.endswith("sec.gov"):
+        if not is_sec_host(host):
             raise ValueError(f"SecHttp only talks to sec.gov hosts, got {host!r}")
-        self._bucket.acquire(self._sleep)
-        if self._session_factory is None:
-            return
-        from app.core.rate_limiter import acquire_distributed_token
-
-        deadline = time.monotonic() + DISTRIBUTED_MAX_WAIT
-        while True:
-            db = self._session_factory()
-            try:
-                if acquire_distributed_token(db, SEC_BUCKET_DOMAIN):
-                    return
-            finally:
-                db.close()
-            if time.monotonic() >= deadline:
-                raise RateLimitTimeout(f"distributed {SEC_BUCKET_DOMAIN} bucket not acquired in {DISTRIBUTED_MAX_WAIT}s")
-            self._sleep(0.25)
 
     # -- requests ---------------------------------------------------------
     def _send(self, url: str, stream: bool, headers: Optional[dict] = None):
@@ -197,6 +127,8 @@ class SecHttp:
             try:
                 request = self._client.build_request("GET", url, headers=headers)
                 response = self._client.send(request, stream=stream)
+            except SecRateLimited:
+                raise
             except (httpx.TransportError,) as e:
                 if attempt < len(BACKOFF_SECONDS):
                     wait = BACKOFF_SECONDS[attempt]
@@ -207,10 +139,15 @@ class SecHttp:
                 raise
             self.requests += 1
             if response.status_code in RETRY_STATUS and attempt < len(BACKOFF_SECONDS):
-                retry_after = _retry_after_seconds(response.headers.get("Retry-After"))
-                wait = min(MAX_RETRY_AFTER, retry_after if retry_after is not None else BACKOFF_SECONDS[attempt])
                 attempt += 1
                 response.close()
+                if response.status_code == 429:
+                    # The gate already recorded the strike and set a GLOBAL cooldown of
+                    # max(Retry-After, backoff); the next _send waits it out there (or
+                    # raises SecRateLimited). No local sleep on top of it.
+                    logger.warning(f"SEC HTTP 429 on {url}; retry after the gate's cooldown")
+                    continue
+                wait = BACKOFF_SECONDS[attempt - 1]
                 logger.warning(f"SEC HTTP {response.status_code} on {url}; retry in {wait:.1f}s")
                 self._sleep(wait)
                 continue

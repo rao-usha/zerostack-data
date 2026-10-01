@@ -605,6 +605,11 @@ def main():
     create_tables()
     verify_mapped_columns()  # refuse to run jobs against an unmigrated schema
 
+    # SPEC_146: gate every httpx request to *.sec.gov through the shared SEC gate
+    from app.core.sec_gate import install as install_sec_gate
+
+    install_sec_gate()
+
     asyncio.run(poll_loop())
 
 

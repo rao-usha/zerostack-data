@@ -351,9 +351,9 @@ class TestD5SessionPerTask:
 
 @pytest.mark.unit
 def test_d22_sec_rate_limits():
-    """T11: Registry 480/min; limiter 8 rps."""
+    """T11 (SPEC_146 lowered 8 -> 5 rps, shared by every process): registry 300/min; limiter 5 rps."""
     from app.core.api_registry import API_REGISTRY
     from app.core.rate_limiter import DEFAULT_RATE_LIMITS
 
-    assert API_REGISTRY["sec"].rate_limit_per_minute == 480
-    assert DEFAULT_RATE_LIMITS["sec"]["requests_per_second"] == 8.0
+    assert API_REGISTRY["sec"].rate_limit_per_minute == 300
+    assert DEFAULT_RATE_LIMITS["sec"]["requests_per_second"] == 5.0

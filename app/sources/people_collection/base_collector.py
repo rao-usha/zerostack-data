@@ -19,6 +19,7 @@ from tenacity import (
     retry_if_exception_type,
 )
 
+from app.core.sec_gate import SecRateLimited, get_sec_gate, is_sec_host, sec_user_agent
 from app.sources.people_collection.config import RATE_LIMITS
 
 logger = logging.getLogger(__name__)
@@ -93,9 +94,9 @@ class BaseCollector:
         "Upgrade-Insecure-Requests": "1",
     }
 
-    # SEC EDGAR specific headers (they require a user-agent with contact info)
+    # SEC EDGAR specific headers. The User-Agent is the single SEC_USER_AGENT
+    # setting (SPEC_146), filled in by _get_headers.
     SEC_HEADERS = {
-        "User-Agent": "Nexdata Research contact@nexdata.com",
         "Accept": "application/json, text/html, */*",
         "Accept-Encoding": "gzip, deflate",
     }
@@ -127,8 +128,8 @@ class BaseCollector:
 
     def _get_headers(self, url: str) -> Dict[str, str]:
         """Get appropriate headers for the URL."""
-        if "sec.gov" in url.lower():
-            return self.SEC_HEADERS.copy()
+        if is_sec_host(urlparse(url).hostname):
+            return {**self.SEC_HEADERS, "User-Agent": sec_user_agent()}
         return self.DEFAULT_HEADERS.copy()
 
     def _cache_key(self, url: str) -> str:
@@ -185,10 +186,22 @@ class BaseCollector:
         """Fetch URL with automatic retry on transient failures."""
         session = await self._get_session()
         headers = self._get_headers(url)
+        sec = is_sec_host(urlparse(url).hostname)
+        gate = get_sec_gate() if sec else None
+        if gate is not None:
+            # SPEC_146: one cross-process SEC budget; raises SecRateLimited (not
+            # retried by tenacity) while SEC calls are paused
+            await gate.acquire_async()
 
         logger.debug(f"Fetching {url}")
 
         async with session.get(url, headers=headers, allow_redirects=True) as response:
+            if gate is not None:
+                await gate.record_async(response.status, response.headers.get("Retry-After"))
+                if response.status in (403, 429):
+                    # No in-place sleep/retry: the gate now holds a GLOBAL cooldown
+                    # (Retry-After / exponential backoff / breaker) for every caller.
+                    raise SecRateLimited(f"SEC HTTP {response.status} for {url}", 0.0)
             if response.status == 200:
                 content = await response.text()
                 logger.debug(f"Fetched {url}: {len(content)} bytes")
@@ -233,12 +246,17 @@ class BaseCollector:
         try:
             session = await self._get_session()
             headers = self._get_headers(url)
+            gate = get_sec_gate() if is_sec_host(urlparse(url).hostname) else None
+            if gate is not None:
+                await gate.acquire_async()
 
             kwargs = {"headers": headers, "allow_redirects": True}
             if timeout:
                 kwargs["timeout"] = ClientTimeout(total=timeout)
 
             async with session.head(url, **kwargs) as response:
+                if gate is not None:
+                    await gate.record_async(response.status, response.headers.get("Retry-After"))
                 return response.status == 200
         except Exception as e:
             logger.debug(f"URL check failed for {url}: {e}")

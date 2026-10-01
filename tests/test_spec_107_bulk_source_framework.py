@@ -43,8 +43,14 @@ class TestSecHttp:
             validate_payload("2025q1_d.zip", b"<!DOCTYPE html><html>" + b" " * 100, "text/html")
         validate_payload("2025q1_d.zip", ZIP_BYTES, "application/zip")
 
-    def test_stream_to_file_atomic_and_hashed(self, tmp_path):
-        """T2"""
+    def test_stream_to_file_atomic_and_hashed(self, tmp_path, monkeypatch):
+        """T2 (SPEC_146: the User-Agent is the SEC_USER_AGENT setting, not a caller argument)"""
+        from app.core.config import reset_settings
+
+        monkeypatch.setenv("SEC_USER_AGENT", "Test agent test@example.com")
+        if not os.environ.get("DATABASE_URL"):
+            monkeypatch.setenv("DATABASE_URL", "postgresql://u:p@localhost:5432/unused")
+        reset_settings()
         seen = {}
 
         def handler(request):
@@ -60,8 +66,12 @@ class TestSecHttp:
         assert result.etag == "abc"
         assert seen["ua"] == "Test agent test@example.com"
 
-    def test_retry_after_is_capped(self, tmp_path):
-        """T3"""
+    def test_retry_after_is_honoured(self, tmp_path):
+        """T3 (SPEC_146 replaces "capped at 60 s"): Retry-After 3600 is honoured by the
+        SEC gate -- no second request to SEC, SecRateLimited at once; a short
+        Retry-After is waited out and the request then succeeds."""
+        from app.core.sec_gate import SecRateLimited
+
         calls = {"n": 0}
 
         def handler(request):
@@ -71,9 +81,31 @@ class TestSecHttp:
             return httpx.Response(200, text="ok body")
 
         sleeps = []
-        assert _http(handler, sleeps).get_text("https://www.sec.gov/x") == "ok body"
+        with pytest.raises(SecRateLimited):
+            _http(handler, sleeps).get_text("https://www.sec.gov/x")
+        assert calls["n"] == 1
+
+        calls["n"] = 0
+
+        def short(request):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return httpx.Response(429, headers={"Retry-After": "5"})
+            return httpx.Response(200, text="ok body")
+
+        from app.core import sec_gate
+
+        sec_gate.reset_sec_gate()
+        clock = {"t": 0.0}
+        gate = sec_gate.SecGate(
+            sec_gate.LocalBackend(clock=lambda: clock["t"]),
+            sec_gate.GateConfig(rate=1e6, burst=1e6, backoff_base=0.0),
+            sleep=lambda s: clock.__setitem__("t", clock["t"] + s),
+        )
+        sec_gate.set_sec_gate(gate)
+        assert _http(short).get_text("https://www.sec.gov/y") == "ok body"
         assert calls["n"] == 2
-        assert sleeps and max(sleeps) <= 60
+        assert clock["t"] >= 5.0
 
     def test_failed_download_leaves_no_file(self, tmp_path):
         """T4"""

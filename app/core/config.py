@@ -12,6 +12,10 @@ from typing import Optional
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# SPEC_146: default SEC User-Agent (CLAUDE.md). No personal contact in code; the
+# owner sets SEC_USER_AGENT to a monitored address.
+SEC_DEFAULT_USER_AGENT = "NexdataResearch/1.0 (research@nexdata.com; respectful research bot)"
+
 
 class MissingCensusAPIKeyError(Exception):
     """Raised when Census ingestion is requested without an API key."""
@@ -231,11 +235,24 @@ class Settings(BaseSettings):
         description="Google Data Commons API key - optional but recommended for higher rate limits",
     )
 
-    # SEC fair-access policy: identify the client with a monitored contact
+    # SEC fair-access policy: identify the client with a monitored contact.
+    # SPEC_146: the ONE User-Agent for every SEC request (app/core/sec_gate.py
+    # forces it on the wire). The owner sets SEC_USER_AGENT to a monitored contact.
     sec_user_agent: str = Field(
-        default="Nexdata research alexiusmichael@gmail.com",
+        default=SEC_DEFAULT_USER_AGENT,
         description="User-Agent for all SEC requests (must include a real contact)",
     )
+    # SPEC_146 SEC fair-access gate, shared by the api process and every worker
+    sec_rate_limit_rps: float = Field(
+        default=5.0, gt=0, le=9.0, description="SEC req/s across ALL NexData processes (SEC allows 10/IP)"
+    )
+    sec_rate_limit_burst: float = Field(default=2.0, ge=1, le=5, description="SEC bucket capacity")
+    sec_gate_max_wait: float = Field(
+        default=120.0, gt=0, description="Max seconds a caller waits for SEC before SecRateLimited"
+    )
+    sec_breaker_threshold: int = Field(default=3, ge=1, description="Consecutive SEC 429/403 that open the breaker")
+    sec_breaker_minutes: float = Field(default=10.0, gt=0, description="Minutes all SEC calls pause on a trip")
+    sec_phase_concurrency: int = Field(default=2, ge=1, description="Concurrent people-job SEC phases per process")
 
     # Bulk file ingestion (PLAN_082): where downloaded publisher files are kept
     bulk_raw_dir: str = Field(
@@ -305,6 +322,14 @@ class Settings(BaseSettings):
         le=10.0,
         description="Exponential backoff factor for retries",
     )
+
+    @field_validator("sec_user_agent", mode="before")
+    @classmethod
+    def _sec_user_agent_not_blank(cls, v):
+        """A blank SEC_USER_AGENT (compose passes ``${SEC_USER_AGENT:-}``) means the default."""
+        if v is None or not str(v).strip():
+            return SEC_DEFAULT_USER_AGENT
+        return str(v).strip()
 
     @field_validator("log_level")
     @classmethod

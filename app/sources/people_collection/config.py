@@ -35,7 +35,7 @@ RATE_LIMITS: Dict[str, RateLimitConfig] = {
         timeout_seconds=30.0,
     ),
     "sec_edgar": RateLimitConfig(
-        requests_per_second=10.0,  # SEC allows 10/second
+        requests_per_second=5.0,  # per collector; the cross-process cap is app.core.sec_gate (SPEC_146)
         retry_attempts=3,
         retry_delay_seconds=1.0,
         timeout_seconds=60.0,

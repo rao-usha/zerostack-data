@@ -14,6 +14,7 @@ import logging
 from typing import List
 from datetime import datetime, date, timedelta
 
+from app.core.sec_gate import sec_phase_slot
 from app.sources.people_collection.base_collector import BaseCollector
 from app.sources.people_collection.filing_fetcher import FilingFetcher
 from app.sources.people_collection.sec_parser import SECParser
@@ -50,6 +51,28 @@ class SECAgent(BaseCollector):
         await self.fetcher.close()
 
     async def collect(
+        self,
+        company_id: int,
+        company_name: str,
+        cik: str = None,
+        include_8k: bool = True,
+        include_form4: bool = True,
+        days_back: int = 365,
+    ) -> CollectionResult:
+        """Collect leadership data from SEC filings (at most SEC_PHASE_CONCURRENCY
+        companies per process at once, SPEC_146; every request also passes the
+        cross-process SEC gate)."""
+        async with sec_phase_slot("people_sec"):
+            return await self._collect_unthrottled(
+                company_id=company_id,
+                company_name=company_name,
+                cik=cik,
+                include_8k=include_8k,
+                include_form4=include_form4,
+                days_back=days_back,
+            )
+
+    async def _collect_unthrottled(
         self,
         company_id: int,
         company_name: str,

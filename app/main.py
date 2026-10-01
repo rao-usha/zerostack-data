@@ -262,6 +262,11 @@ async def lifespan(app: FastAPI):
     logger.info(f"Log level: {settings.log_level}")
     logger.info(f"Max concurrency: {settings.max_concurrency}")
 
+    # SPEC_146: every httpx request to *.sec.gov from this process goes through
+    # the one cross-process SEC fair-access gate (rate, Retry-After, breaker, UA)
+    from app.core.sec_gate import install as install_sec_gate
+    install_sec_gate()
+
     # Apply Alembic migrations first (advisory-locked; never blocks startup)
     from app.core.migrate import run_migrations
     run_migrations()

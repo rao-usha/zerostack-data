@@ -55,7 +55,7 @@ DEFAULT_RATE_LIMITS: Dict[str, Dict[str, Any]] = {
     },
     # Securities and Exchange Commission
     "sec": {
-        "requests_per_second": 8.0,  # SEC allows 10 req/s; stay under it
+        "requests_per_second": 5.0,  # SEC allows 10 req/s; app.core.sec_gate enforces 5/s across processes
         "burst_capacity": 5,
         "concurrent_limit": 2,
         "description": "SEC EDGAR: 10 requests/second max, be respectful",
@@ -645,8 +645,12 @@ def reset_rate_limiter() -> None:
 DISTRIBUTED_RATE_LIMITS: Dict[str, Dict[str, float]] = {
     "api.weather.gov": {"max_tokens": 5.0, "refill_rate": 0.08},       # NOAA: 5/min
     "api.bls.gov": {"max_tokens": 5.0, "refill_rate": 0.5},            # BLS: 500/day
-    "efts.sec.gov": {"max_tokens": 10.0, "refill_rate": 10.0},         # SEC: 10/sec
-    "sec.gov": {"max_tokens": 8.0, "refill_rate": 8.0},                # All SEC hosts via app.core.sec_http (fair access: 10/sec)
+    # SEC: every SEC host is limited by app.core.sec_gate (SPEC_146) through the
+    # "sec.gov" row (5/s burst 2 across ALL processes, rewritten from settings on
+    # use) and "sec.gov#breaker". efts.sec.gov stays as an extra per-host cap for
+    # BaseAPIClient callers; it can never raise the total above the gate's rate.
+    "efts.sec.gov": {"max_tokens": 2.0, "refill_rate": 5.0},
+    "sec.gov": {"max_tokens": 2.0, "refill_rate": 5.0},
     "api.eia.gov": {"max_tokens": 10.0, "refill_rate": 1.4},           # EIA: 5000/hr
     "apps.bea.gov": {"max_tokens": 10.0, "refill_rate": 1.5},          # BEA: 100/min
     "api.stlouisfed.org": {"max_tokens": 10.0, "refill_rate": 2.0},    # FRED: 120/min

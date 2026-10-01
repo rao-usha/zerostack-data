@@ -36,6 +36,43 @@ import app.core.pe_models  # noqa: F401 — registers PE tables with Base.metada
 import app.core.probability_models  # noqa: F401 — registers txn_prob_* tables with Base.metadata
 
 
+class _SecGateTestClock:
+    """Fake clock: the SEC gate's waits advance it instead of sleeping."""
+
+    def __init__(self):
+        self.t = 0.0
+
+    def now(self):
+        return self.t
+
+    def sleep(self, s):
+        self.t += s
+
+    async def async_sleep(self, s):
+        self.t += s
+
+
+@pytest.fixture(autouse=True)
+def _sec_gate_for_tests():
+    """SPEC_146: never let a unit test reach the shared Postgres SEC bucket.
+
+    Every test gets an in-process SEC gate with a fake clock (waits are instant,
+    Retry-After still honoured on that clock). Tests that need a specific gate
+    call ``sec_gate.set_sec_gate`` themselves.
+    """
+    from app.core import sec_gate
+
+    clock = _SecGateTestClock()
+    cfg = sec_gate.GateConfig(rate=1e6, burst=1e6, breaker_threshold=10**9, backoff_base=0.0)
+    sec_gate.set_sec_gate(
+        sec_gate.SecGate(sec_gate.LocalBackend(clock=clock.now), cfg,
+                         sleep=clock.sleep, async_sleep=clock.async_sleep)
+    )
+    yield
+    sec_gate.uninstall()
+    sec_gate.reset_sec_gate()
+
+
 @pytest.fixture(scope="function")
 def clean_env(monkeypatch):
     """

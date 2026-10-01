@@ -260,9 +260,7 @@ def run_source(
     raw_root = Path(raw_root or get_settings().bulk_raw_dir)
     owns_http = http is None
     if http is None:
-        from app.core.database import get_session_factory
-
-        http = SecHttp(session_factory=get_session_factory())
+        http = SecHttp()  # SPEC_146: the SEC gate owns the cross-process limit
 
     summary: Dict[str, Any] = {"source": source.name, "loaded": 0, "skipped": 0, "failed": 0,
                                "rows": 0, "errors": [], "releases": [],
