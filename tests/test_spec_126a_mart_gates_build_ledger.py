@@ -640,18 +640,21 @@ def test_entity_resolve_guarded(pgl, monkeypatch):
     monkeypatch.setattr(entity_resolve, "get_engine", lambda: pgl)
     _fake_entity(monkeypatch)
     _fresh_entity_inputs(pgl)
-    _release(pgl, "sec_13f", "2026q3", status="fetched", discovered_days_ago=1)
+    # SPEC_150: the resolve stage itself reads the 13F / Form D / insider / EDGAR filer
+    # profiles, so the source only the FEEDS stage reads (IAPD) shows the skip rule
+    _release(pgl, "sec_iapd_feed", "edition:2026-09-29", status="fetched", discovered_days_ago=1)
 
-    with pytest.raises(MartInputRefused, match="sec_13f.*fetched"):
+    with pytest.raises(MartInputRefused, match="sec_iapd_feed.*fetched"):
         entity_resolve.run_entity_master(guard=True)
     assert _markers(pgl) == []
 
-    # skipping the stages that read 13F removes it from the inputs
+    # skipping the stage that reads IAPD removes it from the inputs
     entity_resolve.run_entity_master(guard=True, skip_feeds=True, skip_bridge=True)
     out = entity_resolve.run_entity_master(guard=True, input_override=True)
     rows = _builds(pgl, "entity_resolve")
     assert [r["status"] for r in rows] == ["refused", "success", "success"]
-    assert rows[1]["inputs"] == []
+    assert sorted(i["source"] for i in rows[1]["inputs"]) == [
+        "sec_13f", "sec_edgar_submissions", "sec_form_d", "sec_insider"]
     assert out["mart_build"]["status"] == "success"
     assert _markers(pgl) == ["feeds"]
 

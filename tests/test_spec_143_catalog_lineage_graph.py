@@ -207,7 +207,9 @@ class TestStageMaps:
             "sec_iapd_feed", "sec_insider"]
         assert inputs.ENTITY_STAGE_INPUTS["bridge"] == [
             "sec_13f", "sec_adv_roster", "sec_edgar_submissions"]
-        assert inputs.ENTITY_STAGE_INPUTS["resolve"] == []
+        # SPEC_150: the gated-key rules read the EDGAR filer profiles directly
+        assert inputs.ENTITY_STAGE_INPUTS["resolve"] == [
+            "sec_13f", "sec_edgar_submissions", "sec_form_d", "sec_insider"]
         assert inputs.ENTITY_STAGE_UPSTREAM == {}
 
     def test_stages_match_the_executors(self):
@@ -275,7 +277,8 @@ class TestGraph:
         w = walk(_static(), "sec_form_d", direction="down", depth=1)
         assert all(r["depth"] == 1 for r in w["downstream"])
         down = {r["key"] for r in w["downstream"]}
-        assert "pe_funds_sec" in down and "entity_master" not in down
+        # SPEC_150: entity_master reads form_d_filings itself (depth 1); what it feeds is not
+        assert "pe_funds_sec" in down and "entity_master" in down and "pe_firms_sec" not in down
 
     def test_upstream_of_people(self):
         from app.catalog.lineage import walk

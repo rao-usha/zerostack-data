@@ -488,11 +488,19 @@ _DERIVED: List[DatasetSpec] = [
                 "core.entity_merge", "core.resolve_run", "core.key_veto", "core.weak_match",
                 "core.domain_link", "core.domain_probe"),
         primary_key=("entity_id",),
-        inputs=("entity_source_records", "entity_cik_crd_bridge"),
+        # SPEC_150: the gated-key rules read the EDGAR filer profile (names, former
+        # names, filing window, insider / Form D / 13F counts) of the CIKs that share
+        # an EIN or CRD
+        inputs=("entity_source_records", "entity_cik_crd_bridge", "sec_edgar_submissions",
+                "sec_insider", "sec_form_d", "sec_13f"),
         coverage_sql="SELECT max(run_at) FROM core.resolve_run WHERE NOT dry_run",
         coverage_basis="as_of",
         limitations=("core.identifier stores CIK unpadded: join to sec_filers with "
                      "lpad(value, 10, '0').",
+                     "An EIN or CRD shared by two CIKs joins them only when the SPEC_150 gate "
+                     "corroborates it (field_conflicts.gate says why); a contested EIN / CRD "
+                     "has one owner, the other pieces carry it under field_conflicts.contested "
+                     "with no core.identifier row.",
                      "core.weak_match holds name+state candidates for Form 5500 sponsors: "
                      "evidence with a status and its conflicts, never a merge (SPEC_147).",
                      "A sponsor whose EIN no other record carries stays a keyed singleton "

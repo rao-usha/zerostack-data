@@ -2334,7 +2334,7 @@
    "disposition": {
     "primary_key": "applied",
     "coverage_sql": "applied",
-    "inputs": "applied",
+    "inputs": "amended:SPEC_150 adds the EDGAR filer-profile sources the gated-key rules read (sec_filers, former names, insider owners, Form D, 13F counts)",
     "grain": "waived:confirmed as declared (defects, if any, are in limitations)",
     "pii": "waived:kept the conservative class (PLAN_088 SPEC_134 item 4: only the verified raises/lowerings)"
    }

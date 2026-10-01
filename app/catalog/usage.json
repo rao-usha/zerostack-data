@@ -2173,6 +2173,13 @@
     ]
    },
    {
+    "kind": "entity",
+    "path": "app/entities/resolve.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
     "kind": "mart",
     "path": "app/marts/pe_people_sec.py",
     "via": [
@@ -6804,6 +6811,13 @@
     "via": [
      "sql"
     ]
+   },
+   {
+    "kind": "entity",
+    "path": "app/entities/resolve.py",
+    "via": [
+     "sql"
+    ]
    }
   ],
   "sec_13f_other_managers": [
@@ -6902,6 +6916,15 @@
     ]
    }
   ],
+  "sec_filer_former_names": [
+   {
+    "kind": "entity",
+    "path": "app/entities/resolve.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
   "sec_filers": [
    {
     "kind": "entity",
@@ -6913,6 +6936,13 @@
    {
     "kind": "entity",
     "path": "app/entities/feeds.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "entity",
+    "path": "app/entities/resolve.py",
     "via": [
      "sql"
     ]
@@ -6949,6 +6979,13 @@
    {
     "kind": "entity",
     "path": "app/entities/feeds.py",
+    "via": [
+     "sql"
+    ]
+   },
+   {
+    "kind": "entity",
+    "path": "app/entities/resolve.py",
     "via": [
      "sql"
     ]

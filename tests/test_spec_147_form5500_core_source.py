@@ -547,8 +547,10 @@ def test_merge_dissolves_absorbed_entity_pg(pg_engine):
         )
         assert ids["edgar:0000000042"] != ids["edgar:0000000043"]
         # a new record asserting both CIKs' keys would be odd; an EIN shared by both is the
-        # realistic join: Bolt's EDGAR row gains Acme's EIN
-        conn.execute(text("UPDATE sec_filers SET ein = '012345678' WHERE cik = '0000000043'"))
+        # realistic join. SPEC_150: a shared EIN joins two CIKs only when corroborated, so
+        # CIK 43's EDGAR row becomes Acme's '/ADV' duplicate filer account (rule R1)
+        conn.execute(text("UPDATE sec_filers SET ein = '012345678', name = 'Acme Dental Inc /ADV' "
+                          "WHERE cik = '0000000043'"))
     with pg_engine.begin() as conn:
         feeds.run_feeds(conn)
         m = resolve.resolve(conn)
