@@ -15,6 +15,12 @@ name+state tier); `domain_links()` sees every record and decides each domain ->
 subject link. Strong entity links become `core.identifier` rows
 (`id_type = 'domain'`) and the entity's `canonical_domain`; every link, with its
 claims and status, is written to `core.domain_link`.
+
+SPEC_150: an EIN / CRD shared by two CIKs joins them only when the gate
+corroborates it. `_load_profiles` reads the EDGAR filer profile of exactly the CIKs
+that need one (`resolve_core.gated_ciks`); the write path records why: `gate` and
+`split_from` in `field_conflicts`, and `dissolved_by_gate` on an entity whose
+records all became single-record pieces.
 """
 
 from __future__ import annotations
@@ -34,6 +40,7 @@ from app.entities.resolve_core import (
     assign_ids,
     canonical_row,
     domain_links,
+    gated_ciks,
     plan,
     source_metrics,
     weak_name_state,
@@ -97,6 +104,19 @@ def _load_bridge(conn) -> List[Tuple[str, str, str, str]]:
     return [(r["cik"], r["crd"], r["tier"], r["matched_on"]) for r in rows]
 
 
+def _load_crd_hints(conn) -> List[Tuple[str, str]]:
+    """SPEC_150 review hints: identifier-tier bridge edges on a CRD that maps to several
+    CIKs (never unioned). `plan()` reads them only to flag a split EIN-sharing pair."""
+    rows = conn.execute(
+        text(
+            "SELECT cik, crd FROM core.cik_crd_bridge "
+            "WHERE tier = ANY(:tiers) AND crd_cik_count > 1"
+        ),
+        {"tiers": list(BRIDGE_TIERS_ACCEPTED)},
+    ).mappings()
+    return [(r["cik"], r["crd"]) for r in rows]
+
+
 PROBE_TABLE = "core.domain_probe"
 
 
@@ -132,6 +152,91 @@ def _load_probes(conn) -> Dict[str, Dict[str, Any]]:
             "evidence": evidence,
         }
     return out
+
+
+# SPEC_150: the EDGAR filer profile the gate reads. A table or column a database
+# lacks is tolerated -- a missing one is a NULL feature, never an error.
+PROFILE_BATCH = 5000
+
+
+def _columns(conn, table: str) -> set:
+    rows = conn.execute(
+        text("SELECT column_name FROM information_schema.columns "
+             "WHERE table_schema = 'public' AND table_name = :t"),
+        {"t": table},
+    ).fetchall()
+    return {r[0] for r in rows}
+
+
+def _profile_rows(conn, sql: str, ciks: List[str]) -> List[dict]:
+    """Run one profile query over CIKs in batches, inside a savepoint so a bad
+    source table costs that feature, not the resolve."""
+    out: List[dict] = []
+    try:
+        with conn.begin_nested():
+            for i in range(0, len(ciks), PROFILE_BATCH):
+                batch = ciks[i:i + PROFILE_BATCH]
+                forms = sorted(set(batch) | {c.zfill(10) for c in batch})
+                out.extend(dict(r) for r in conn.execute(text(sql), {"ciks": forms}).mappings())
+    except Exception as exc:  # noqa: BLE001 -- reported; the feature is dropped
+        logger.warning(f"[entities:resolve] filer profile query skipped: {type(exc).__name__}: {exc}")
+        return []
+    return out
+
+
+def _load_profiles(conn, ciks) -> Dict[str, Dict[str, Any]]:
+    """canonical CIK -> EDGAR filer profile (SPEC_150), for exactly `ciks`."""
+    ciks = sorted(ciks)
+    if not ciks:
+        return {}
+
+    def canon(v):
+        return str(v or "").lstrip("0")
+
+    prof: Dict[str, Dict[str, Any]] = {}
+    have = _columns(conn, "sec_filers")
+    if "cik" in have:
+        want = {"name": "name", "sic": "sic", "latest_filing_date": "last_filed",
+                "earliest_recent_filing_date": "first_filed", "latest_form": "latest_form",
+                "tickers": "tickers", "insider_transaction_for_owner_exists": "insider_owner",
+                "insider_transaction_for_issuer_exists": "insider_issuer",
+                "recent_filing_count": "recent_filing_count"}
+        cols = ", ".join(f"{c} AS {a}" if c in have else f"NULL AS {a}" for c, a in want.items())
+        for r in _profile_rows(conn, f"SELECT cik, {cols} FROM sec_filers WHERE cik = ANY(:ciks)", ciks):
+            prof[canon(r.pop("cik"))] = {k: (v.isoformat() if hasattr(v, "isoformat") else v)
+                                         for k, v in r.items()}
+
+    def add(table, need, sql, apply):
+        if not need <= _columns(conn, table):
+            return
+        for r in _profile_rows(conn, sql, ciks):
+            apply(prof.setdefault(canon(r["cik"]), {}), r)
+
+    # dated former names: when a CIK was renamed INTO its name (SPEC_150 V4), and the
+    # earliest name date of a heavy filer whose recent-filing list is truncated
+    fcols = _columns(conn, "sec_filer_former_names")
+    dated = ", ".join(c if c in fcols else f"NULL::date AS {c}" for c in ("from_date", "to_date"))
+
+    def _iso(v):
+        return v.isoformat() if hasattr(v, "isoformat") else v
+
+    add("sec_filer_former_names", {"cik", "name"},
+        f"SELECT DISTINCT cik, name, {dated} FROM sec_filer_former_names "
+        "WHERE cik = ANY(:ciks) ORDER BY 1, 2, 3, 4",
+        lambda p, r: p.setdefault("former_names", []).append(
+            {"name": r["name"], "from_date": _iso(r["from_date"]), "to_date": _iso(r["to_date"])}))
+    add("sec_insider_owners", {"rptowner_cik"},
+        "SELECT rptowner_cik AS cik, COUNT(*) AS n FROM sec_insider_owners "
+        "WHERE rptowner_cik = ANY(:ciks) GROUP BY 1",
+        lambda p, r: p.__setitem__("owner_filings", int(r["n"])))
+    add("form_d_filings", {"cik", "is_pooled_investment_fund"},
+        "SELECT cik, COUNT(*) AS n, bool_or(is_pooled_investment_fund) AS pooled "
+        "FROM form_d_filings WHERE cik = ANY(:ciks) GROUP BY 1",
+        lambda p, r: p.update({"formd_filings": int(r["n"]), "formd_pooled": bool(r["pooled"])}))
+    add("sec_13f_filings", {"cik"},
+        "SELECT cik, COUNT(*) AS n FROM sec_13f_filings WHERE cik = ANY(:ciks) GROUP BY 1",
+        lambda p, r: p.__setitem__("f13_filings", int(r["n"])))
+    return prof
 
 
 def entity_domain_columns(strong: List[str]) -> Tuple[Any, Dict[str, Any]]:
@@ -254,8 +359,14 @@ def _reserve_entity_ids(conn, count: int) -> List[int]:
     ]
 
 
-def _build_rows(comps, ids, by_key, rec_keys, now, domain_plan=None):
-    """Components -> (entity rows, membership rows, identifier rows, alias rows)."""
+def _build_rows(comps, ids, by_key, rec_keys, now, domain_plan=None, prior_split_from=None):
+    """Components -> (entity rows, membership rows, identifier rows, alias rows).
+
+    `prior_split_from` (entity_id -> ids) keeps a piece's SPEC_150 `split_from`
+    note on later runs, when no split happens any more (idempotent)."""
+    split_from = {s["component_first_member"]: sorted(s["lost_entity_ids"])
+                  for s in ids.get("splits", [])}
+    prior_split_from = prior_split_from or {}
     reserved = _RESERVED
     entity_rows, membership_rows, identifier_rows, alias_rows = [], [], [], []
     strong = (domain_plan or {}).get("entity_strong", {})
@@ -265,11 +376,18 @@ def _build_rows(comps, ids, by_key, rec_keys, now, domain_plan=None):
         if r["status"] == "strong" and r["candidate_comp"] is not None
     }
     for idx, comp in enumerate(comps):
-        cols, conflicts = canonical_row(comp["members"], by_key)
+        cols, conflicts = canonical_row(comp["members"], by_key, comp.get("withheld"))
+        # SPEC_150 provenance: why the gate joined / refused, where a piece came from
+        if comp.get("gate"):
+            conflicts["gate"] = comp["gate"]
         # SPEC_148: canonical_domain is a STRONG link or nothing
         cols["canonical_domain"], extra = entity_domain_columns(strong.get(idx, []))
         conflicts.update(extra)
         entity_id = ids["assigned"].get(idx) or reserved.pop()
+        if comp["members"][0] in split_from:
+            conflicts["split_from"] = split_from[comp["members"][0]]
+        elif entity_id in prior_split_from:
+            conflicts["split_from"] = prior_split_from[entity_id]
         entity_rows.append(
             (
                 entity_id,
@@ -320,6 +438,35 @@ def _flat(d: Dict[str, Any], prefix: str = "") -> Dict[str, Any]:
             out[key] = ",".join(str(x) for x in v)
         else:
             out[key] = v
+    return out
+
+
+def dissolved_by_gate(comps, live, ids, rec_keys, refused_by_cik) -> Dict[int, Dict[str, Any]]:
+    """Live entities this run leaves with no component, where the gate refused a
+    link among their records -> {entity_id: evidence}. PURE (SPEC_150)."""
+    from app.entities.gate import GATE_VERSION
+    from app.entities.resolve_core import DETAIL_CAP
+
+    kept = set(ids["assigned"].values()) | {
+        e for s in ids.get("splits", []) for e in s["lost_entity_ids"]}
+    in_comp = {rk for c in comps for rk in c["members"]}
+    by_entity: Dict[int, List[str]] = {}
+    for rk, eid in live.items():
+        by_entity.setdefault(eid, []).append(rk)
+    out: Dict[int, Dict[str, Any]] = {}
+    for eid, rks in by_entity.items():
+        if eid in kept or any(rk in in_comp for rk in rks):
+            continue
+        ciks = sorted({v for rk in rks for t, v in rec_keys.get(rk, ()) if t == "cik"})
+        refused = [e for c in ciks for e in refused_by_cik.get(c, ())]
+        if not refused:
+            continue
+        refused.sort(key=lambda e: (e["cik"], e["other_cik"]))
+        ev = {"gate_version": GATE_VERSION, "records": sorted(rks)[:DETAIL_CAP],
+              "refused": refused[:DETAIL_CAP]}
+        if len(refused) > DETAIL_CAP:
+            ev["refused_count"] = len(refused)
+        out[eid] = ev
     return out
 
 
@@ -455,21 +602,29 @@ def resolve(conn, dry_run: bool = False) -> Dict[str, Any]:
     bridge = _load_bridge(conn)
     by_key = {r["record_key"]: r for r in records}
 
-    result = plan(records, bridge, vetoes)
+    # SPEC_150: the gate's filer profiles, for exactly the CIKs that need one
+    profiles = _load_profiles(conn, gated_ciks(records, bridge, vetoes))
+    result = plan(records, bridge, vetoes, profiles=profiles, crd_hints=_load_crd_hints(conn))
     comps = result["components"]
     metrics = dict(result["metrics"])
+    metrics["gate"] = _flat(metrics["gate"])
     metrics["refusals"] = result["refusals"]
     metrics["refused_detail"] = result["refused_detail"]
 
     live, dissolved = _load_prior(conn)
     ids = assign_ids(comps, live, dissolved)
+    gate_dissolved = dissolved_by_gate(comps, live, ids, result["record_keys"],
+                                       result["gate_refused_by_cik"])
+    metrics["gate"]["entities_dissolved_by_gate"] = len(gate_dissolved)
+    metrics["gate"]["pieces_split_off"] = len(ids["splits"])
     # SPEC_147: the weak tier reads the components, it never changes them
     weak = weak_name_state(records, result["record_keys"], comps)
     metrics["weak"] = _flat(weak["metrics"])
     metrics["dol5500"] = _flat(source_metrics(
         records, result["record_keys"], comps, weak, new_components=ids["new_entities"]
     ))
-    domain_plan = domain_links(all_records, result["record_keys"], comps, _load_probes(conn))
+    domain_plan = domain_links(all_records, result["record_keys"], comps, _load_probes(conn),
+                               key_owner=result["key_owner"])
     metrics["domains"] = _flat(domain_plan["metrics"])
     metrics["domains"]["attach_only_records"] = len(all_records) - len(records)
     metrics.update(
@@ -490,8 +645,13 @@ def resolve(conn, dry_run: bool = False) -> Dict[str, Any]:
     now = started.replace(tzinfo=None)
     global _RESERVED
     _RESERVED = _reserve_entity_ids(conn, len(ids["new_entities"]))
+    prior_split_from = {
+        r[0]: r[1] for r in conn.execute(text(
+            "SELECT entity_id, field_conflicts->'split_from' FROM core.entity "
+            "WHERE dissolved_at IS NULL AND field_conflicts ? 'split_from'"))
+    }
     entity_rows, membership_rows, identifier_rows, alias_rows = _build_rows(
-        comps, ids, by_key, result["record_keys"], now, domain_plan
+        comps, ids, by_key, result["record_keys"], now, domain_plan, prior_split_from
     )
 
     # Set-based writes: four COPY + merge passes instead of ~1M statements.
@@ -558,6 +718,16 @@ def resolve(conn, dry_run: bool = False) -> Dict[str, Any]:
             """
         )
     ).rowcount or 0
+
+    # SPEC_150: an entity the gate dissolved says why (after the orphan sweep)
+    for eid, ev in sorted(gate_dissolved.items()):
+        conn.execute(
+            text(
+                "UPDATE core.entity SET field_conflicts = COALESCE(field_conflicts, '{}'::jsonb) "
+                "|| CAST(:ev AS JSONB) WHERE entity_id = :e AND dissolved_at IS NOT NULL"
+            ),
+            {"e": eid, "ev": json.dumps({"dissolved_by_gate": ev})},
+        )
 
     metrics.update(
         {

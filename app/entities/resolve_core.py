@@ -12,6 +12,14 @@ curated CIK<->CRD crosswalk edge joins them. Names, addresses, phones and
 domains never merge anything — that is what produced "Investor Relations" as a
 person linked to four firms in the old nexdata resolver.
 
+SPEC_150 (gated shared keys): an EIN or a CRD -- and a bridge edge -- shared by
+two different CIKs is "related", not "the same legal person" (a parent and its
+subsidiary, an issuer and its insider, an insurer and its separate accounts). It
+joins them only when `gate.corroborate` holds for the pair (names equal up to
+EDGAR tags, a rename or legal-form conversion after the old CIK went dormant, a
+strategy-labelled or successor 13F CIK of one adviser). Names still never merge
+anything on their own: they only corroborate a shared strong key.
+
 Values are canonicalized before comparison, so EDGAR's zero-padded CIK
 ("0001002784") and the bare integer (1002784) are ONE key, and placeholder
 values made of one repeated digit are refused outright.
@@ -182,18 +190,15 @@ def _extract_keys(rec):
     return out
 
 
-def plan(records, bridge_edges, vetoes):
-    """Compute the resolution. PURE: no DB, no clock, no randomness.
+GATED_KEY_TYPES = ("ein", "crd")      # SPEC_150: these join two CIK groups only when corroborated
 
-    -> dict with 'components' (materializable, >=2 records), 'record_keys'
-    (record_key -> [(type, value)]), 'refusals' and 'metrics'.
-    """
+
+def _first_steps(records, bridge_edges, vetoes):
+    """Steps 1-2 of plan(): record keys (vetoes, fanout cap) and the live bridge edges."""
     refusals = {"key_veto_record": 0, "key_veto_global": 0,
                 "key_fanout_over_cap": 0, "xwalk_veto": 0,
                 "component_over_cap": 0}
     refused_detail = {"fanout": [], "oversize_components": []}
-
-    # 1. record -> keys, honouring vetoes
     rec_keys = {}
     key_to_recs = {}
     key_assertions_by_type = {}
@@ -213,7 +218,7 @@ def plan(records, bridge_edges, vetoes):
                 key_assertions_by_type.get(key_type, 0) + 1)
         rec_keys[rk] = kept
 
-    # 2. fanout cap -- a key asserted by too many records is a placeholder
+    # fanout cap -- a key asserted by too many records is a placeholder
     over_cap = {k for k, v in key_to_recs.items() if len(v) > KEY_FANOUT_CAP}
     for k in sorted(over_cap):
         refusals["key_fanout_over_cap"] += 1
@@ -225,22 +230,6 @@ def plan(records, bridge_edges, vetoes):
         for rk, kept in rec_keys.items():
             rec_keys[rk] = [k for k in kept if k not in over_cap]
 
-    # 3. two graphs: A is exact_key edges only, B adds the crosswalk. The
-    #    difference between a record's A-component and its B-component is
-    #    exactly what makes its membership 'crosswalk' rather than 'exact_key'.
-    uf_a, uf_b = _UF(), _UF()
-    for rk, kept in rec_keys.items():
-        node = _rec_node(rk)
-        uf_a.add(node)
-        uf_b.add(node)
-        for key_type, val in kept:
-            kn = _key_node(key_type, val)
-            uf_a.add(kn)
-            uf_b.add(kn)
-            uf_a.union(node, kn)
-            uf_b.union(node, kn)
-
-    live_keys = {k for k, v in key_to_recs.items() if k not in over_cap}
     xwalk_used = []
     for cik, crd, tier, matched_on in bridge_edges:
         pair = f"{cik}:{crd}"
@@ -250,52 +239,384 @@ def plan(records, bridge_edges, vetoes):
         # An edge between two identifiers nobody in the corpus asserts joins
         # nothing. Counted separately so "the bridge has 2,271 usable rows" is
         # never confused with "2,271 of them did anything here".
-        if ("cik", cik) not in live_keys or ("crd", crd) not in live_keys:
+        if (("cik", cik) not in key_to_recs or ("crd", crd) not in key_to_recs
+                or ("cik", cik) in over_cap or ("crd", crd) in over_cap):
             continue
-        a, b = _key_node("cik", cik), _key_node("crd", crd)
-        uf_b.add(a)
-        uf_b.add(b)
-        uf_b.union(a, b)
         xwalk_used.append({"cik": cik, "crd": crd, "bridge_tier": tier,
                            "matched_on": matched_on})
+    return (rec_keys, key_to_recs, key_assertions_by_type, refusals,
+            refused_detail, xwalk_used, over_cap)
 
-    # 4. components of B that contain at least two RECORDS
-    comps = {}
-    for rk in rec_keys:
-        if not rec_keys[rk]:
-            continue                     # no strong key: not in any component
-        comps.setdefault(uf_b.find(_rec_node(rk)), []).append(rk)
 
-    materializable, singleton_keyed = [], 0
-    for root in sorted(comps):
-        members = sorted(comps[root])
-        if len(members) < 2:
+def _groups(rec_keys, xwalk_used):
+    """SPEC_150 structure: ungated groups, their CIKs and gated keys, the no-CIK
+    anchor clusters, and which CIK groups hold each gated key.
+
+    An UNGATED group is the records joined by CIK / LEI / UEI / state id (unchanged
+    rules). A group with a CIK is a "CIK group"; the rest are anchors (ADV, IAPD,
+    Form 5500, ...). Anchors sharing an EIN / CRD cluster freely: there is no CIK
+    between them to protect.
+    """
+    uf = _UF()
+    for rk, kept in rec_keys.items():
+        if not kept:
+            continue
+        node = _rec_node(rk)
+        uf.add(node)
+        for key_type, val in kept:
+            if key_type in GATED_KEY_TYPES:
+                continue
+            kn = _key_node(key_type, val)
+            uf.add(kn)
+            uf.union(node, kn)
+    members, gciks, gkeys = {}, {}, {}
+    for rk in sorted(rec_keys):
+        kept = rec_keys[rk]
+        if not kept:
+            continue
+        g = uf.find(_rec_node(rk))
+        members.setdefault(g, []).append(rk)
+        for key_type, val in kept:
+            if key_type == "cik":
+                gciks.setdefault(g, set()).add(val)
+            elif key_type in GATED_KEY_TYPES:
+                gkeys.setdefault(g, {})[(key_type, val)] = "record"
+    cik_group = {c: g for g, cs in gciks.items() for c in cs}
+    for e in xwalk_used:
+        g = cik_group.get(e["cik"])
+        if g is not None:
+            gkeys.setdefault(g, {}).setdefault(("crd", e["crd"]), "xwalk")
+
+    # anchors: no-CIK groups, clustered on their (record-asserted) gated keys
+    auf = _UF()
+    anchors = sorted(g for g in members if g not in gciks)
+    for g in anchors:
+        auf.add("g:" + g)
+        for k in gkeys.get(g, {}):
+            kn = _key_node(*k)
+            auf.add(kn)
+            auf.union("g:" + g, kn)
+    clusters = {}
+    for g in anchors:
+        clusters.setdefault(auf.find("g:" + g), []).append(g)
+    clusters = sorted(sorted(v) for v in clusters.values())
+
+    key_groups = {}                        # gated key -> CIK groups holding it
+    for g in sorted(gciks):
+        for k in gkeys.get(g, {}):
+            key_groups.setdefault(k, []).append(g)
+    return {"members": members, "gciks": gciks, "gkeys": gkeys, "cik_group": cik_group,
+            "clusters": clusters, "key_groups": key_groups}
+
+
+def _cluster_candidates(G, cluster):
+    cands = set()
+    for g in cluster:
+        for k in G["gkeys"].get(g, {}):
+            cands.update(G["key_groups"].get(k, ()))
+    return cands
+
+
+def gated_ciks(records, bridge_edges, vetoes):
+    """The CIKs whose filer profile the gate needs (SPEC_150): every CIK that shares
+    an EIN / CRD / bridge CRD with a different CIK group, or is one of several
+    groups a no-CIK record could attach to. PURE; resolve.py loads exactly these."""
+    steps = _first_steps(records, bridge_edges, vetoes)
+    G = _groups(steps[0], steps[5])
+    out = set()
+    for groups in G["key_groups"].values():
+        if len(groups) > 1:
+            for g in groups:
+                out |= G["gciks"][g]
+    for cluster in G["clusters"]:
+        cands = _cluster_candidates(G, cluster)
+        if len(cands) > 1:
+            for g in cands:
+                out |= G["gciks"][g]
+    return out
+
+
+def _cap_list(block, name, items):
+    """Sorted, capped evidence list with its exact count alongside when capped."""
+    items = sorted(items, key=lambda d: sorted((k, str(v)) for k, v in d.items()))
+    if items:
+        block[name] = items[:DETAIL_CAP]
+        if len(items) > DETAIL_CAP:
+            block[name + "_count"] = len(items)
+
+
+def plan(records, bridge_edges, vetoes, profiles=None, crd_hints=()):
+    """Compute the resolution. PURE: no DB, no clock, no randomness.
+
+    SPEC_150: CIK / LEI / UEI / state ids union records as always. An EIN or a CRD
+    (and a CIK<->CRD bridge edge) joins two CIK groups only when `gate.corroborate`
+    says the pair is one legal person; records with no CIK attach to one class by
+    rule 5; an EIN / CRD left on several pieces gets one owner. `profiles` maps a
+    canonical CIK to its EDGAR filer profile; without one the gate sees only record
+    names and never calls two CIKs sequential. No run date: every gate rule is
+    data-relative, and "active" (main piece) is measured against the newest filing
+    the profiles show, so the same data plans the same on any day. `crd_hints`
+    ((cik, crd) pairs, e.g. 13F bridge edges on a CRD that maps to several CIKs) are
+    REVIEW-ONLY: they let a split EIN-sharing pair carry the A2 / A4 flag and never
+    union anything.
+
+    -> dict with 'components' (materializable, >=2 records), 'record_keys'
+    (record_key -> [(type, value)]), 'refusals', 'metrics', and the gate's
+    'key_owner' (contested key -> owning identity), 'gate_refused_by_cik' and
+    'gate_decisions'.
+    """
+    from app.entities import gate
+
+    profiles = profiles or {}
+    (rec_keys, key_to_recs, key_assertions_by_type, refusals,
+     refused_detail, xwalk_used, over_cap) = _first_steps(records, bridge_edges, vetoes)
+    G = _groups(rec_keys, xwalk_used)
+    members, gciks, gkeys, cik_group = G["members"], G["gciks"], G["gkeys"], G["cik_group"]
+    by_key = {r["record_key"]: r for r in records}
+
+    # gate features, cached; a CIK with no profile falls back to its EDGAR record's name
+    fallback = {}
+    for g in gciks:
+        for rk in members[g]:
+            r = by_key[rk]
+            if not r.get("legal_name"):
+                continue
+            pri = (0 if (r.get("source") or rk.split(":", 1)[0]) == "edgar" else 1, rk)
+            for t, v in rec_keys[rk]:
+                if t == "cik" and (v not in fallback or pri < fallback[v][0]):
+                    fallback[v] = (pri, r["legal_name"])
+    feat_cache = {}
+    data_asof = max((d for d in (gate._d(p.get("last_filed")) for p in profiles.values()) if d),
+                    default=None)
+
+    def F(cik):
+        f = feat_cache.get(cik)
+        if f is None:
+            f = feat_cache[cik] = gate.features(
+                cik, profiles.get(cik), (fallback.get(cik) or (None, None))[1])
+        return f
+
+    # uf_a: the record graph without bridge edges (decides the tier);
+    # ucb: the group graph with everything (decides the pieces)
+    uf_a = _UF()
+    ucb = _UF()
+    for g, rks in members.items():
+        ucb.add(g)
+        for rk in rks:
+            uf_a.add(_rec_node(rk))
+            uf_a.union(_rec_node(rks[0]), _rec_node(rk))
+
+    def head(g):
+        return _rec_node(members[g][0])
+
+    for cluster in G["clusters"]:          # anchors sharing a key are one identity
+        for g in cluster[1:]:
+            ucb.union(cluster[0], g)
+            uf_a.union(head(cluster[0]), head(g))
+
+    # gated CIK pairs: every two CIKs of different groups sharing an EIN / CRD
+    cik_keys = {c: gkeys.get(g, {}) for g, cs in gciks.items() for c in cs}
+    pairs = set()
+    for groups in G["key_groups"].values():
+        if len(groups) < 2:
+            continue
+        ks = sorted(c for g in groups for c in gciks[g])
+        for i, a in enumerate(ks):
+            for b in ks[i + 1:]:
+                if cik_group[a] != cik_group[b]:
+                    pairs.add((a, b))
+    hint_crds = {}                         # cik -> CRDs it names (records, xwalk, hints)
+    for c, ks in cik_keys.items():
+        hint_crds[c] = {v for t, v in ks if t == "crd"}
+    for hc, hr in crd_hints or ():
+        hc, hr = _cik(hc), _crd(hr)
+        if hc and hr:
+            hint_crds.setdefault(hc, set()).add(hr)
+    decisions = []
+    for a, b in sorted(pairs):
+        shared = sorted(set(cik_keys[a]) & set(cik_keys[b]))
+        share_crd = any(t == "crd" for t, _v in shared)
+        share_ein = any(t == "ein" for t, _v in shared)
+        rule, reason = gate.corroborate(F(a), F(b), share_crd)
+        decisions.append({"a": a, "b": b, "rule": rule, "reason": reason,
+                          "keys": [f"{t}:{v}" for t, v in shared],
+                          "share_crd": share_crd, "share_ein": share_ein,
+                          "crd_hint": bool(hint_crds.get(a, set()) & hint_crds.get(b, set()))})
+        if rule:
+            ga, gb = cik_group[a], cik_group[b]
+            ucb.union(ga, gb)
+            if any(cik_keys[a][k] == "record" and cik_keys[b][k] == "record" for k in shared):
+                uf_a.union(head(ga), head(gb))
+
+    # rule 5: no-CIK clusters attach to one class (decided against the CIK classes
+    # as the pairs left them, before any attachment)
+    class_ciks = {}
+    for g, cs in gciks.items():
+        class_ciks.setdefault(ucb.find(g), set()).update(cs)
+    attach_ev, attach_how, attaches = [], {}, []
+    for cluster in G["clusters"]:
+        cands = sorted({ucb.find(g) for g in _cluster_candidates(G, cluster)})
+        if not cands:
+            continue
+        if len(cands) == 1:
+            to, how = cands[0], "only_class"
+        else:
+            rn, forms = set(), set()
+            for g in cluster:
+                for rk in members[g]:
+                    rn |= gate.record_name_keys(by_key[rk].get("legal_name"))
+                    forms.add(gate.legal_form(by_key[rk].get("legal_name")))
+            cc = {c: sorted(class_ciks[c]) for c in cands}
+            named = [c for c in cands if any(rn & F(x)["allkeys"] for x in cc[c])]
+            named_f = [c for c in named if any(F(x)["form"] in forms for x in cc[c])]
+            ops = [c for c in cands if any(gate.operating(F(x)) for x in cc[c])]
+            if len(named) == 1:
+                to, how = named[0], "name_match"
+            elif len(named_f) == 1:
+                to, how = named_f[0], "name_and_form_match"
+            elif len(ops) == 1:
+                to, how = ops[0], "single_operating_class"
+            else:
+                to, how = None, "own_entity"
+            attach_ev.append({"record_key": members[cluster[0]][0], "how": how,
+                              "candidates": len(cands)})
+        attach_how[how] = attach_how.get(how, 0) + 1
+        if to is not None:
+            attaches.append((cluster, to))
+    for cluster, to in attaches:
+        cluster_keys = {k for g in cluster for k in gkeys.get(g, {})}
+        via_group = [g for g in sorted(gciks) if ucb.find(g) == ucb.find(to)
+                     and any(gkeys.get(g, {}).get(k) == "record" for k in cluster_keys)]
+        ucb.union(to, cluster[0])
+        if via_group:
+            uf_a.union(head(via_group[0]), head(cluster[0]))
+
+    # pieces: every final identity, single-record ones included (key ownership)
+    pieces = {}
+    for g in sorted(members):
+        pieces.setdefault(ucb.find(g), []).extend(members[g])
+    for p in pieces:
+        pieces[p].sort()
+    piece_of_rec = {rk: p for p, rks in pieces.items() for rk in rks}
+    piece_ciks = {}
+    for g, cs in gciks.items():
+        piece_ciks.setdefault(ucb.find(g), set()).update(cs)
+
+    # rule 6: an EIN / CRD on two or more pieces has ONE owner (core.identifier PK)
+    contested = {}
+    for k, rks in key_to_recs.items():
+        if k[0] not in GATED_KEY_TYPES or len(rks) < 2 or k in over_cap:
+            continue
+        holders = sorted({piece_of_rec[rk] for rk in rks if rk in piece_of_rec})
+        if len(holders) < 2:
+            continue
+        anchor = sorted({piece_of_rec[rk] for rk in rks if rk in piece_of_rec
+                         and not any(t == "cik" for t, _v in rec_keys[rk])})
+        if len(anchor) == 1:
+            owner = anchor[0]
+        else:
+            ops = [p for p in holders
+                   if any(gate.operating(F(c)) for c in sorted(piece_ciks.get(p, ())))]
+            owner = ops[0] if len(ops) == 1 else None
+        contested[k] = owner
+
+    # gate evidence
+    refused_by_cik, joined_by_cik, amb_by_cik = {}, {}, {}
+    amb_count, refused_count, joined_count = {}, {}, {}
+    for d in decisions:
+        if d["rule"]:
+            joined_count[d["rule"]] = joined_count.get(d["rule"], 0) + 1
+            joined_by_cik.setdefault(d["a"], []).append(
+                {"a": d["a"], "b": d["b"], "rule": d["rule"], "keys": d["keys"]})
+            continue
+        refused_count[d["reason"]] = refused_count.get(d["reason"], 0) + 1
+        if ucb.find(cik_group[d["a"]]) == ucb.find(cik_group[d["b"]]):
+            continue                       # joined through another pair after all
+        for own, other in ((d["a"], d["b"]), (d["b"], d["a"])):
+            refused_by_cik.setdefault(own, []).append(
+                {"cik": own, "other_cik": other, "reason": d["reason"], "keys": d["keys"]})
+        flag = gate.ambiguity(F(d["a"]), F(d["b"]), d["share_crd"], d["share_ein"],
+                             d["crd_hint"])
+        if flag:
+            amb_count[flag] = amb_count.get(flag, 0) + 1
+            for own, other in ((d["a"], d["b"]), (d["b"], d["a"])):
+                amb_by_cik.setdefault(own, []).append(
+                    {"cik": own, "other_cik": other, "flag": flag})
+
+    # materialize
+    materializable, singleton_keyed, piece_index = [], 0, {}
+    for rks in sorted(pieces.values(), key=lambda m: m[0]):
+        if len(rks) < 2:
             singleton_keyed += 1
             continue
-        if len(members) > COMPONENT_RECORD_CAP:
+        if len(rks) > COMPONENT_RECORD_CAP:
             refusals["component_over_cap"] += 1
             if len(refused_detail["oversize_components"]) < DETAIL_CAP:
                 refused_detail["oversize_components"].append(
-                    {"root": root, "records": len(members),
-                     "sample_members": members[:10]})
+                    {"root": _rec_node(rks[0]), "records": len(rks),
+                     "sample_members": rks[:10]})
             continue
-        # tier per record: exact_key when the crosswalk added nothing to this
-        # record's cluster, crosswalk when its co-membership depends on a
-        # bridge edge.
-        a_roots = {uf_a.find(_rec_node(rk)) for rk in members}
-        tier = "exact_key" if len(a_roots) == 1 else "crosswalk"
-        keys_in_comp = sorted({kv for rk in members for kv in rec_keys[rk]})
+        piece_index[piece_of_rec[rks[0]]] = len(materializable)
+        materializable.append({"members": rks})
+
+    def ident(p):
+        if p is None:
+            return None
+        if p in piece_index:
+            return ("comp", piece_index[p])
+        return ("rec", pieces[p][0])
+
+    multi_cik = 0
+    for comp in materializable:
+        rks = comp["members"]
+        p = piece_of_rec[rks[0]]
+        tier = "exact_key" if len({uf_a.find(_rec_node(rk)) for rk in rks}) == 1 else "crosswalk"
+        all_keys = sorted({kv for rk in rks for kv in rec_keys[rk]})
+        withheld = [k for k in all_keys if k in contested and contested[k] != p]
+        keys = [k for k in all_keys if k not in set(withheld)]
         via = []
         if tier == "crosswalk":
-            comp_ciks = {v for t, v in keys_in_comp if t == "cik"}
-            comp_crds = {v for t, v in keys_in_comp if t == "crd"}
+            comp_ciks = {v for t, v in all_keys if t == "cik"}
+            comp_crds = {v for t, v in all_keys if t == "crd"}
             via = [e for e in xwalk_used
                    if e["cik"] in comp_ciks and e["crd"] in comp_crds]
-        materializable.append({
-            "root": root, "members": members, "tier": tier,
-            "keys": keys_in_comp, "via": via,
+        cs = sorted(piece_ciks.get(p, ()))
+        multi_cik += len(cs) > 1
+        block = {}
+        _cap_list(block, "joined", [e for c in cs for e in joined_by_cik.get(c, ())])
+        _cap_list(block, "refused", [e for c in cs for e in refused_by_cik.get(c, ())])
+        _cap_list(block, "ambiguous", [e for c in cs for e in amb_by_cik.get(c, ())])
+        _cap_list(block, "attached", [e for e in attach_ev if piece_of_rec[e["record_key"]] == p])
+        _cap_list(block, "contested", [
+            {"type": k[0], "value": k[1],
+             "owner": pieces[contested[k]][0] if contested[k] is not None else None}
+            for k in all_keys if k in contested])
+        if block:
+            block["gate_version"] = gate.GATE_VERSION
+        fs = [F(c) for c in cs] if (block or len(cs) > 1) else []
+        lasts = [f["last"] for f in fs if f["last"]]
+        # a heavy filer whose first filing is unknown (truncated recent list) is the oldest
+        firsts = [f["first"].isoformat() if f["first"] else "0001-01-01"
+                  for f in fs if f["first"] or f["first_floor"]]
+        active = bool(data_asof and lasts and (data_asof - max(lasts)).days < gate.DORMANT_DAYS)
+        comp.update({
+            "root": _rec_node(rks[0]), "tier": tier, "keys": keys, "via": via,
+            "withheld": withheld, "gate": block or None,
+            # SPEC_150 main piece (assign_ids keeper): owns a CRD, operating,
+            # active, oldest -- then the older rules (largest, smallest key)
+            "main_rank": (0 if any(t == "crd" for t, _v in keys) else 1,
+                          0 if (not fs or any(gate.operating(f) for f in fs)) else 1,
+                          0 if active else 1,
+                          min(firsts) if firsts else "9999-12-31"),
         })
 
+    gated_singletons = sum(1 for p, rks in pieces.items() if len(rks) == 1
+                           and any(c in refused_by_cik for c in piece_ciks.get(p, ())))
+    contested_by_type, no_owner_by_type = {}, {}
+    for k, owner in contested.items():
+        contested_by_type[k[0]] = contested_by_type.get(k[0], 0) + 1
+        if owner is None:
+            no_owner_by_type[k[0]] = no_owner_by_type.get(k[0], 0) + 1
     no_key = sum(1 for rk in rec_keys if not rec_keys[rk])
     metrics = {
         "corpus_records": len(records),
@@ -321,10 +642,27 @@ def plan(records, bridge_edges, vetoes):
             "crosswalk": sum(len(c["members"]) for c in materializable
                              if c["tier"] == "crosswalk"),
         },
+        "gate": {
+            "gate_version": gate.GATE_VERSION,
+            "profiles_supplied": len(profiles),
+            "ciks_in_gated_pairs": len({c for d in decisions for c in (d["a"], d["b"])}),
+            "pairs_considered": len(decisions),
+            "pairs_joined": sum(joined_count.values()),
+            "joined_by_rule": joined_count,
+            "refused_by_reason": refused_count,
+            "ambiguous_by_flag": amb_count,
+            "anchor_attach": attach_how,
+            "contested_keys": contested_by_type,
+            "contested_no_owner": no_owner_by_type,
+            "components_multi_cik": multi_cik,
+            "gated_single_record_pieces": gated_singletons,
+        },
     }
     return {"components": materializable, "record_keys": rec_keys,
             "refusals": refusals, "refused_detail": refused_detail,
-            "metrics": metrics, "xwalk_used": xwalk_used}
+            "metrics": metrics, "xwalk_used": xwalk_used,
+            "key_owner": {k: ident(o) for k, o in contested.items()},
+            "gate_refused_by_cik": refused_by_cik, "gate_decisions": decisions}
 
 
 # ---------------------------------------------------------------------------
@@ -351,17 +689,23 @@ _AGREEMENT_COLS = (("ein", "ein", _ein), ("cik", "cik", _cik),
                    ("canonical_domain", "domain", _passthrough))
 
 
-def canonical_row(members, by_key):
+def canonical_row(members, by_key, withheld=()):
     """-> (columns dict, field_conflicts dict) for one component.
 
     AGREEMENT ONLY on every column except canonical_name. See the module
     docstring: two members asserting different values leaves the column NULL
     and writes both values into field_conflicts.
+
+    SPEC_150: `withheld` are the (type, value) keys this component carries but
+    another piece owns (a contested EIN / CRD): they never become a canonical
+    column here, and are listed under `contested`.
     """
     cols, conflicts = {}, {}
+    withheld = {tuple(k) for k in withheld or ()}
     for out_col, src_col, canon in _AGREEMENT_COLS:
         vals = sorted({v for v in (canon(by_key[rk].get(src_col))
-                                   for rk in members) if v})
+                                   for rk in members)
+                       if v and (out_col, v) not in withheld})
         if len(vals) == 1:
             cols[out_col] = vals[0]
         else:
@@ -377,6 +721,8 @@ def canonical_row(members, by_key):
         nn = by_key[rk].get("name_norm")
         if nn:
             counts.setdefault(nn, []).append(rk)
+    if withheld:
+        conflicts["contested"] = [{"type": t, "value": v} for t, v in sorted(withheld)]
     if counts:
         winner = min(counts, key=lambda nn: (-len(counts[nn]),
                                              min(counts[nn])))
@@ -442,15 +788,18 @@ def assign_ids(comps, prior, dissolved_claim=None):
     # record_key (comp["members"] is sorted, so members[0] IS that key), and
     # the component index is the last tiebreak so the result cannot depend on
     # dict or row order.
+    # SPEC_150: a component from plan() carries `main_rank` (owns a CRD,
+    # operating, active, oldest), which decides first.
     keeper = {}
     for idx, ids in enumerate(claims):
         for eid in ids:
-            cand = (-len(comps[idx]["members"]), comps[idx]["members"][0], idx)
+            cand = (tuple(comps[idx].get("main_rank") or ()), -len(comps[idx]["members"]),
+                    comps[idx]["members"][0], idx)
             if keeper.get(eid) is None or cand < keeper[eid]:
                 keeper[eid] = cand
     splits = []
     for idx, ids in enumerate(claims):
-        claims[idx] = [eid for eid in ids if keeper[eid][2] == idx]
+        claims[idx] = [eid for eid in ids if keeper[eid][-1] == idx]
         if len(ids) != len(claims[idx]):
             splits.append({"component_first_member": comps[idx]["members"][0],
                            "lost_entity_ids": [e for e in ids
@@ -633,7 +982,7 @@ def source_metrics(records, rec_keys, comps, weak, new_components=(), source="do
             in_new += 1
     field_conflicts = {}
     for ci in sorted(strong_comps):
-        _cols, conflicts = canonical_row(comps[ci]["members"], by_key)
+        _cols, conflicts = canonical_row(comps[ci]["members"], by_key, comps[ci].get("withheld"))
         for k, v in conflicts.items():
             if k == "name_norm_distinct":
                 if v > 1:
@@ -691,7 +1040,7 @@ def family_of(source):
     return SOURCE_FAMILY.get(source, source)
 
 
-def domain_links(records, rec_keys, comps, probes=None, cap=DOMAIN_SUBJECT_CAP):
+def domain_links(records, rec_keys, comps, probes=None, cap=DOMAIN_SUBJECT_CAP, key_owner=None):
     """Domain -> subject links with a status. PURE, and it changes no component.
 
     `records` is EVERY source record (attach-only included); `rec_keys` and
@@ -725,11 +1074,16 @@ def domain_links(records, rec_keys, comps, probes=None, cap=DOMAIN_SUBJECT_CAP):
         nn = by_key[ident[1]].get("name_norm")
         return {nn} if nn else set()
 
+    # SPEC_150: a contested EIN / CRD belongs to its owner (plan()'s key_owner),
+    # or to nobody -- never to whichever holder happens to come first
+    contested = dict(key_owner or {})
     key_owner = {}
     for rk, kept in rec_keys.items():
         ident = ("comp", comp_of[rk]) if rk in comp_of else ("rec", rk)
         for k in kept:
-            key_owner.setdefault(k, ident)
+            if k not in contested:
+                key_owner.setdefault(k, ident)
+    key_owner.update({k: o for k, o in contested.items() if o is not None})
 
     attach = {"member": 0, "lone_record": 0, "key": 0, "name": 0, "unattached": 0,
               "key_disagreement": 0}
