@@ -569,6 +569,12 @@ SOURCE_DISPATCH: Dict[str, Tuple[str, str, List[str]]] = {
         "ingest_job_postings_discover",
         ["company_id"],
     ),
+    # SPEC_151: gated public job boards (Greenhouse / Lever / Ashby JSON through open_web)
+    "ats_boards": (
+        "app.sources.ats_boards.ingest",
+        "ingest_ats_boards",
+        ["preset", "ciks", "industrial_ids", "apply"],
+    ),
     # ── openFDA ─────────────────────────────────────────────────────────
     "fda": (
         "app.sources.fda.ingest",

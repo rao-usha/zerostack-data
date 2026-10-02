@@ -372,6 +372,20 @@ SOURCE_RIGHTS: Dict[str, SourceRights] = {
     # ── scraped / LLM-extracted collections ─────────────────────────────
     "job_postings": SourceRights("Public ATS job boards (Greenhouse, Lever, Workday, Ashby); "
                                  "content owned by the employers", "internal_only", "none", "scraped"),
+    # SPEC_151: the gated board lane. Same posture as job_postings (employers' content,
+    # internal only); storage/commercial use left unassessed (None) -- the vendors' terms bind
+    # customers and say nothing either way, which is not a licence.
+    "ats_boards": SourceRights("Public job-board APIs (Greenhouse Job Board API, Lever Postings API; "
+                               "Ashby refused by its robots.txt); content owned by the employers",
+                               "internal_only", "none", "scraped",
+                               citation_url="https://developers.greenhouse.io/job-board.html",
+                               citation_quote="Job Board data is publicly available, so authentication is "
+                                              "not required for any GET endpoints.",
+                               confidence="medium",
+                               notes="Per-host terms verdicts in app/entities/data/site_terms.json; every "
+                                     "request through app.core.open_web (robots, terms, UA, Retry-After). "
+                                     "Description text stored with e-mails and phone numbers redacted; pay "
+                                     "parsed from text is derived (snippet + confidence kept)."),
     "public_lp_strategies": SourceRights("Public pension documents (public records); LLM-extracted",
                                          "internal_only", "business_contact", "llm_extracted"),
     "people_collection": SourceRights("Company websites, SEC filings, news (mixed)", "internal_only",

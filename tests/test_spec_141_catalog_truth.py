@@ -773,7 +773,8 @@ class TestReviewFixes:
         # the specs added after the evidence file state it themselves
         assert set(unverified) == {"census_cbp", "census_acs_county_tract",
                                    "census_cbp_county_yearly",
-                                   "zip_medspa_scores"}  # SPEC_142 fix: split out of medspa_prospects
+                                   "zip_medspa_scores",  # SPEC_142 fix: split out of medspa_prospects
+                                   "ats_boards"}  # SPEC_151: new gated board lane
         for s in _catalog():
             assert s.verified_at and s.data_state is not None, s.key
 

@@ -43,6 +43,11 @@ class CollectionResult:
     closed_postings: int = 0
     error: Optional[str] = None
     duration_seconds: float = 0.0
+    skipped: Optional[str] = None   # "retired": generic HTML scraper (SPEC_151), not an error
+
+
+GENERIC_RETIRED = ("generic HTML scraper retired (SPEC_151): 18-19% navigation junk, no robots or terms "
+                   "gate; use the gated ats_boards lane")
 
 
 class JobPostingCollector:
@@ -104,6 +109,9 @@ class JobPostingCollector:
             )
             result.ats_type = ats_config.ats_type
 
+            if ats_config.ats_type == "generic":
+                return self._retire_generic(db, company_id, ats_config, result, start)
+
             if ats_config.ats_type == "unknown":
                 result.error = ats_config.error or "Could not detect ATS"
                 self._update_ats_config(db, company_id, ats_config, 0, "failed", result.error)
@@ -117,6 +125,8 @@ class JobPostingCollector:
                 logger.info(f"Cached ATS config for {company_name} returned 0 jobs, re-detecting...")
                 ats_config = await self._detector.detect(company_name, website, careers_url)
                 result.ats_type = ats_config.ats_type
+                if ats_config.ats_type == "generic":
+                    return self._retire_generic(db, company_id, ats_config, result, start)
                 if ats_config.ats_type not in ("unknown",):
                     raw_jobs = await self._fetch_jobs(ats_config)
 
@@ -193,8 +203,19 @@ class JobPostingCollector:
             "total_new": sum(r.new_postings for r in results),
             "total_closed": sum(r.closed_postings for r in results),
             "errors": sum(1 for r in results if r.error),
+            "skipped": sum(1 for r in results if r.skipped),
         }
         return summary
+
+    def _retire_generic(self, db: Session, company_id: int, ats_config: ATSResult,
+                        result: CollectionResult, start: datetime) -> CollectionResult:
+        """SPEC_151: the generic HTML scraper is retired. Nothing is fetched; the config row is
+        marked 'retired'; stored generic rows are left in place (never deleted)."""
+        result.skipped = "retired"
+        self._update_ats_config(db, company_id, ats_config, 0, "retired", GENERIC_RETIRED)
+        db.commit()
+        result.duration_seconds = (datetime.utcnow() - start).total_seconds()
+        return result
 
     async def discover_ats(
         self, db: Session, company_id: int
@@ -267,8 +288,9 @@ class JobPostingCollector:
             else:
                 url = ats.careers_url or ""
             return await self._workday.fetch_jobs(url, token if "myworkdayjobs" not in token else None)
-        elif ats_type == "generic" and ats.careers_url:
-            return await self._generic.fetch_jobs(ats.careers_url)
+        elif ats_type == "generic":
+            logger.warning(GENERIC_RETIRED)  # SPEC_151: never fetched
+            return []
         else:
             logger.warning(f"No client for ATS type '{ats_type}' token='{token}'")
             return []

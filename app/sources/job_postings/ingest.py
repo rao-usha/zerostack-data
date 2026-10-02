@@ -87,12 +87,13 @@ async def ingest_job_postings_all(
     total = summary.get("total_fetched", 0)
     errors = summary.get("errors", 0)
 
+    logger.info(f"Job posting bulk collection: {summary}")
+
     if errors > 0 and errors == summary.get("companies_processed", 0):
         _update_job(db, job_id, "failed", records=total, error=f"All {errors} companies failed")
-    else:
-        _update_job(db, job_id, "success", records=total)
-
-    logger.info(f"Job posting bulk collection: {summary}")
+        # SPEC_151: raise, or the dispatcher marks the job success over the failed status
+        raise RuntimeError(f"All {errors} companies failed")
+    _update_job(db, job_id, "success", records=total)
 
 
 async def ingest_job_postings_discover(

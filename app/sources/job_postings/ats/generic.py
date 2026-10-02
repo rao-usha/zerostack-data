@@ -1,4 +1,15 @@
 """
+DEPRECATED (SPEC_151, 2026-10-02) -- RETIRED, NOT CALLED.
+
+The collector (``app/sources/job_postings/collector.py``) no longer fetches with this
+scraper: a company whose ATS is ``generic`` is marked ``crawl_status = 'retired'`` and
+skipped. Why: it requested careers pages with no robots.txt or terms gate, and its link
+extraction stored navigation links as jobs -- 5,550 rows, 0 with a location, 18-19%
+matching a navigation-title regex (all 36 Kimball Midwest rows were nav links). Rows it
+wrote are left in ``job_postings`` (``ats_type = 'generic'``), never deleted. Open roles
+now come from the gated ``app/sources/ats_boards`` lane (public board JSON only). Kept
+for reference; do not re-enable without a robots + terms gate and a junk-precision check.
+
 Generic job posting scraper for companies without a known ATS.
 
 Tries structured data (JSON-LD), CSS selectors, then falls back to basic link extraction.

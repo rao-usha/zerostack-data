@@ -29,7 +29,7 @@ PLAN_EVIDENCE = REPO / "docs" / "plans" / "PLAN_088_evidence.json"
 LOOSENED_WITH_REVIEW: set = set()
 # datasets added after the baseline snapshot (each split out of a baseline dataset; the
 # fix-round tests pin their rights)
-ADDED_AFTER_BASELINE = {"zip_medspa_scores"}
+ADDED_AFTER_BASELINE = {"zip_medspa_scores", "ats_boards"}  # ats_boards: SPEC_151, a new source
 
 STORAGE_FLAGGED = {"yelp_businesses", "fred_series", "kaggle_m5", "prediction_markets", "si_zoning_districts",
                    "si_internet_exchanges", "si_warehouse_listings", "medspa_prospects"}

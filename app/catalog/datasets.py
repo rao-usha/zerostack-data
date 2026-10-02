@@ -1365,6 +1365,23 @@ _DISPATCH: List[DatasetSpec] = [
               coverage_basis="period",
               coverage_from="2025-11-25",
               notes="company_ats_config is crawler configuration, not customer data."),
+    # SPEC_151: the gated board lane (public board JSON only, open_web gate, pay with provenance)
+    _dispatch("ats_boards", "ats_boards", "ATS job boards (gated)",
+              "Open roles from companies' public Greenhouse and Lever job boards, linked to the core "
+              "entity, with first/last seen and closed dates for hiring velocity and pay parsed from "
+              "structured fields or pay-transparency text (snippet and confidence kept).",
+              "timeseries", "one row per posting per board; one fetch row per board per run",
+              "dispatch:ats_boards", "ad_hoc",
+              tables=("ats_board", "ats_posting", "ats_board_fetch"),
+              primary_key=("board_id", "external_id"),
+              coverage_sql="SELECT max(fetched_at)::date FROM ats_board_fetch WHERE outcome = 'fetched'",
+              coverage_basis="as_of",
+              data_state="ok", verified_at="2026-10-02",
+              limitations=("Pilot scope: boards are discovered for at most 25 named companies per run.",
+                           "Ashby boards are not fetched: api.ashbyhq.com/robots.txt answers 401 and the "
+                           "open_web gate treats that as disallow-all.",
+                           "Pay from text is parsed (pay_source = 'text'); read pay_snippet and "
+                           "pay_confidence before using a figure.")),
     # openFDA
     _dispatch("fda_device_registrations", "fda", "FDA device registrations",
               "Medical device establishment registrations with their product codes and device "

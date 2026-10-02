@@ -34,5 +34,23 @@
     "verdict": "refused",
     "citation": "Frazier Healthcare Partners Terms of Use, last updated March 2024 (https://www.frazierhealthcare.com/terms-conditions/): 'Do not use automated means to access the Site' (search-engine indexing excepted).",
     "reviewed": "2026-09-30"
+  },
+  {
+    "host": "greenhouse.io",
+    "verdict": "allowed",
+    "reviewed": "2026-10-02",
+    "citation": "Reviewed for the public Job Board API only (boards-api.greenhouse.io/v1/boards/<token> and /jobs; SPEC_151). Greenhouse Job Board API docs (https://developers.greenhouse.io/job-board.html, redirects to docs.greenhouse.io): 'Job Board data is publicly available, so authentication is not required for any GET endpoints.' No rate limit or use restriction stated. Greenhouse legal center (https://www.greenhouse.com/legal) lists the Master Subscription Agreement, DPA, privacy and cookie notices -- customer documents; no website terms with a clause on automated access, robots, scraping or data mining. robots.txt (boards-api.greenhouse.io, 2026-10-02): 'User-agent: * / Disallow: /embed/' and still applies."
+  },
+  {
+    "host": "lever.co",
+    "verdict": "allowed",
+    "reviewed": "2026-10-02",
+    "citation": "Reviewed for the public Postings API only (api.lever.co/v0/postings/<site>?mode=json; SPEC_151). lever/postings-api README (https://github.com/lever/postings-api): 'This API is designed to help you create a job site'; only application POSTs are rate limited. Lever Terms of Service, last updated August 25, 2023 (https://www.lever.co/legal/terms-of-service, the footer 'Terms of Use' link): they 'govern a customer's acquisition and use of Lever ... software and/or services'; their bar on access 'for any other benchmarking or competitive purposes' concerns Lever's software, not employers' published postings. robots.txt (api.lever.co, 2026-10-02): 'User-agent: * / Allow: / / Crawl-delay: 1' and still applies."
+  },
+  {
+    "host": "ashbyhq.com",
+    "verdict": "allowed",
+    "reviewed": "2026-10-02",
+    "citation": "Terms reviewed for the public job posting API (api.ashbyhq.com/posting-api/job-board/<org>?includeCompensation=true; SPEC_151). Ashby Customer Terms of Service, last updated September 29, 2025 (https://www.ashbyhq.com/terms): effective when a Customer 'first completes a purchase ... or logs into the Service' -- customers only; no clause on automated access or scraping. developers.ashbyhq.com/docs/public-job-posting-api documents the endpoint with no use restriction. NOTE: api.ashbyhq.com/robots.txt answers 401 Unauthorized to every user agent (2026-10-02); open_web treats 401 as disallow-all, so the gate refuses the API and nothing is fetched until that changes or the owner decides otherwise."
   }
 ]
