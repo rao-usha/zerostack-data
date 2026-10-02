@@ -2,6 +2,10 @@
 Job Posting Intelligence — collection orchestrator.
 
 Coordinates ATS detection, job fetching, normalization, and storage.
+
+RETIRED (SPEC_152, 2026-10-02): the run is unscheduled and its entry points refuse; the Ashby
+client and the website ATS detector raise ``OldLaneRetired`` before any request, and this
+collector re-raises it. Stored rows stay readable. Use ``app.sources.ats_boards``.
 """
 
 import json
@@ -28,6 +32,7 @@ from app.sources.job_postings.ats.ashby import AshbyClient
 from app.sources.job_postings.ats.workday import WorkdayClient
 from app.sources.job_postings.ats.generic import GenericJobScraper
 from app.sources.job_postings.ats.smartrecruiters import SmartRecruitersClient
+from app.sources.job_postings.retired import OldLaneRetired
 
 logger = logging.getLogger(__name__)
 
@@ -158,6 +163,8 @@ class JobPostingCollector:
 
             db.commit()
 
+        except OldLaneRetired:
+            raise                       # SPEC_152: a refused network path fails loudly, never per-company noise
         except Exception as e:
             logger.error(f"Collection failed for company {company_id}: {e}", exc_info=True)
             result.error = str(e)

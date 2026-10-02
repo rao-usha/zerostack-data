@@ -21,6 +21,9 @@ A failed fetch closes nothing.
     python -m app.sources.ats_boards.collect --preset pilot            # DRY RUN
     python -m app.sources.ats_boards.collect --preset pilot --apply
     python -m app.sources.ats_boards.collect --ciks 1617078,1686840 --apply
+    python -m app.sources.ats_boards.collect --preset migrated [--apply]   # SPEC_152: the retired
+        job_postings:all run's verified Greenhouse / Lever boards (seeded token only, no slugs);
+        with --apply the blocked Ashby seeds are recorded as status 'refused' (no request)
 """
 
 from __future__ import annotations
@@ -328,10 +331,10 @@ def store(db, br: BoardResult) -> Dict[str, Optional[int]]:
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     from app.core.database import get_session_factory
-    from app.sources.ats_boards.ingest import _companies
+    from app.sources.ats_boards.ingest import _companies, record_blocked
 
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--preset", choices=("pilot",))
+    ap.add_argument("--preset", choices=("pilot", "migrated"))
     ap.add_argument("--ciks", help="comma-separated CIKs (resolved to core entities)")
     ap.add_argument("--industrial-ids", help="comma-separated industrial_companies ids")
     ap.add_argument("--apply", action="store_true", help="write (default: dry run, writes nothing)")
@@ -340,14 +343,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     db = get_session_factory()()
     try:
         companies = _companies(db, preset=a.preset, ciks=a.ciks, industrial_ids=a.industrial_ids)
-        rep = run(db, companies, apply=a.apply)
+        rep = run(db, companies, apply=a.apply, slugs=a.preset != "migrated")
+        if a.preset == "migrated":
+            rep["blocked_recorded"] = record_blocked(db, apply=a.apply)
     finally:
         db.close()
     if a.json:
         with open(a.json, "w", encoding="utf-8") as fh:
             json.dump(rep, fh, indent=2, default=str)
     print(f"{'APPLIED' if a.apply else 'DRY RUN'}: {rep['companies']} companies, {len(rep['attempts'])} attempts, "
-          f"{rep['boards_fetched']} boards fetched, {rep['requests']} HTTP requests")
+          f"{rep['boards_fetched']} boards fetched, {rep['requests']} HTTP requests"
+          + (f", {rep['blocked_recorded']} blocked seeds {'recorded' if a.apply else 'listed'}"
+             if "blocked_recorded" in rep else ""))
     for at in rep["attempts"]:
         print(f"  {at['company'][:34]:34} {at['ats']:10} {at['token']:24} {at['basis']:12} {at['outcome']}")
     for b in rep["boards"]:

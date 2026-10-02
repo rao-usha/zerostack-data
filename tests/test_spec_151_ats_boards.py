@@ -595,7 +595,8 @@ class TestOldLane:
                     "errors": 5, "skipped": 0}
 
         monkeypatch.setattr(JobPostingCollector, "collect_all", all_failed)
-        with pytest.raises(RuntimeError, match="All 5 companies failed"):
+        # SPEC_152: the old run is retired; it now fails before collecting at all
+        with pytest.raises(RuntimeError, match="retired"):
             asyncio.run(jp_ingest.ingest_job_postings_all(MagicMock(), 1))
 
         monkeypatch.setattr(collect, "run", lambda db, companies, apply, **kw: {

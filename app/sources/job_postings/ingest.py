@@ -2,6 +2,10 @@
 Job Posting Intelligence — ingestion entry points.
 
 Called by the job dispatch system (app/api/v1/jobs.py) or directly from the API router.
+
+RETIRED (SPEC_152, owner decision 2026-10-02): every entry point raises ``OldLaneRetired`` before
+the collector is built, so ``job_postings:all`` / ``:company`` / ``:discover`` jobs fail loudly
+with a pointer to the gated ``ats_boards`` lane. Stored rows stay readable.
 """
 
 import logging
@@ -18,6 +22,7 @@ from app.sources.job_postings.metadata import (
     DATASET_INFO,
 )
 from app.sources.job_postings.collector import JobPostingCollector
+from app.sources.job_postings.retired import OLD_RUN_RETIRED, OldLaneRetired
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +33,15 @@ def _ensure_tables(db: Session):
     db.execute(text(generate_create_company_ats_config_sql()))
     db.execute(text(generate_create_job_posting_snapshots_sql()))
     db.commit()
+
+
+def _refuse(db: Session, job_id: int):
+    """SPEC_152: record the refusal on the job row (best effort) and raise."""
+    try:
+        _update_job(db, job_id, "failed", error=OLD_RUN_RETIRED)
+    except Exception:
+        pass
+    raise OldLaneRetired(OLD_RUN_RETIRED)
 
 
 def _update_job(db: Session, job_id: int, status: str, records: int = 0, error: str = None):
@@ -46,6 +60,7 @@ async def ingest_job_postings_company(
     db: Session, job_id: int, company_id: int = None, force_rediscover: bool = False, **config
 ):
     """Collect job postings for a single company."""
+    _refuse(db, job_id)
     _ensure_tables(db)
     _update_job(db, job_id, "running")
 
@@ -75,6 +90,7 @@ async def ingest_job_postings_all(
     db: Session, job_id: int, limit: int = None, skip_recent_hours: int = 24, **config
 ):
     """Collect job postings for all companies with websites."""
+    _refuse(db, job_id)
     _ensure_tables(db)
     _update_job(db, job_id, "running")
 
@@ -100,6 +116,7 @@ async def ingest_job_postings_discover(
     db: Session, job_id: int, company_id: int = None, **config
 ):
     """Just discover ATS type for a company (no job collection)."""
+    _refuse(db, job_id)
     _ensure_tables(db)
     _update_job(db, job_id, "running")
 

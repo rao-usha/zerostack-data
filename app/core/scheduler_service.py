@@ -975,16 +975,8 @@ DEFAULT_SCHEDULES = [
         "description": "Monthly FEMA disaster declarations (full refresh)",
         "priority": 3,
     },
-    {
-        "name": "Job Postings All Sources - Monthly",
-        "source": "job_postings:all",
-        "config": {"skip_recent_hours": 600},
-        "frequency": ScheduleFrequency.MONTHLY,
-        "hour": 14,
-        "day_of_month": 1,
-        "description": "Monthly job postings refresh — leading economic indicator",
-        "priority": 4,
-    },
+    # "Job Postings All Sources - Monthly" (job_postings:all) removed 2026-10-02: the old run is
+    # retired (SPEC_152). Its successor ats_boards is not scheduled (owner call).
     {
         "name": "BEA GDP/Income - Monthly",
         "source": "bea",

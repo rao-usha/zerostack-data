@@ -48,7 +48,7 @@ BATCH_SCHEDULED_DISPATCH = frozenset({
     "treasury", "fred", "eia", "cftc_cot", "noaa",
     "bea", "bls", "eia:electricity", "eia:natural_gas", "fema", "fdic", "sec:formadv",
     "fbi_crime", "irs_soi", "data_commons:us_states", "fcc_broadband:all_states",
-    "job_postings:all",
+    # "job_postings:all" retired 2026-10-02 (SPEC_152) -> job_postings is archival
     "census", "bea:regional", "uspto", "us_trade:summary", "bts",
     "international_econ:worldbank_countries", "realestate", "usda:annual_summary",
 })

@@ -3,8 +3,437 @@
     "cik": "1988828",
     "ats": "ashby",
     "token": "geniusai",
-    "aliases": ["Genius"],
+    "aliases": [
+      "Genius"
+    ],
     "citation": "Workbench PE-TARGETS-DEPTH-PLAN.md (2026-09-29 pilot probe): 'Genius (Ashby board geniusai) has compensation on 14 of 18'; glossgenius.com/careers redirects to genius.ai (rebrand). The board is still verified on the postings before use.",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 201,
+    "company_name": "Affirm",
+    "ats": "greenhouse",
+    "token": "affirm",
+    "verified": {
+      "rule": "greenhouse_board_name",
+      "on": "2026-10-02",
+      "board_name": "Affirm"
+    },
+    "citation": "SPEC_152 migration from the retired job_postings:all run (company_ats_config token). Verified by the ats_boards lane through open_web (robots + terms gated) in the 2026-10-02 dry run: Greenhouse board name 'Affirm' equals the company name.",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 171,
+    "company_name": "Airtable",
+    "ats": "greenhouse",
+    "token": "airtable",
+    "verified": {
+      "rule": "greenhouse_board_name",
+      "on": "2026-10-02",
+      "board_name": "Airtable"
+    },
+    "citation": "SPEC_152 migration from the retired job_postings:all run (company_ats_config token). Verified by the ats_boards lane through open_web (robots + terms gated) in the 2026-10-02 dry run: Greenhouse board name 'Airtable' equals the company name.",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 170,
+    "company_name": "Brex",
+    "ats": "greenhouse",
+    "token": "brex",
+    "verified": {
+      "rule": "greenhouse_board_name",
+      "on": "2026-10-02",
+      "board_name": "Brex"
+    },
+    "citation": "SPEC_152 migration from the retired job_postings:all run (company_ats_config token). Verified by the ats_boards lane through open_web (robots + terms gated) in the 2026-10-02 dry run: Greenhouse board name 'Brex' equals the company name.",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 191,
+    "company_name": "Canonical",
+    "ats": "greenhouse",
+    "token": "canonical",
+    "verified": {
+      "rule": "greenhouse_board_name",
+      "on": "2026-10-02",
+      "board_name": "Canonical"
+    },
+    "citation": "SPEC_152 migration from the retired job_postings:all run (company_ats_config token). Verified by the ats_boards lane through open_web (robots + terms gated) in the 2026-10-02 dry run: Greenhouse board name 'Canonical' equals the company name.",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 160,
+    "company_name": "Cloudflare",
+    "ats": "greenhouse",
+    "token": "cloudflare",
+    "verified": {
+      "rule": "greenhouse_board_name",
+      "on": "2026-10-02",
+      "board_name": "Cloudflare"
+    },
+    "citation": "SPEC_152 migration from the retired job_postings:all run (company_ats_config token). Verified by the ats_boards lane through open_web (robots + terms gated) in the 2026-10-02 dry run: Greenhouse board name 'Cloudflare' equals the company name.",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 190,
+    "company_name": "Cockroach Labs",
+    "ats": "greenhouse",
+    "token": "cockroachlabs",
+    "verified": {
+      "rule": "greenhouse_board_name",
+      "on": "2026-10-02",
+      "board_name": "Cockroach Labs"
+    },
+    "citation": "SPEC_152 migration from the retired job_postings:all run (company_ats_config token). Verified by the ats_boards lane through open_web (robots + terms gated) in the 2026-10-02 dry run: Greenhouse board name 'Cockroach Labs' equals the company name.",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 173,
+    "company_name": "Coinbase",
+    "ats": "greenhouse",
+    "token": "coinbase",
+    "verified": {
+      "rule": "greenhouse_board_name",
+      "on": "2026-10-02",
+      "board_name": "Coinbase"
+    },
+    "citation": "SPEC_152 migration from the retired job_postings:all run (company_ats_config token). Verified by the ats_boards lane through open_web (robots + terms gated) in the 2026-10-02 dry run: Greenhouse board name 'Coinbase' equals the company name.",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 172,
+    "company_name": "Databricks",
+    "ats": "greenhouse",
+    "token": "databricks",
+    "verified": {
+      "rule": "greenhouse_board_name",
+      "on": "2026-10-02",
+      "board_name": "Databricks"
+    },
+    "citation": "SPEC_152 migration from the retired job_postings:all run (company_ats_config token). Verified by the ats_boards lane through open_web (robots + terms gated) in the 2026-10-02 dry run: Greenhouse board name 'Databricks' equals the company name.",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 166,
+    "company_name": "Datadog",
+    "ats": "greenhouse",
+    "token": "datadog",
+    "verified": {
+      "rule": "greenhouse_board_name",
+      "on": "2026-10-02",
+      "board_name": "Datadog"
+    },
+    "citation": "SPEC_152 migration from the retired job_postings:all run (company_ats_config token). Verified by the ats_boards lane through open_web (robots + terms gated) in the 2026-10-02 dry run: Greenhouse board name 'Datadog' equals the company name.",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 162,
+    "company_name": "Discord",
+    "ats": "greenhouse",
+    "token": "discord",
+    "verified": {
+      "rule": "greenhouse_board_name",
+      "on": "2026-10-02",
+      "board_name": "Discord"
+    },
+    "citation": "SPEC_152 migration from the retired job_postings:all run (company_ats_config token). Verified by the ats_boards lane through open_web (robots + terms gated) in the 2026-10-02 dry run: Greenhouse board name 'Discord' equals the company name.",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 193,
+    "company_name": "Elastic",
+    "ats": "greenhouse",
+    "token": "elastic",
+    "verified": {
+      "rule": "greenhouse_board_name",
+      "on": "2026-10-02",
+      "board_name": "Elastic"
+    },
+    "citation": "SPEC_152 migration from the retired job_postings:all run (company_ats_config token). Verified by the ats_boards lane through open_web (robots + terms gated) in the 2026-10-02 dry run: Greenhouse board name 'Elastic' equals the company name.",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 164,
+    "company_name": "Figma",
+    "ats": "greenhouse",
+    "token": "figma",
+    "verified": {
+      "rule": "greenhouse_board_name",
+      "on": "2026-10-02",
+      "board_name": "Figma"
+    },
+    "citation": "SPEC_152 migration from the retired job_postings:all run (company_ats_config token). Verified by the ats_boards lane through open_web (robots + terms gated) in the 2026-10-02 dry run: Greenhouse board name 'Figma' equals the company name.",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 194,
+    "company_name": "GitLab",
+    "ats": "greenhouse",
+    "token": "gitlab",
+    "verified": {
+      "rule": "greenhouse_board_name",
+      "on": "2026-10-02",
+      "board_name": "GitLab"
+    },
+    "citation": "SPEC_152 migration from the retired job_postings:all run (company_ats_config token). Verified by the ats_boards lane through open_web (robots + terms gated) in the 2026-10-02 dry run: Greenhouse board name 'GitLab' equals the company name.",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 199,
+    "company_name": "Gusto",
+    "ats": "greenhouse",
+    "token": "gusto",
+    "verified": {
+      "rule": "greenhouse_board_name",
+      "on": "2026-10-02",
+      "board_name": "Gusto, Inc."
+    },
+    "citation": "SPEC_152 migration from the retired job_postings:all run (company_ats_config token). Verified by the ats_boards lane through open_web (robots + terms gated) in the 2026-10-02 dry run: Greenhouse board name 'Gusto, Inc.' equals the company name.",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 186,
+    "company_name": "Lyft",
+    "ats": "greenhouse",
+    "token": "lyft",
+    "verified": {
+      "rule": "greenhouse_board_name",
+      "on": "2026-10-02",
+      "board_name": "Lyft"
+    },
+    "citation": "SPEC_152 migration from the retired job_postings:all run (company_ats_config token). Verified by the ats_boards lane through open_web (robots + terms gated) in the 2026-10-02 dry run: Greenhouse board name 'Lyft' equals the company name.",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 192,
+    "company_name": "MongoDB",
+    "ats": "greenhouse",
+    "token": "mongodb",
+    "verified": {
+      "rule": "greenhouse_board_name",
+      "on": "2026-10-02",
+      "board_name": "MongoDB"
+    },
+    "citation": "SPEC_152 migration from the retired job_postings:all run (company_ats_config token). Verified by the ats_boards lane through open_web (robots + terms gated) in the 2026-10-02 dry run: Greenhouse board name 'MongoDB' equals the company name.",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 196,
+    "company_name": "New Relic",
+    "ats": "greenhouse",
+    "token": "newrelic",
+    "verified": {
+      "rule": "greenhouse_board_name",
+      "on": "2026-10-02",
+      "board_name": "New Relic"
+    },
+    "citation": "SPEC_152 migration from the retired job_postings:all run (company_ats_config token). Verified by the ats_boards lane through open_web (robots + terms gated) in the 2026-10-02 dry run: Greenhouse board name 'New Relic' equals the company name.",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 185,
+    "company_name": "Pinterest",
+    "ats": "greenhouse",
+    "token": "pinterest",
+    "verified": {
+      "rule": "greenhouse_board_name",
+      "on": "2026-10-02",
+      "board_name": "Pinterest"
+    },
+    "citation": "SPEC_152 migration from the retired job_postings:all run (company_ats_config token). Verified by the ats_boards lane through open_web (robots + terms gated) in the 2026-10-02 dry run: Greenhouse board name 'Pinterest' equals the company name.",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 203,
+    "company_name": "Reddit",
+    "ats": "greenhouse",
+    "token": "reddit",
+    "verified": {
+      "rule": "greenhouse_board_name",
+      "on": "2026-10-02",
+      "board_name": "Reddit"
+    },
+    "citation": "SPEC_152 migration from the retired job_postings:all run (company_ats_config token). Verified by the ats_boards lane through open_web (robots + terms gated) in the 2026-10-02 dry run: Greenhouse board name 'Reddit' equals the company name.",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 198,
+    "company_name": "Squarespace",
+    "ats": "greenhouse",
+    "token": "squarespace",
+    "verified": {
+      "rule": "greenhouse_board_name",
+      "on": "2026-10-02",
+      "board_name": "Squarespace"
+    },
+    "citation": "SPEC_152 migration from the retired job_postings:all run (company_ats_config token). Verified by the ats_boards lane through open_web (robots + terms gated) in the 2026-10-02 dry run: Greenhouse board name 'Squarespace' equals the company name.",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 161,
+    "company_name": "Stripe",
+    "ats": "greenhouse",
+    "token": "stripe",
+    "verified": {
+      "rule": "greenhouse_board_name",
+      "on": "2026-10-02",
+      "board_name": "Stripe"
+    },
+    "citation": "SPEC_152 migration from the retired job_postings:all run (company_ats_config token). Verified by the ats_boards lane through open_web (robots + terms gated) in the 2026-10-02 dry run: Greenhouse board name 'Stripe' equals the company name.",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 184,
+    "company_name": "Twitch",
+    "ats": "greenhouse",
+    "token": "twitch",
+    "verified": {
+      "rule": "greenhouse_board_name",
+      "on": "2026-10-02",
+      "board_name": "Twitch"
+    },
+    "citation": "SPEC_152 migration from the retired job_postings:all run (company_ats_config token). Verified by the ats_boards lane through open_web (robots + terms gated) in the 2026-10-02 dry run: Greenhouse board name 'Twitch' equals the company name.",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 292,
+    "company_name": "Match Group",
+    "ats": "lever",
+    "token": "matchgroup",
+    "verified": {
+      "rule": "name_in_postings",
+      "on": "2026-10-02",
+      "mentions": 38,
+      "postings": 71
+    },
+    "citation": "SPEC_152 migration from the retired job_postings:all run (company_ats_config token). Verified by the ats_boards lane through open_web (robots + terms gated) in the 2026-10-02 dry run: company name in 38 of 71 postings.",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 295,
+    "company_name": "Olo",
+    "ats": "lever",
+    "token": "olo",
+    "verified": {
+      "rule": "name_in_postings",
+      "on": "2026-10-02",
+      "mentions": 13,
+      "postings": 13
+    },
+    "citation": "SPEC_152 migration from the retired job_postings:all run (company_ats_config token). Verified by the ats_boards lane through open_web (robots + terms gated) in the 2026-10-02 dry run: company name in 13 of 13 postings.",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 291,
+    "company_name": "Palantir",
+    "ats": "lever",
+    "token": "palantir",
+    "verified": {
+      "rule": "name_in_postings",
+      "on": "2026-10-02",
+      "mentions": 319,
+      "postings": 319
+    },
+    "citation": "SPEC_152 migration from the retired job_postings:all run (company_ats_config token). Verified by the ats_boards lane through open_web (robots + terms gated) in the 2026-10-02 dry run: company name in 319 of 319 postings.",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 178,
+    "company_name": "Anthropic",
+    "ats": "ashby",
+    "token": "anthropic",
+    "blocked": "robots_401: api.ashbyhq.com/robots.txt answers 401 to every agent; open_web treats 401/403 as disallow-all; owner decision 2026-10-02: Ashby stays blocked, no override",
+    "citation": "SPEC_152: company_ats_config token from the retired job_postings:all run; not migrated. Robots answer measured 2026-10-02 (SPEC_151 pilot: 1 robots request, 0 API requests).",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 232,
+    "company_name": "Cursor",
+    "ats": "ashby",
+    "token": "anysphere",
+    "blocked": "robots_401: api.ashbyhq.com/robots.txt answers 401 to every agent; open_web treats 401/403 as disallow-all; owner decision 2026-10-02: Ashby stays blocked, no override",
+    "citation": "SPEC_152: company_ats_config token from the retired job_postings:all run; not migrated. Robots answer measured 2026-10-02 (SPEC_151 pilot: 1 robots request, 0 API requests).",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 168,
+    "company_name": "Linear",
+    "ats": "ashby",
+    "token": "linear",
+    "blocked": "robots_401: api.ashbyhq.com/robots.txt answers 401 to every agent; open_web treats 401/403 as disallow-all; owner decision 2026-10-02: Ashby stays blocked, no override",
+    "citation": "SPEC_152: company_ats_config token from the retired job_postings:all run; not migrated. Robots answer measured 2026-10-02 (SPEC_151 pilot: 1 robots request, 0 API requests).",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 233,
+    "company_name": "Mistral AI",
+    "ats": "ashby",
+    "token": "mistralai",
+    "blocked": "robots_401: api.ashbyhq.com/robots.txt answers 401 to every agent; open_web treats 401/403 as disallow-all; owner decision 2026-10-02: Ashby stays blocked, no override",
+    "citation": "SPEC_152: company_ats_config token from the retired job_postings:all run; not migrated. Robots answer measured 2026-10-02 (SPEC_151 pilot: 1 robots request, 0 API requests).",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 167,
+    "company_name": "Notion",
+    "ats": "ashby",
+    "token": "notion",
+    "blocked": "robots_401: api.ashbyhq.com/robots.txt answers 401 to every agent; open_web treats 401/403 as disallow-all; owner decision 2026-10-02: Ashby stays blocked, no override",
+    "citation": "SPEC_152: company_ats_config token from the retired job_postings:all run; not migrated. Robots answer measured 2026-10-02 (SPEC_151 pilot: 1 robots request, 0 API requests).",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 175,
+    "company_name": "OpenAI",
+    "ats": "ashby",
+    "token": "openai",
+    "blocked": "robots_401: api.ashbyhq.com/robots.txt answers 401 to every agent; open_web treats 401/403 as disallow-all; owner decision 2026-10-02: Ashby stays blocked, no override",
+    "citation": "SPEC_152: company_ats_config token from the retired job_postings:all run; not migrated. Robots answer measured 2026-10-02 (SPEC_151 pilot: 1 robots request, 0 API requests).",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 163,
+    "company_name": "Ramp",
+    "ats": "ashby",
+    "token": "ramp",
+    "blocked": "robots_401: api.ashbyhq.com/robots.txt answers 401 to every agent; open_web treats 401/403 as disallow-all; owner decision 2026-10-02: Ashby stays blocked, no override",
+    "citation": "SPEC_152: company_ats_config token from the retired job_postings:all run; not migrated. Robots answer measured 2026-10-02 (SPEC_151 pilot: 1 robots request, 0 API requests).",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 228,
+    "company_name": "Rippling",
+    "ats": "ashby",
+    "token": "rippling",
+    "blocked": "robots_401: api.ashbyhq.com/robots.txt answers 401 to every agent; open_web treats 401/403 as disallow-all; owner decision 2026-10-02: Ashby stays blocked, no override",
+    "citation": "SPEC_152: company_ats_config token from the retired job_postings:all run; not migrated. Robots answer measured 2026-10-02 (SPEC_151 pilot: 1 robots request, 0 API requests).",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 226,
+    "company_name": "Supabase",
+    "ats": "ashby",
+    "token": "supabase",
+    "blocked": "robots_401: api.ashbyhq.com/robots.txt answers 401 to every agent; open_web treats 401/403 as disallow-all; owner decision 2026-10-02: Ashby stays blocked, no override",
+    "citation": "SPEC_152: company_ats_config token from the retired job_postings:all run; not migrated. Robots answer measured 2026-10-02 (SPEC_151 pilot: 1 robots request, 0 API requests).",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 229,
+    "company_name": "Vanta",
+    "ats": "ashby",
+    "token": "vanta",
+    "blocked": "robots_401: api.ashbyhq.com/robots.txt answers 401 to every agent; open_web treats 401/403 as disallow-all; owner decision 2026-10-02: Ashby stays blocked, no override",
+    "citation": "SPEC_152: company_ats_config token from the retired job_postings:all run; not migrated. Robots answer measured 2026-10-02 (SPEC_151 pilot: 1 robots request, 0 API requests).",
+    "recorded": "2026-10-02"
+  },
+  {
+    "industrial_company_id": 231,
+    "company_name": "Weights & Biases",
+    "ats": "ashby",
+    "token": "wandb",
+    "blocked": "robots_401: api.ashbyhq.com/robots.txt answers 401 to every agent; open_web treats 401/403 as disallow-all; owner decision 2026-10-02: Ashby stays blocked, no override",
+    "citation": "SPEC_152: company_ats_config token from the retired job_postings:all run; not migrated. Robots answer measured 2026-10-02 (SPEC_151 pilot: 1 robots request, 0 API requests).",
     "recorded": "2026-10-02"
   }
 ]

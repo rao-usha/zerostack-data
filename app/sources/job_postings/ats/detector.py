@@ -2,6 +2,11 @@
 ATS (Applicant Tracking System) detector.
 
 Discovers which ATS a company uses from their careers URL or website.
+
+RETIRED (SPEC_152, 2026-10-02): ``detect`` requested company websites with no robots.txt or
+terms check. It now refuses before any request; board tokens come from the gated
+``app.sources.ats_boards`` lane (held data + cited seeds, verified through ``open_web``).
+The pattern tables stay importable.
 """
 
 import asyncio
@@ -12,6 +17,8 @@ from typing import Optional
 from urllib.parse import urlparse
 
 import httpx
+
+from app.sources.job_postings.retired import DETECTOR_RETIRED, OldLaneRetired
 
 logger = logging.getLogger(__name__)
 
@@ -121,8 +128,11 @@ class ATSDetector:
         1. If careers_url is provided, check URL patterns first
         2. Try common career URL paths on the website domain
         3. Match HTML signatures on the discovered page
+
+        Refused (SPEC_152): no request is made.
         """
-        try:
+        raise OldLaneRetired(DETECTOR_RETIRED)
+        try:  # unreachable: the retired, ungated strategy, kept for the record
             # Phase 1: try the provided careers URL
             if careers_url:
                 result = self._match_url_patterns(careers_url)

@@ -103,7 +103,9 @@ TIER_3 = Tier(
         SourceDef("data_commons:us_states"),
         SourceDef("fcc_broadband:all_states"),
         # app_rankings — no ingest function implemented yet
-        SourceDef("job_postings:all", {"skip_recent_hours": 600}),
+        # job_postings:all retired 2026-10-02 (SPEC_152): it fetched Ashby despite robots.txt 401
+        # and its ATS detector hit company websites ungated. Successor: ats_boards (not scheduled;
+        # owner call). The live DB also carries a batch_source_tier_overrides row (enabled=false).
     ],
 )
 
@@ -211,7 +213,7 @@ DEFAULT_COLLECTION_GROUPS = [
      "sources": ["eia", "cftc_cot", "noaa"]},
     {"name": "government", "description": "Monthly government releases and regulatory filings", "priority": 5, "max_concurrent": 4,
      "sources": ["bea", "bls", "fema", "fdic", "sec:formadv", "fbi_crime", "irs_soi",
-                  "data_commons:us_states", "fcc_broadband:all_states", "job_postings:all"]},
+                  "data_commons:us_states", "fcc_broadband:all_states"]},  # job_postings:all retired (SPEC_152)
     {"name": "deep", "description": "Quarterly Census, SEC, trade, and slow-moving data", "priority": 8, "max_concurrent": 3,
      "sources": ["census", "uspto", "us_trade:summary", "bts", "international_econ:worldbank_countries",
                   "realestate", "usda:annual_summary"]},

@@ -1,10 +1,15 @@
 """
 ATS boards -- job-path entry point and company loading (SPEC_151).
 
-Dispatch key ``ats_boards`` (app/api/v1/jobs.py). Config: ``preset`` ("pilot"), ``ciks``,
+Dispatch key ``ats_boards`` (app/api/v1/jobs.py). Config: ``preset`` ("pilot" | "migrated"), ``ciks``,
 ``industrial_ids`` (comma-separated or lists), ``apply`` (default False: a dry run that
 writes nothing). The job FAILS (raises) when no board could be fetched at all, so a lane
 that collected nothing never reports success.
+
+Preset ``migrated`` (SPEC_152): the retired ``job_postings:all`` run's Greenhouse / Lever companies
+whose board this lane verified (seeds keyed by ``industrial_company_id``); the seeded token only,
+no slug discovery. Seeds with ``blocked`` (Ashby: robots.txt 401) are never offered to the
+fetcher; ``record_blocked`` records them as ``ats_board.status = 'refused'`` without a request.
 """
 
 from __future__ import annotations
@@ -39,6 +44,33 @@ def _list(v: Union[None, str, Sequence[Any]]) -> List[str]:
     return [str(x).strip() for x in v if str(x).strip()]
 
 
+def migrated_industrial_ids(path: Path = SEEDS_PATH) -> List[int]:
+    """SPEC_152: industrial companies moved over from the retired job_postings:all run."""
+    return sorted({int(s["industrial_company_id"]) for s in load_seeds(path)
+                   if s.get("industrial_company_id") and not s.get("blocked")})
+
+
+def _blocked_keys(seeds: Sequence[Dict[str, Any]]) -> set:
+    return {(s["ats"], s["token"].lower()) for s in seeds if s.get("blocked")}
+
+
+def record_blocked(db, apply: bool = False, path: Path = SEEDS_PATH) -> int:
+    """SPEC_152: write each blocked seed as an ``ats_board`` row with status ``refused`` (no request is
+    made; the reason and its measurement are the evidence). Dry run writes nothing. Returns the count."""
+    blocked = [s for s in load_seeds(path) if s.get("blocked")]
+    if not apply:
+        return len(blocked)
+    for s in blocked:
+        db.execute(collect._BOARD_UPSERT, {
+            "ats": s["ats"], "token": s["token"], "name": s.get("company_name") or s["token"],
+            "eid": None, "cik": s.get("cik"), "iid": s.get("industrial_company_id"), "basis": "seed",
+            "evidence": json.dumps({"blocked": s["blocked"], "citation": s["citation"]}),
+            "status": "refused", "citation": None, "fetched_at": None, "outcome": "robots_disallowed",
+        })
+    db.commit()
+    return len(blocked)
+
+
 def load_seeds(path: Path = SEEDS_PATH) -> List[Dict[str, Any]]:
     seeds = json.loads(Path(path).read_text(encoding="utf-8"))
     for s in seeds:
@@ -71,12 +103,15 @@ def _aliases(db, entity_id: int) -> List[str]:
 def _companies(db, preset: Optional[str] = None, ciks=None, industrial_ids=None) -> List[Company]:
     cik_list = _list(ciks)
     ind_list = [int(x) for x in _list(industrial_ids)]
+    seeds = load_seeds()
     if preset == "pilot":
         cik_list += [c for c in PILOT_CIKS if c not in cik_list]
         ind_list += [i for i in PILOT_INDUSTRIAL_IDS if i not in ind_list]
+    elif preset == "migrated":
+        ind_list += [i for i in migrated_industrial_ids() if i not in ind_list]
     elif preset:
         raise ValueError(f"unknown preset {preset!r}")
-    seeds = load_seeds()
+    blocked = _blocked_keys(seeds)
     out: List[Company] = []
     for cik in cik_list:
         row = _entity_by_cik(db, cik)
@@ -102,17 +137,24 @@ def _companies(db, preset: Optional[str] = None, ciks=None, industrial_ids=None)
         out.append(co)
     for co in out:
         for s in seeds:
+            if s.get("blocked"):
+                continue
             if (s.get("cik") and s["cik"] == co.cik) or (
                     s.get("industrial_company_id") and s["industrial_company_id"] == co.industrial_company_id):
-                co.tokens.append((s["ats"], s["token"], "seed", {"citation": s["citation"]}))
+                ev = {"citation": s["citation"]}
+                if s.get("verified"):
+                    ev["verified"] = s["verified"]
+                co.tokens.append((s["ats"], s["token"], "seed", ev))
                 co.aliases += [a for a in s.get("aliases") or [] if a not in co.aliases]
+        # SPEC_152: a blocked board (Ashby, robots 401) is never offered to the fetcher
+        co.tokens = [t for t in co.tokens if (t[0], t[1].lower()) not in blocked]
     return out
 
 
 async def ingest_ats_boards(db, job_id: Optional[int] = None, preset: Optional[str] = None, ciks=None,
                             industrial_ids=None, apply: bool = False, **config) -> Dict[str, Any]:
     companies = _companies(db, preset=preset, ciks=ciks, industrial_ids=industrial_ids)
-    rep = collect.run(db, companies, apply=bool(apply))
+    rep = collect.run(db, companies, apply=bool(apply), slugs=preset != "migrated")
     logger.info(f"ats_boards job {job_id}: {rep['boards_fetched']} boards fetched of {len(companies)} companies, "
                 f"{len(rep['attempts'])} attempts, apply={bool(apply)}")
     if rep["boards_fetched"] == 0:

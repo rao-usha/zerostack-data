@@ -2,7 +2,7 @@
 Job Posting Intelligence API endpoints.
 
 Provides endpoints for:
-- Job posting collection triggers (single company, all, ATS discovery)
+- Job posting collection triggers (single company, all, ATS discovery) -- RETIRED, 410 (SPEC_152)
 - Querying postings with filters
 - Trend snapshots
 - ATS configuration listing
@@ -138,6 +138,13 @@ async def _run_discover_ats(db_factory, job_id: int, company_id: int):
         db.close()
 
 
+def _gone():
+    """SPEC_152: the old collection triggers are retired; reads stay."""
+    from app.sources.job_postings.retired import OLD_RUN_RETIRED
+
+    raise HTTPException(status_code=410, detail=OLD_RUN_RETIRED)
+
+
 def _create_job(db: Session, source: str, config: dict) -> IngestionJob:
     job = IngestionJob(
         source=source,
@@ -162,7 +169,8 @@ async def collect_company(
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
 ):
-    """Collect job postings for a single company."""
+    """RETIRED (SPEC_152): 410 Gone -- the old collector had no robots/terms gate."""
+    _gone()
     job = _create_job(db, "job_postings", {"company_id": company_id, "force_rediscover": body.force_rediscover})
 
     from app.core.database import get_session_factory
@@ -185,7 +193,8 @@ async def collect_all(
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
 ):
-    """Collect job postings for all companies with websites."""
+    """RETIRED (SPEC_152): 410 Gone -- the old collector had no robots/terms gate."""
+    _gone()
     job = _create_job(db, "job_postings", {"limit": body.limit, "skip_recent_hours": body.skip_recent_hours})
 
     from app.core.database import get_session_factory
@@ -208,7 +217,8 @@ async def discover_ats(
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
 ):
-    """Discover ATS type for a company (no job collection)."""
+    """RETIRED (SPEC_152): 410 Gone -- website ATS detection had no robots/terms gate."""
+    _gone()
     job = _create_job(db, "job_postings", {"company_id": company_id})
 
     from app.core.database import get_session_factory

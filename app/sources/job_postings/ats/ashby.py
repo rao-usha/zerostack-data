@@ -3,12 +3,18 @@ Ashby public job board API client.
 
 API: GET https://api.ashbyhq.com/posting-api/job-board/{boardName}
 No authentication required.
+
+RETIRED (SPEC_152, 2026-10-02): api.ashbyhq.com/robots.txt answers 401, which NexData treats as
+disallow-all; the owner declined an override. ``fetch_jobs`` refuses before any request.
+``normalize_job`` stays for reading stored rows.
 """
 
 import logging
 from typing import Optional
 
 import httpx
+
+from app.sources.job_postings.retired import ASHBY_BLOCKED, OldLaneRetired
 
 logger = logging.getLogger(__name__)
 
@@ -36,13 +42,8 @@ class AshbyClient:
             self._client = None
 
     async def fetch_jobs(self, board_name: str) -> list[dict]:
-        """Fetch all jobs from an Ashby board."""
-        client = await self._get_client()
-        url = f"{self.BASE_URL}/{board_name}"
-        resp = await client.get(url, params={"includeCompensation": "true"})
-        resp.raise_for_status()
-        data = resp.json()
-        return data.get("jobs", [])
+        """Refused (SPEC_152): Ashby's robots.txt answers 401 = disallow-all. No request is made."""
+        raise OldLaneRetired(ASHBY_BLOCKED)
 
     def normalize_job(self, raw: dict, board_name: str) -> dict:
         """Map Ashby fields to our unified schema."""
