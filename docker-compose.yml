@@ -122,6 +122,14 @@ services:
       BROWSER_HEADED: ${BROWSER_HEADED:-0}
       # Set to "1" to route jobs through the queue instead of BackgroundTasks
       WORKER_MODE: ${WORKER_MODE:-1}
+      # SPEC_160: one scheduler. 0 = this api never runs APScheduler jobs; with
+      # 1, only the process holding the Postgres leader lock does.
+      RUN_SCHEDULER: ${RUN_SCHEDULER:-1}
+      # standby retry / leader re-check (s); a new leader waits check + 10 s
+      SCHEDULER_LEADER_RETRY_SECONDS: ${SCHEDULER_LEADER_RETRY_SECONDS:-120}
+      SCHEDULER_LEADER_CHECK_SECONDS: ${SCHEDULER_LEADER_CHECK_SECONDS:-30}
+      DB_POOL_SIZE: ${API_DB_POOL_SIZE:-5}
+      DB_MAX_OVERFLOW: ${API_DB_MAX_OVERFLOW:-10}
       # Data watchdog (SPEC_128): Slack-compatible webhook + dead-man's ping URL
       ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
       HEARTBEAT_PING_URL: ${HEARTBEAT_PING_URL:-}
@@ -179,6 +187,9 @@ services:
       WORKER_MODE: "1"
       WORKER_POLL_INTERVAL: "2.0"
       WORKER_MAX_CONCURRENT: "6"
+      # SPEC_160: per-worker pool (worst case = workers x (size + overflow))
+      DB_POOL_SIZE: ${WORKER_DB_POOL_SIZE:-5}
+      DB_MAX_OVERFLOW: ${WORKER_DB_MAX_OVERFLOW:-10}
       MAX_CONCURRENCY: 4
       LOG_LEVEL: INFO
     depends_on:  # see api

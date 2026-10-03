@@ -249,147 +249,21 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+def _register_scheduled_jobs() -> None:
+    """Register every APScheduler job the app runs (SPEC_160: leader only).
+
+    Called by the scheduler leader runtime when this process is elected,
+    never directly from the lifespan, so a standby or a RUN_SCHEDULER=0
+    process registers nothing. Idempotent (replace_existing): it runs again
+    after a re-election.
+
+    The five PE/report jobs below are closures, which APScheduler cannot
+    serialize into the SQLAlchemy job store; they have never registered
+    ("This Job cannot be serialized") and are kept as they were.
     """
-    Application lifespan context manager.
-
-    Runs on startup and shutdown.
-    """
-    # Startup
-    settings = get_settings()
-    logger.info("Starting External Data Ingestion Service")
-    logger.info(f"Log level: {settings.log_level}")
-    logger.info(f"Max concurrency: {settings.max_concurrency}")
-
-    # SPEC_146: every httpx request to *.sec.gov from this process goes through
-    # the one cross-process SEC fair-access gate (rate, Retry-After, breaker, UA)
-    from app.core.sec_gate import install as install_sec_gate
-    install_sec_gate()
-
-    # Apply Alembic migrations first (advisory-locked; never blocks startup)
-    from app.core.migrate import run_migrations
-    run_migrations()
-
-    # Ensure all tables exist (create_all is idempotent — skips existing tables)
-    try:
-        from app.core.database import get_engine, create_tables
-        engine = get_engine()
-        create_tables(engine)
-        logger.info("Database tables verified via create_all()")
-        # A failed migration must not leave ORM-mapped columns missing (SPEC_124)
-        from app.core.migrate import verify_mapped_columns
-        verify_mapped_columns(engine)
-    except Exception as e:
-        logger.error(f"create_tables failed: {e}")
-        raise
-
-    # dataset_registry is a generated mirror of the dataset catalog (SPEC_123).
-    # Idempotent; never deletes rows. A failure must not block startup.
-    try:
-        from app.catalog.mirror import sync_dataset_registry
-        sync_dataset_registry(engine)
-    except Exception as e:
-        logger.warning(f"dataset catalog mirror sync skipped: {e}")
-
-    # --- Batch metadata columns on ingestion_jobs ---
-    try:
-        from app.core.database import get_engine
-        from sqlalchemy import text as sa_text
-
-        engine = get_engine()
-        with engine.begin() as conn:
-            # Add new columns (idempotent)
-            conn.execute(sa_text(
-                "ALTER TABLE ingestion_jobs ADD COLUMN IF NOT EXISTS "
-                "batch_run_id VARCHAR(50)"
-            ))
-            conn.execute(sa_text(
-                "ALTER TABLE ingestion_jobs ADD COLUMN IF NOT EXISTS "
-                "trigger VARCHAR(20)"
-            ))
-            conn.execute(sa_text(
-                "ALTER TABLE ingestion_jobs ADD COLUMN IF NOT EXISTS "
-                "tier INTEGER"
-            ))
-
-            # Partial index on batch_run_id (only non-null rows)
-            conn.execute(sa_text("""
-                CREATE INDEX IF NOT EXISTS ix_ingestion_jobs_batch_run_id
-                ON ingestion_jobs (batch_run_id)
-                WHERE batch_run_id IS NOT NULL
-            """))
-
-            # Rename legacy nightly_batch table → batch_runs (idempotent)
-            conn.execute(sa_text("""
-                DO $$
-                BEGIN
-                    IF EXISTS (SELECT 1 FROM information_schema.tables
-                               WHERE table_name = 'nightly_batch') THEN
-                        ALTER TABLE nightly_batch RENAME TO batch_runs;
-                    END IF;
-                END $$
-            """))
-
-            # Backfill from legacy batch_runs records
-            conn.execute(sa_text("""
-                UPDATE ingestion_jobs
-                SET batch_run_id = 'legacy_batch_' || nb.id::text,
-                    trigger = 'batch'
-                FROM batch_runs nb
-                WHERE ingestion_jobs.id = ANY(
-                    SELECT jsonb_array_elements_text(nb.job_ids::jsonb)::int
-                )
-                AND ingestion_jobs.batch_run_id IS NULL
-            """))
-
-            # Auto-resolve stale RUNNING jobs (>2 hours old)
-            conn.execute(sa_text("""
-                UPDATE ingestion_jobs
-                SET status = 'failed',
-                    error_message = 'Stale job auto-resolved on startup',
-                    completed_at = NOW()
-                WHERE status = 'running'
-                AND started_at < NOW() - INTERVAL '2 hours'
-            """))
-
-        logger.info("Batch metadata columns + backfill applied to ingestion_jobs")
-    except Exception as e:
-        logger.warning(f"Batch metadata migration skipped: {e}")
-
-    # --- SPEC_049 / PLAN_062 W1.C: synthetic-data prerequisite views ---
-    try:
-        from app.core.database import get_engine
-        from app.sources.sec.views import create_public_company_financials_view
-        from app.sources.fred.views import create_fred_observations_view
-
-        engine = get_engine()
-        create_public_company_financials_view(engine)
-        create_fred_observations_view(engine)
-    except Exception as e:
-        logger.warning(f"Synthetic-data prerequisite views skipped: {e}")
-
-    # --- PLAN_062 W2.1: synthetic_model provenance column on ingestion_jobs ---
-    try:
-        from app.core.database import get_engine
-        from sqlalchemy import text as sa_text
-
-        engine = get_engine()
-        with engine.begin() as conn:
-            conn.execute(sa_text(
-                "ALTER TABLE ingestion_jobs ADD COLUMN IF NOT EXISTS "
-                "synthetic_model VARCHAR(64) NULL"
-            ))
-        logger.info("ingestion_jobs.synthetic_model column ensured")
-    except Exception as e:
-        logger.warning(f"synthetic_model column migration skipped: {e}")
-
-    # Start scheduler (optional - can be started manually via API)
     try:
         from app.core import scheduler_service
         from app.core.database import get_session_factory
-
-        scheduler_service.start_scheduler()
 
         # The bulk SEC loaders and the marts that read them (SPEC_114/120).
         # Idempotent: existing schedules, even paused ones, are left alone.
@@ -800,7 +674,165 @@ async def lifespan(app: FastAPI):
             logger.warning(f"Failed to register Les Schwab report scheduler: {e}")
 
     except Exception as e:
-        logger.warning(f"Failed to start scheduler: {e}")
+        logger.warning(f"Failed to register scheduled jobs: {e}")
+
+    # Eval Builder scheduled runs — P1 daily, P2 weekly, P3 monthly
+    try:
+        from app.core.scheduler_service import get_scheduler
+        from app.services.eval_runner import scheduled_eval_p1, scheduled_eval_p2, scheduled_eval_p3
+        from apscheduler.triggers.cron import CronTrigger
+
+        sched = get_scheduler()
+        sched.add_job(scheduled_eval_p1, CronTrigger(hour=5, minute=0),
+                      id="eval_run_p1_daily", replace_existing=True)
+        sched.add_job(scheduled_eval_p2, CronTrigger(day_of_week="mon", hour=5, minute=30),
+                      id="eval_run_p2_weekly", replace_existing=True)
+        sched.add_job(scheduled_eval_p3, CronTrigger(day=1, hour=6, minute=0),
+                      id="eval_run_p3_monthly", replace_existing=True)
+        logger.info("Eval Builder scheduled: P1 daily 05:00, P2 weekly Mon 05:30, P3 monthly 1st 06:00")
+    except Exception as e:
+        logger.warning(f"Failed to register eval schedules: {e}")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Application lifespan context manager.
+
+    Runs on startup and shutdown.
+    """
+    # Startup
+    settings = get_settings()
+    logger.info("Starting External Data Ingestion Service")
+    logger.info(f"Log level: {settings.log_level}")
+    logger.info(f"Max concurrency: {settings.max_concurrency}")
+
+    # SPEC_146: every httpx request to *.sec.gov from this process goes through
+    # the one cross-process SEC fair-access gate (rate, Retry-After, breaker, UA)
+    from app.core.sec_gate import install as install_sec_gate
+    install_sec_gate()
+
+    # Apply Alembic migrations first (advisory-locked; never blocks startup)
+    from app.core.migrate import run_migrations
+    run_migrations()
+
+    # Ensure all tables exist (create_all is idempotent — skips existing tables)
+    try:
+        from app.core.database import get_engine, create_tables
+        engine = get_engine()
+        create_tables(engine)
+        logger.info("Database tables verified via create_all()")
+        # A failed migration must not leave ORM-mapped columns missing (SPEC_124)
+        from app.core.migrate import verify_mapped_columns
+        verify_mapped_columns(engine)
+    except Exception as e:
+        logger.error(f"create_tables failed: {e}")
+        raise
+
+    # dataset_registry is a generated mirror of the dataset catalog (SPEC_123).
+    # Idempotent; never deletes rows. A failure must not block startup.
+    try:
+        from app.catalog.mirror import sync_dataset_registry
+        sync_dataset_registry(engine)
+    except Exception as e:
+        logger.warning(f"dataset catalog mirror sync skipped: {e}")
+
+    # --- Batch metadata columns on ingestion_jobs ---
+    try:
+        from app.core.database import get_engine
+        from sqlalchemy import text as sa_text
+
+        engine = get_engine()
+        with engine.begin() as conn:
+            # Add new columns (idempotent)
+            conn.execute(sa_text(
+                "ALTER TABLE ingestion_jobs ADD COLUMN IF NOT EXISTS "
+                "batch_run_id VARCHAR(50)"
+            ))
+            conn.execute(sa_text(
+                "ALTER TABLE ingestion_jobs ADD COLUMN IF NOT EXISTS "
+                "trigger VARCHAR(20)"
+            ))
+            conn.execute(sa_text(
+                "ALTER TABLE ingestion_jobs ADD COLUMN IF NOT EXISTS "
+                "tier INTEGER"
+            ))
+
+            # Partial index on batch_run_id (only non-null rows)
+            conn.execute(sa_text("""
+                CREATE INDEX IF NOT EXISTS ix_ingestion_jobs_batch_run_id
+                ON ingestion_jobs (batch_run_id)
+                WHERE batch_run_id IS NOT NULL
+            """))
+
+            # Rename legacy nightly_batch table → batch_runs (idempotent)
+            conn.execute(sa_text("""
+                DO $$
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM information_schema.tables
+                               WHERE table_name = 'nightly_batch') THEN
+                        ALTER TABLE nightly_batch RENAME TO batch_runs;
+                    END IF;
+                END $$
+            """))
+
+            # Backfill from legacy batch_runs records
+            conn.execute(sa_text("""
+                UPDATE ingestion_jobs
+                SET batch_run_id = 'legacy_batch_' || nb.id::text,
+                    trigger = 'batch'
+                FROM batch_runs nb
+                WHERE ingestion_jobs.id = ANY(
+                    SELECT jsonb_array_elements_text(nb.job_ids::jsonb)::int
+                )
+                AND ingestion_jobs.batch_run_id IS NULL
+            """))
+
+            # The stale RUNNING-job resolver that used to run here on every
+            # API start is leader-only now (SPEC_160):
+            # scheduler_leader.resolve_stale_running_jobs.
+
+        logger.info("Batch metadata columns + backfill applied to ingestion_jobs")
+    except Exception as e:
+        logger.warning(f"Batch metadata migration skipped: {e}")
+
+    # --- SPEC_049 / PLAN_062 W1.C: synthetic-data prerequisite views ---
+    try:
+        from app.core.database import get_engine
+        from app.sources.sec.views import create_public_company_financials_view
+        from app.sources.fred.views import create_fred_observations_view
+
+        engine = get_engine()
+        create_public_company_financials_view(engine)
+        create_fred_observations_view(engine)
+    except Exception as e:
+        logger.warning(f"Synthetic-data prerequisite views skipped: {e}")
+
+    # --- PLAN_062 W2.1: synthetic_model provenance column on ingestion_jobs ---
+    try:
+        from app.core.database import get_engine
+        from sqlalchemy import text as sa_text
+
+        engine = get_engine()
+        with engine.begin() as conn:
+            conn.execute(sa_text(
+                "ALTER TABLE ingestion_jobs ADD COLUMN IF NOT EXISTS "
+                "synthetic_model VARCHAR(64) NULL"
+            ))
+        logger.info("ingestion_jobs.synthetic_model column ensured")
+    except Exception as e:
+        logger.warning(f"synthetic_model column migration skipped: {e}")
+
+    # Scheduler (SPEC_160): every process starts APScheduler paused (so API
+    # schedule edits still reach the shared job store). Only a RUN_SCHEDULER=1
+    # process that holds the Postgres leader lock resolves stale RUNNING jobs,
+    # registers the jobs (_register_scheduled_jobs) and lets them fire.
+    try:
+        from app.core.scheduler_leader import start_scheduler_runtime
+
+        await start_scheduler_runtime(_register_scheduled_jobs)
+    except Exception as e:
+        logger.warning(f"Failed to start scheduler runtime: {e}")
 
     # Seed distributed rate limit buckets (idempotent — only creates missing rows)
     try:
@@ -827,23 +859,6 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Failed to start PG listener: {e}")
 
-    # Eval Builder scheduled runs — P1 daily, P2 weekly, P3 monthly
-    try:
-        from app.core.scheduler_service import get_scheduler
-        from app.services.eval_runner import scheduled_eval_p1, scheduled_eval_p2, scheduled_eval_p3
-        from apscheduler.triggers.cron import CronTrigger
-
-        sched = get_scheduler()
-        sched.add_job(scheduled_eval_p1, CronTrigger(hour=5, minute=0),
-                      id="eval_run_p1_daily", replace_existing=True)
-        sched.add_job(scheduled_eval_p2, CronTrigger(day_of_week="mon", hour=5, minute=30),
-                      id="eval_run_p2_weekly", replace_existing=True)
-        sched.add_job(scheduled_eval_p3, CronTrigger(day=1, hour=6, minute=0),
-                      id="eval_run_p3_monthly", replace_existing=True)
-        logger.info("Eval Builder scheduled: P1 daily 05:00, P2 weekly Mon 05:30, P3 monthly 1st 06:00")
-    except Exception as e:
-        logger.warning(f"Failed to register eval schedules: {e}")
-
     yield
 
     # Shutdown
@@ -858,11 +873,11 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Error stopping PG listener: {e}")
 
-    # Stop scheduler
+    # Stop scheduler, then release the leader lock (SPEC_160)
     try:
-        from app.core import scheduler_service
+        from app.core.scheduler_leader import stop_scheduler_runtime
 
-        scheduler_service.stop_scheduler()
+        await stop_scheduler_runtime()
         logger.info("Scheduler stopped")
     except Exception as e:
         logger.warning(f"Error stopping scheduler: {e}")

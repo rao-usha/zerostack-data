@@ -14,6 +14,7 @@ try:
     from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
     from apscheduler.triggers.cron import CronTrigger
     from apscheduler.triggers.interval import IntervalTrigger
+    from apscheduler.schedulers.base import STATE_PAUSED, STATE_RUNNING
 
     APSCHEDULER_AVAILABLE = True
 except ImportError:
@@ -21,6 +22,7 @@ except ImportError:
     SQLAlchemyJobStore = None
     CronTrigger = None
     IntervalTrigger = None
+    STATE_RUNNING, STATE_PAUSED = 1, 2
     APSCHEDULER_AVAILABLE = False
 
 from app.core.models import (
@@ -455,13 +457,27 @@ async def _run_job_schedule(db: Session, schedule: IngestionSchedule) -> None:
 
 
 async def _execute_ingestion_job(db: Session, job: IngestionJob):
-    """Execute an ingestion job based on its source."""
+    """Execute an ingestion job based on its source.
+
+    The run happens in this process (no queue row) and uses its own session.
+    SPEC_160 review: the caller's commit expired ``job``, so reading
+    ``job.id`` here re-SELECTed the row and left ``db`` "idle in transaction"
+    for the whole run. Read the values, end that read, then await.
+    """
     from app.api.v1.jobs import run_ingestion_job
+    from app.core.database import end_read_transaction
+
+    job_id, source, config = job.id, job.source, job.config
+    try:
+        end_read_transaction(db)
+    except Exception as e:
+        logger.warning(f"Could not end the scheduler session's read before job {job_id}: {e}")
+        db.rollback()
 
     try:
-        await run_ingestion_job(job.id, job.source, job.config)
+        await run_ingestion_job(job_id, source, config)
     except Exception as e:
-        logger.error(f"Error executing job {job.id}: {e}", exc_info=True)
+        logger.error(f"Error executing job {job_id}: {e}", exc_info=True)
         # Job status should already be updated by run_ingestion_job
 
 
@@ -683,12 +699,36 @@ def load_all_schedules(db: Session) -> int:
     return count
 
 
-def start_scheduler():
-    """Start the scheduler if not already running."""
+def start_scheduler(paused: bool = False):
+    """Start (or resume) the scheduler.
+
+    SPEC_160: only the scheduler leader may run jobs. Any other process (a
+    standby, or RUN_SCHEDULER=false) gets the scheduler started *paused*: the
+    shared job store accepts schedule edits, but nothing fires here.
+    """
+    from app.core import scheduler_leader
+
     scheduler = get_scheduler()
+    if not paused and not scheduler_leader.may_run_jobs():
+        logger.warning(
+            "Scheduler left paused: this process is not the scheduler leader "
+            "(RUN_SCHEDULER off, or another process holds the leader lock)"
+        )
+        paused = True
     if not scheduler.running:
-        scheduler.start()
-        logger.info("Scheduler started")
+        scheduler.start(paused=paused)
+        logger.info("Scheduler started" + (" (paused)" if paused else ""))
+    elif not paused and scheduler.state == STATE_PAUSED:
+        scheduler.resume()
+        logger.info("Scheduler resumed")
+
+
+def pause_scheduler():
+    """Stop firing jobs but keep the job store usable (SPEC_160 demotion)."""
+    scheduler = get_scheduler()
+    if scheduler.running and scheduler.state != STATE_PAUSED:
+        scheduler.pause()
+        logger.info("Scheduler paused")
 
 
 def stop_scheduler():
@@ -716,7 +756,16 @@ def get_scheduler_status() -> Dict[str, Any]:
             }
         )
 
-    return {"running": scheduler.running, "job_count": len(jobs), "jobs": jobs}
+    from app.core import scheduler_leader
+
+    return {
+        "running": scheduler.running,
+        "paused": scheduler.state == STATE_PAUSED,
+        # SPEC_160: True = this process fires the jobs; False = standby; None = RUN_SCHEDULER off
+        "scheduler_leader": scheduler_leader.leader_status(),
+        "job_count": len(jobs),
+        "jobs": jobs,
+    }
 
 
 # =============================================================================

@@ -2,6 +2,9 @@
 Database connection and session management.
 """
 
+import os
+import socket
+from datetime import datetime
 from typing import Generator
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
@@ -46,24 +49,80 @@ logger = logging.getLogger(__name__)
 _engine = None
 _SessionLocal = None
 
+# pg_stat_activity.application_name for this process unless DB_APPLICATION_NAME
+# overrides it (SPEC_160). The worker entry point sets "nexdata-worker".
+_process_role = "nexdata-api"
+
+# Who this process is and when it started (SPEC_160 review): connections are
+# named "<role>@<host>:<pid>" so the scheduler leader can tell whether another
+# API process is alive (and may own in-process RUNNING jobs) before it fails
+# stale ones, and only jobs started before this process booted can be ours-dead.
+PROCESS_INSTANCE = f"{socket.gethostname()}:{os.getpid()}"
+PROCESS_STARTED_AT = datetime.utcnow()
+
+
+def set_process_role(name: str) -> None:
+    """Name this process's connections; call before the engine is created."""
+    global _process_role
+    _process_role = name
+
+
+def process_role_name() -> str:
+    """The role part of application_name (``nexdata-api`` unless overridden)."""
+    try:
+        override = get_settings().db_application_name
+    except Exception:
+        override = None
+    return override or _process_role
+
+
+def process_application_name() -> str:
+    """``<role>@<host>:<pid>`` (Postgres keeps at most 63 characters)."""
+    return f"{process_role_name()}@{PROCESS_INSTANCE}"[:63]
+
+
+def end_read_transaction(db: Session) -> None:
+    """End the session's open (read) transaction but keep loaded attributes.
+
+    SPEC_160: committing expires every ORM object, so the next attribute read
+    re-SELECTs the row and opens a transaction that then sits "idle in
+    transaction" through whatever the caller awaits next. Committing with
+    expire_on_commit off returns the connection to the pool and leaves the
+    objects' attributes readable without SQL.
+    """
+    previous = db.expire_on_commit
+    db.expire_on_commit = False
+    try:
+        db.commit()
+    finally:
+        db.expire_on_commit = previous
+
 
 def get_engine():
     """
     Get the shared database engine (singleton).
 
     Uses connection pooling for efficiency. The engine is created once
-    and reused for the lifetime of the process.
+    and reused for the lifetime of the process. Pool size, overflow and
+    recycle come from DB_POOL_SIZE / DB_MAX_OVERFLOW / DB_POOL_RECYCLE.
     """
     global _engine
     if _engine is None:
         settings = get_settings()
+        kwargs = {}
+        if settings.database_url.startswith("postgresql"):
+            kwargs["connect_args"] = {
+                "application_name": process_application_name(),
+            }
         _engine = create_engine(
             settings.database_url,
             poolclass=QueuePool,
-            pool_size=5,
-            max_overflow=10,
+            pool_size=settings.db_pool_size,
+            max_overflow=settings.db_max_overflow,
+            pool_recycle=settings.db_pool_recycle,
             pool_pre_ping=True,  # Verify connections before using
             echo=False,  # Set to True for SQL debugging
+            **kwargs,
         )
     return _engine
 

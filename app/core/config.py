@@ -36,6 +36,29 @@ class Settings(BaseSettings):
     # Database (REQUIRED for API startup)
     database_url: str = Field(..., description="PostgreSQL connection URL")
 
+    # SPEC_160: shared engine pool, per process. Worst case connections =
+    # processes x (pool_size + max_overflow); Cloud SQL allows 100.
+    db_pool_size: int = Field(default=5, ge=1, description="SQLAlchemy pool_size of the shared engine")
+    db_max_overflow: int = Field(default=10, ge=0, description="SQLAlchemy max_overflow of the shared engine")
+    db_pool_recycle: int = Field(
+        default=-1, ge=-1, description="Seconds before a pooled connection is replaced (-1 = never)"
+    )
+    db_application_name: Optional[str] = Field(
+        default=None,
+        description="pg_stat_activity application_name (default nexdata-api / nexdata-worker)",
+    )
+
+    # SPEC_160: one scheduler. RUN_SCHEDULER=false keeps APScheduler jobs out
+    # of this process entirely; with it on, only the holder of the Postgres
+    # leader lock runs them.
+    run_scheduler: bool = Field(default=True, description="Run APScheduler jobs in this process (if leader)")
+    scheduler_leader_retry_seconds: float = Field(
+        default=120.0, gt=0, description="How often a standby retries the scheduler leader lock"
+    )
+    scheduler_leader_check_seconds: float = Field(
+        default=30.0, gt=0, description="How often the leader re-checks that it still holds the lock"
+    )
+
     # JWT Authentication
     jwt_secret_key: Optional[str] = Field(
         default=None,
