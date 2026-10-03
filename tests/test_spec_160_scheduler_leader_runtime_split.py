@@ -168,7 +168,7 @@ class TestFlagOff:
             lock.free = True
             for _ in range(100):
                 await asyncio.sleep(0.02)
-                if scheduler_leader.leader_status():
+                if scheduler_leader.leader_status() and runtime.state == 1:  # STATE_RUNNING: on_elected done
                     break
             after = (scheduler_leader.leader_status(), list(calls), list(resolved), runtime.state,
                      [j.id for j in runtime.get_jobs()])
@@ -198,7 +198,8 @@ class TestFlagOff:
 
         async def go():
             await scheduler_leader.start_scheduler_runtime(
-                _register_one, enabled=True, lock=lock, retry_seconds=10, check_seconds=0.05)
+                _register_one, enabled=True, lock=lock, retry_seconds=10, check_seconds=0.05,
+                fence_seconds=0)
             elected = (scheduler_leader.leader_status(), runtime.state)
             lock.held = False  # the server dropped our session
             lock.free = False  # ...and someone else took the lock
@@ -298,7 +299,8 @@ class TestSettings:
         assert captured["pool_size"] == 3
         assert captured["max_overflow"] == 4
         assert captured["pool_recycle"] == 1800
-        assert captured["connect_args"]["application_name"] == "nexdata-worker"
+        # "<role>@<host>:<pid>": the leader's stale resolver tells processes apart by it
+        assert captured["connect_args"]["application_name"] == f"nexdata-worker@{database.PROCESS_INSTANCE}"[:63]
 
 
 @pytest.mark.unit
@@ -583,3 +585,458 @@ def test_worker_holds_no_transaction_while_executor_runs(jobsdb, monkeypatch):
     assert seen == {"before": False, "payload": {"x": 1}, "after_read": False}
     with jobsdb.connect() as c:
         assert c.execute(text("SELECT status FROM job_queue WHERE id=:i"), {"i": qid}).scalar() == "success"
+
+
+# ---------------------------------------------------------------------------
+# Review fixes (spec-160-fix)
+# ---------------------------------------------------------------------------
+
+
+def _ticks(seconds):
+    """Iterate until a deadline. Count-based loops are not: on Windows an
+    asyncio.sleep below the ~15.6 ms clock resolution returns at once."""
+    import time
+
+    end = time.monotonic() + seconds
+    while time.monotonic() < end:
+        yield
+
+
+class SharedServer:
+    """One fake Postgres: whoever is `owner` holds the advisory lock."""
+
+    def __init__(self):
+        self.owner = None
+
+
+class ServerLock:
+    """A LeaderLock stand-in backed by a SharedServer (sessions can be killed)."""
+
+    key = "fake"
+    backend_pid = None
+
+    def __init__(self, server):
+        self.server = server
+
+    def try_acquire(self):
+        if self.server.owner is None:
+            self.server.owner = self
+        return self.server.owner is self
+
+    def is_held(self):
+        return self.server.owner is self
+
+    def release(self):
+        if self.server.owner is self:
+            self.server.owner = None
+
+    def holder(self):
+        return None
+
+
+@pytest.mark.unit
+class TestReviewFixesUnit:
+    def test_resolver_runs_only_on_first_election(self, runtime, monkeypatch):
+        """R1: a leader demoted and re-elected in the same process must not run
+        the stale resolver again (its own in-process runs are alive)."""
+        from app.core import scheduler_leader
+
+        resolved = []
+        monkeypatch.setattr(scheduler_leader, "resolve_stale_running_jobs",
+                            lambda *a, **k: resolved.append(k) or 0)
+        lock = FakeLock(free=True)
+        calls.clear()
+
+        async def go():
+            await scheduler_leader.start_scheduler_runtime(
+                _register_one, enabled=True, lock=lock, retry_seconds=0.05, check_seconds=0.02,
+                fence_seconds=0)
+            lock.held, lock.free = False, False  # lost the lock
+            for _ in _ticks(5.0):
+                await asyncio.sleep(0.01)
+                if scheduler_leader.leader_status() is False:
+                    break
+            demoted = scheduler_leader.leader_status()
+            lock.free = True
+            for _ in _ticks(5.0):
+                await asyncio.sleep(0.01)
+                if scheduler_leader.leader_status() and runtime.state == 1:  # STATE_RUNNING: on_elected done
+                    break
+            reelected = scheduler_leader.leader_status()
+            elections = scheduler_leader._leadership.elections
+            await scheduler_leader.stop_scheduler_runtime()
+            return demoted, reelected, elections
+
+        demoted, reelected, elections = asyncio.run(go())
+        assert (demoted, reelected, elections) == (False, True, 2)
+        assert calls == ["register", "register"]
+        assert len(resolved) == 1
+        # it passes this process's identity so live owners are recognised
+        assert set(resolved[0]) == {"started_before", "process_role", "process_name"}
+
+    def test_hung_check_demotes_within_timeout(self, runtime, monkeypatch):
+        """R2: a lock check that blocks (dead socket) counts as a lost lock:
+        the scheduler is paused within about check + timeout, and the stuck
+        connection is abandoned rather than awaited."""
+        import threading
+        import time
+
+        from apscheduler.schedulers.base import STATE_PAUSED, STATE_RUNNING
+
+        from app.core import scheduler_leader
+
+        monkeypatch.setattr(scheduler_leader, "resolve_stale_running_jobs", lambda *a, **k: 0)
+        unblock = threading.Event()
+
+        class HangingLock(FakeLock):
+            hang = False
+            abandoned = 0
+
+            def is_held(self):
+                if self.hang:
+                    unblock.wait(10)
+                    return True  # far too late: the caller gave up
+                return self.held
+
+            def abandon(self):
+                self.abandoned += 1
+
+        lock = HangingLock(free=True)
+
+        async def go():
+            await scheduler_leader.start_scheduler_runtime(
+                _register_one, enabled=True, lock=lock, retry_seconds=60, check_seconds=0.1,
+                check_timeout=0.2, fence_seconds=0)
+            elected = (scheduler_leader.leader_status(), runtime.state)
+            lock.hang = True
+            t0 = time.monotonic()
+            while time.monotonic() - t0 < 3 and scheduler_leader.leader_status():
+                await asyncio.sleep(0.01)
+            took = time.monotonic() - t0
+            lost = (scheduler_leader.leader_status(), runtime.state)
+            unblock.set()
+            await scheduler_leader.stop_scheduler_runtime()
+            return elected, lost, took
+
+        elected, lost, took = asyncio.run(go())
+        assert elected == (True, STATE_RUNNING)
+        assert lost == (False, STATE_PAUSED)
+        assert took < 1.0  # check (0.1) + timeout (0.2), with slack
+        assert lock.abandoned >= 1
+
+    def test_fence_delays_the_first_election(self, runtime, monkeypatch):
+        """R3: a process that takes the lock waits check + timeout before it
+        registers anything or resumes the scheduler."""
+        from apscheduler.schedulers.base import STATE_PAUSED, STATE_RUNNING
+
+        from app.core import scheduler_leader
+
+        monkeypatch.setattr(scheduler_leader, "resolve_stale_running_jobs", lambda *a, **k: 0)
+        calls.clear()
+
+        async def go():
+            status = await scheduler_leader.start_scheduler_runtime(
+                _register_one, enabled=True, lock=FakeLock(), retry_seconds=60, check_seconds=0.2,
+                check_timeout=0.1)
+            during = (status, scheduler_leader.leader_status(), list(calls), runtime.state)
+            fence = scheduler_leader._leadership.fence_seconds
+            for _ in _ticks(5.0):
+                await asyncio.sleep(0.01)
+                if scheduler_leader.leader_status() and runtime.state == 1:  # STATE_RUNNING: on_elected done
+                    break
+            after = (scheduler_leader.leader_status(), list(calls), runtime.state)
+            await scheduler_leader.stop_scheduler_runtime()
+            return during, fence, after
+
+        during, fence, after = asyncio.run(go())
+        assert fence == pytest.approx(0.3)
+        assert during == (False, False, [], STATE_PAUSED)
+        assert after == (True, ["register"], STATE_RUNNING)
+
+    def test_no_overlap_when_a_fast_standby_takes_over(self):
+        """R4: the old leader's session dies and a standby (retrying far more
+        often than the leader checks) takes the lock at once. The fence keeps
+        the two from ever being leader at the same time."""
+        from app.core.scheduler_leader import SchedulerLeadership
+
+        server = SharedServer()
+
+        async def go():
+            a = SchedulerLeadership(ServerLock(server), retry_seconds=0.01, check_seconds=0.2,
+                                    check_timeout=0.1)
+            b = SchedulerLeadership(ServerLock(server), retry_seconds=0.01, check_seconds=0.2,
+                                    check_timeout=0.1)
+            await a.start()
+            await b.start()
+            for _ in _ticks(5.0):
+                await asyncio.sleep(0.005)
+                if a.is_leader:
+                    break
+            first = (a.is_leader, b.is_leader)
+            overlap = 0
+            handovers = []
+            for _round in range(3):
+                old, new = (a, b) if a.is_leader else (b, a)
+                server.owner = None  # the leader's session is gone server-side
+                for _ in _ticks(5.0):
+                    await asyncio.sleep(0.002)
+                    if a.is_leader and b.is_leader:
+                        overlap += 1
+                    if new.is_leader:
+                        break
+                handovers.append((new.is_leader, old.is_leader))
+            await a.stop()
+            await b.stop()
+            return first, overlap, handovers
+
+        first, overlap, handovers = asyncio.run(go())
+        assert first == (True, False)
+        assert overlap == 0
+        assert handovers == [(True, False)] * 3
+
+    def test_lock_connection_has_bounded_io(self, monkeypatch):
+        """R5: tcp_user_timeout and statement_timeout on the lock connection,
+        so a query on a dead socket cannot hang for the OS retransmit time."""
+        import app.core.scheduler_leader as sl
+
+        captured = {}
+        monkeypatch.setattr(sl, "create_engine", lambda url, **kw: captured.update(kw) or object())
+        sl.LeaderLock("postgresql://x:x@127.0.0.1:1/x")._get_engine()
+        args = captured["connect_args"]
+        assert args["tcp_user_timeout"] == sl.LOCK_TCP_USER_TIMEOUT_MS
+        assert f"statement_timeout={sl.LOCK_STATEMENT_TIMEOUT_MS}" in args["options"]
+
+    def test_stop_endpoint_says_the_leader_keeps_the_lock(self, monkeypatch):
+        """R6: POST /schedules/stop on the leader keeps the lock (nobody else
+        schedules); the response says so."""
+        from app.api.v1 import schedules
+        from app.core import scheduler_leader, scheduler_service
+
+        monkeypatch.setattr(scheduler_service, "stop_scheduler", lambda: None)
+        monkeypatch.setattr(scheduler_leader, "leader_status", lambda: True)
+        body = schedules.stop_scheduler()
+        assert body["scheduler_leader"] is True
+        assert "keeps the scheduler leader lock" in body["message"]
+        monkeypatch.setattr(scheduler_leader, "leader_status", lambda: None)
+        assert schedules.stop_scheduler() == {"message": "Scheduler stopped", "scheduler_leader": None}
+
+
+@pg
+class TestReviewFixesPG:
+    def test_reelection_leaves_live_in_process_run_alone(self, jobsdb, runtime, monkeypatch):
+        """R7 (findings 1/2): the first election fails a pre-boot orphan; an
+        in-process run this process started (RUNNING > 2 h, no queue row)
+        survives a demotion + re-election."""
+        from sqlalchemy import text
+
+        from app.core import scheduler_leader
+
+        boot = datetime.utcnow() - timedelta(hours=4)
+        monkeypatch.setattr(scheduler_leader, "_resolver_identity", lambda: {
+            "started_before": boot, "process_role": "nexdata-t160r7",
+            "process_name": "nexdata-t160r7@me:1"})
+        orphan = _ing(jobsdb, "running", datetime.utcnow() - timedelta(hours=5))  # before boot
+        mine = _ing(jobsdb, "running", datetime.utcnow() - timedelta(hours=3))    # ours, alive
+        lock = FakeLock(free=True)
+
+        async def go():
+            await scheduler_leader.start_scheduler_runtime(
+                _register_one, enabled=True, lock=lock, engine=jobsdb, retry_seconds=0.05,
+                check_seconds=0.02, fence_seconds=0)
+            with jobsdb.connect() as c:
+                first = dict(c.execute(text("SELECT id, status FROM ingestion_jobs")).all())
+            lock.held, lock.free = False, False
+            for _ in _ticks(5.0):
+                await asyncio.sleep(0.01)
+                if scheduler_leader.leader_status() is False:
+                    break
+            lock.free = True
+            for _ in _ticks(5.0):
+                await asyncio.sleep(0.01)
+                if scheduler_leader.leader_status() and runtime.state == 1:  # STATE_RUNNING: on_elected done
+                    break
+            elections = scheduler_leader._leadership.elections
+            await scheduler_leader.stop_scheduler_runtime()
+            with jobsdb.connect() as c:
+                second = dict(c.execute(text("SELECT id, status FROM ingestion_jobs")).all())
+            return first, second, elections
+
+        first, second, elections = asyncio.run(go())
+        assert elections == 2
+        assert first[orphan] == "failed" and first[mine] == "running"
+        assert second[mine] == "running"
+
+    def test_resolver_skips_while_another_api_process_is_alive(self, jobsdb):
+        """R8 (findings 1/2): another live process of the same role may own
+        in-process RUNNING rows (a demoted leader, a BackgroundTasks API), so
+        the resolver does nothing until it is gone."""
+        from sqlalchemy import create_engine, text
+
+        from app.core.scheduler_leader import resolve_stale_running_jobs
+
+        old = _ing(jobsdb, "running", datetime.utcnow() - timedelta(hours=5))
+        ident = {"process_role": "nexdata-t160r8", "process_name": "nexdata-t160r8@me:1",
+                 "started_before": datetime.utcnow()}
+        other = create_engine(PG_URL, connect_args={"application_name": "nexdata-t160r8@other:7"})
+        mine = create_engine(PG_URL, connect_args={"application_name": "nexdata-t160r8@me:1"})
+        worker = create_engine(PG_URL, connect_args={"application_name": "nexdata-t160r8x@w:1"})
+        try:
+            with mine.connect(), worker.connect():
+                with other.connect():
+                    assert resolve_stale_running_jobs(jobsdb, **ident) == 0
+                    with jobsdb.connect() as c:
+                        assert c.execute(text("SELECT status FROM ingestion_jobs WHERE id=:i"),
+                                         {"i": old}).scalar() == "running"
+                other.dispose()
+                # only our own name and another role are left: resolve
+                assert resolve_stale_running_jobs(jobsdb, **ident) == 1
+        finally:
+            for e in (other, mine, worker):
+                e.dispose()
+
+    def test_resolver_skips_rows_started_after_boot(self, jobsdb):
+        from app.core.scheduler_leader import resolve_stale_running_jobs
+
+        _ing(jobsdb, "running", datetime.utcnow() - timedelta(hours=5))
+        _ing(jobsdb, "running", datetime.utcnow() - timedelta(hours=3))
+        assert resolve_stale_running_jobs(
+            jobsdb, started_before=datetime.utcnow() - timedelta(hours=4)) == 1
+
+    def test_scheduler_session_not_idle_in_transaction_during_run(self, jobsdb, monkeypatch):
+        """R9 (finding 3): run_scheduled_job used to re-SELECT the expired job
+        before awaiting run_ingestion_job, leaving its own session "idle in
+        transaction" for the whole in-process run."""
+        from sqlalchemy import text
+        from sqlalchemy.orm import sessionmaker
+
+        import app.api.v1.jobs as jobs_api
+        from app.core import audit_service, scheduler_service
+
+        base = sessionmaker(bind=jobsdb)
+        sessions = []
+
+        def factory():
+            s = base()
+            sessions.append(s)
+            return s
+
+        monkeypatch.setattr(scheduler_service, "get_session_factory", lambda: factory)
+        monkeypatch.setattr(audit_service, "log_collection", lambda db, **k: None)
+        with jobsdb.begin() as conn:
+            sid = conn.execute(text("""
+                INSERT INTO ingestion_schedules (name, source, config, frequency, hour, is_active,
+                                                 priority, created_at, updated_at)
+                VALUES ('t160-r9', 'fred', '{}', 'daily', 6, 1, 5, NOW(), NOW()) RETURNING id
+            """)).scalar()
+        seen = {}
+
+        async def fake_run(job_id, source, config):
+            seen["args"] = (source, config)
+            seen["in_tx"] = sessions[0].in_transaction()
+            with jobsdb.connect() as c:
+                seen["idle_in_tx"] = c.execute(text(
+                    "SELECT count(*) FROM pg_stat_activity "
+                    "WHERE state = 'idle in transaction' AND datname = current_database()"
+                )).scalar()
+
+        monkeypatch.setattr(jobs_api, "run_ingestion_job", fake_run)
+        asyncio.run(scheduler_service.run_scheduled_job(sid))
+        assert seen["args"][0] == "fred"
+        assert seen["in_tx"] is False
+        assert seen["idle_in_tx"] == 0
+
+    def test_execute_ingestion_job_ends_the_read(self, jobsdb, monkeypatch):
+        """R10: the auto-refresh path (db.refresh(job) right before the run)
+        goes through the same helper."""
+        from sqlalchemy.orm import sessionmaker
+
+        import app.api.v1.jobs as jobs_api
+        from app.core import scheduler_service
+        from app.core.models import IngestionJob
+
+        jid = _ing(jobsdb, "pending", datetime.utcnow())
+        db = sessionmaker(bind=jobsdb)()
+        seen = {}
+
+        async def fake_run(job_id, source, config):
+            seen["v"] = (job_id, source, db.in_transaction())
+
+        monkeypatch.setattr(jobs_api, "run_ingestion_job", fake_run)
+        try:
+            job = db.get(IngestionJob, jid)
+            db.refresh(job)
+            assert db.in_transaction()
+            asyncio.run(scheduler_service._execute_ingestion_job(db, job))
+        finally:
+            db.close()
+        assert seen["v"] == (jid, "cms", False)
+
+    def test_lock_session_timeouts_and_abandon(self):
+        """R11: the lock session runs with a statement timeout, and an
+        abandoned lock connection is closed (the lock frees) without the
+        caller waiting on it."""
+        import time
+
+        from sqlalchemy import text
+
+        from app.core.scheduler_leader import LOCK_STATEMENT_TIMEOUT_MS, LeaderLock
+
+        key = next(_KEYS)
+        a, b = LeaderLock(PG_URL, key=key), LeaderLock(PG_URL, key=key)
+        try:
+            assert a.try_acquire()
+            st = a._conn.execute(text("SHOW statement_timeout")).scalar()
+            assert st == f"{LOCK_STATEMENT_TIMEOUT_MS // 1000}s"
+            a.abandon()
+            assert a.is_held() is False
+            for _ in range(100):
+                if b.try_acquire():
+                    break
+                time.sleep(0.02)
+            assert b.is_held()
+        finally:
+            a.release()
+            b.release()
+
+    def test_no_overlap_on_real_pg_after_backend_kill(self):
+        """R12: two leaderships on real Postgres; the leader's lock backend is
+        terminated, the standby (fast retry) takes over, and at no sample are
+        both leaders."""
+        from sqlalchemy import create_engine, text
+
+        from app.core.scheduler_leader import LeaderLock, SchedulerLeadership
+
+        key = next(_KEYS)
+        admin = create_engine(PG_URL)
+
+        async def go():
+            a = SchedulerLeadership(LeaderLock(PG_URL, key=key), retry_seconds=0.02,
+                                    check_seconds=0.3, check_timeout=0.2)
+            b = SchedulerLeadership(LeaderLock(PG_URL, key=key), retry_seconds=0.02,
+                                    check_seconds=0.3, check_timeout=0.2)
+            await a.start()
+            await b.start()
+            for _ in _ticks(5.0):
+                await asyncio.sleep(0.01)
+                if a.is_leader:
+                    break
+            first = (a.is_leader, b.is_leader)
+            pid = a.lock.backend_pid
+            with admin.connect() as c:
+                c.execute(text("SELECT pg_terminate_backend(:p)"), {"p": pid})
+            overlap = 0
+            for _ in _ticks(5.0):
+                await asyncio.sleep(0.005)
+                if a.is_leader and b.is_leader:
+                    overlap += 1
+                if b.is_leader:
+                    break
+            result = (first, overlap, a.is_leader, b.is_leader)
+            await a.stop()
+            await b.stop()
+            return result
+
+        try:
+            assert asyncio.run(go()) == ((True, False), 0, False, True)
+        finally:
+            admin.dispose()

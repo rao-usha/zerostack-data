@@ -1,6 +1,6 @@
 # SPEC 160 — Runtime split: one scheduler, by flag and by leader lock
 
-**Status:** Implemented (branch `spec-160`; takes effect on the next `docker-compose restart api worker`)
+**Status:** Implemented (branch `spec-160`, review fixes on `spec-160-fix`; takes effect on the next `docker-compose restart api worker`)
 **Task type:** service
 **Date:** 2026-10-03
 **Plan:** `docs/plans/PLAN_089_hosted_runtime.md` Phase 1 (first half; the image split and `docker-compose.gcp.yml` are the second half)
@@ -83,19 +83,29 @@ transaction without expiring the object, before any await.
   error means the connection is gone, and it is closed.
 - `SchedulerLeadership(lock, on_elected, on_demoted, retry_seconds,
   check_seconds)` — the async loop. `start()` makes the first attempt inline
-  (so a laptop's single API is leader before it serves requests, as today)
-  and then runs the loop as a task. DB calls go through `asyncio.to_thread`.
+  (the lock is taken before the API serves requests) and then runs the loop
+  as a task; the election itself follows after the fence (below), so a
+  laptop's single API starts firing jobs about 40 s after boot (SPEC_121
+  misfire grace covers anything due in that window). DB calls go through
+  `asyncio.to_thread`, each bounded by a timeout.
 - `start_scheduler_runtime(register_jobs, ...)` / `stop_scheduler_runtime()` —
   what `main.py` calls. `on_elected` = stale resolver → `register_jobs()` →
   resume the scheduler. `on_demoted` = pause.
 - `leader_status()` → True / False / None for `/health`;
   `may_run_jobs()` for `scheduler_service.start_scheduler()`.
 
-The retry interval (120 s) is longer than the check interval (30 s), so a
-leader whose connection dropped normally pauses before a standby can take
-over. This is a lease-free lock, not consensus: a leader that is alive but
-partitioned from Postgres can keep firing in-memory jobs for up to one check
-interval. Every job it fires needs the database anyway.
+**Overlap bound (review fix).** Every lock check is bounded by a timeout
+(`min(10 s, check)`); a check that hangs (dead socket after a laptop sleep or
+a proxy death) counts as a lost lock: the leader pauses first, then abandons
+the connection to a background close. The lock connection also sets
+`tcp_user_timeout=30 s` and `statement_timeout=10 s`. A process that takes
+the lock **fences**: it waits `check + check timeout` (40 s by default)
+before it resolves, registers and resumes, so a previous leader has paused
+by then (assuming every host uses the same check settings).
+`leader_status()` is `false` while fencing. Residual case, documented not
+solved: a process frozen whole (laptop sleep) may fire due jobs on wake
+before its next check runs; the schedule active-job guard (SPEC_121) limits
+the damage for ingestion schedules.
 
 ### `app/main.py`
 
@@ -111,10 +121,54 @@ the stale resolver moves out of the batch-metadata migration block into
 | Loop | Where | Decision |
 |---|---|---|
 | All APScheduler jobs: schedules, stuck-job cleanup + SPEC_121 orphan sweep, retry processor, freshness/quality/validation, watchdog + dead-man ping, `reset_stale_queue_jobs`, `cancel_stale_pending_jobs`, batch, eval, people/PE/site-intel | APScheduler | **Leader only.** They write shared state; two copies double-fire. The watchdog ping going quiet when no leader exists is the right alarm. |
-| Startup stale-running resolver | lifespan | **Leader only**, on each election, narrowed (above). Kept, not removed: it is the only fast path for in-process (`WORKER_MODE=0`) runs lost with the API that hosted them; `cleanup_stuck_jobs` waits the per-source timeout. |
+| Startup stale-running resolver | lifespan | **Leader only, first election of a process only**, narrowed (above and below). Kept, not removed: it is the only fast path for in-process runs lost with the API that hosted them; `cleanup_stuck_jobs` waits the per-source timeout. |
 | PG LISTEN → EventBus bridge | lifespan | **Per process.** Each API process feeds its own SSE clients from its own in-memory EventBus. |
 | Rate-limit bucket seeding, dataset_registry mirror, batch-metadata DDL/backfill, migrations | lifespan | **Per process.** Idempotent; migrations already take their own advisory lock. |
 | Worker poll loop, heartbeats, liveness | worker | **Per process** (queue claims use `SKIP LOCKED`). |
+
+### In-process runs and the resolver (review fix)
+
+Ordinary schedules (a plain source, not `bulk:` / `job:`) run **inside the
+leader API process** even with `WORKER_MODE=1`:
+`run_scheduled_job -> _execute_ingestion_job -> run_ingestion_job`, with no
+`job_queue` row; so does the freshness auto-refresh. Which host leads
+therefore decides where those ingestions run, and a failover strands the
+ones in flight on the old leader (they keep running there if it is alive;
+`cleanup_stuck_jobs` settles them if it died). BackgroundTasks runs
+(`WORKER_MODE=0`, and the API routes that always use them) are the same:
+RUNNING rows with no queue row.
+
+SQL cannot tell such a row of a dead process from one of a live process, so
+the resolver now fails a RUNNING row (> 2 h, no live queue row) only if:
+
+- this is the process's **first** election (a re-election after a brief lock
+  loss would otherwise fail its own live runs, unblocking the schedule's
+  active-job guard and double-running it);
+- the row **started before this process booted** (`PROCESS_STARTED_AT`), so
+  it cannot be this process's own run;
+- **no other process of the same role is connected**: engine connections are
+  now named `<role>@<host>:<pid>` (`nexdata-api@…`, `nexdata-worker@…`); if
+  any other `nexdata-api@…` session exists, the resolver does nothing and
+  leaves real orphans to `cleanup_stuck_jobs` (per-source timeout). A process
+  restarted in the same container keeps its `host:pid` name, so a dead
+  predecessor's lingering sessions do not block it.
+
+### `idle in transaction`: API in-process paths (review fix)
+
+`run_scheduled_job` and the auto-refresh committed the job (expiring it) and
+then read `job.id` inside `_execute_ingestion_job`, which re-SELECTed the row
+and held the scheduler's session "idle in transaction" for the whole
+in-process run. `_execute_ingestion_job` now reads id/source/config and ends
+that read (`database.end_read_transaction`, shared with the worker) before it
+awaits.
+
+### `POST /schedules/stop` on the leader
+
+It shuts APScheduler down but **keeps the leader lock**, so no standby takes
+over: scheduling stops everywhere until `POST /schedules/start` on that
+process (or its restart). That is the intended meaning of "stop"; the
+response now says so. To move scheduling to another host, restart (or set
+`RUN_SCHEDULER=0` on) the leader instead.
 
 ## Configuration
 
@@ -122,11 +176,12 @@ the stale resolver moves out of the batch-metadata migration block into
 |---|---|---|
 | `RUN_SCHEDULER` | `true` | `false`: never run APScheduler jobs in this process |
 | `SCHEDULER_LEADER_RETRY_SECONDS` | `120` | standby retry interval |
-| `SCHEDULER_LEADER_CHECK_SECONDS` | `30` | leader lock re-check interval |
+| `SCHEDULER_LEADER_CHECK_SECONDS` | `30` | leader lock re-check interval; a new leader fences for check + `min(10, check)` s |
 | `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` / `DB_POOL_RECYCLE` | `5` / `10` / `-1` | shared engine pool |
-| `DB_APPLICATION_NAME` | `nexdata-api` (`nexdata-worker` in the worker) | `pg_stat_activity.application_name` |
+| `DB_APPLICATION_NAME` | `nexdata-api` (`nexdata-worker` in the worker) | role part of `pg_stat_activity.application_name` (`<role>@<host>:<pid>`) |
 
-Laptop: nothing to set. GCP compose (PLAN_089 Phase 1b): set `RUN_SCHEDULER`
+Laptop: nothing to set (docker-compose passes the leader intervals through
+with their defaults). GCP compose (PLAN_089 Phase 1b): set `RUN_SCHEDULER`
 explicitly on the api; with 3 workers × 6, `DB_POOL_SIZE=3 DB_MAX_OVERFLOW=4`
 on workers keeps the worst case under 100 connections.
 
@@ -141,3 +196,22 @@ skips rows with a live queue row; `/health` and `/schedules/status` expose the
 field; pool settings reach the engine; `execute_job` holds no transaction
 while the executor runs; every `add_job`/`start_scheduler` in `main.py` is
 inside `_register_scheduled_jobs`.
+
+Review fixes (`spec-160-fix`): R1 resolver only on the first election; R2 a
+hung check demotes within check + timeout; R3 the fence delays the first
+election; R4 no overlap when a fast standby takes over (fake server); R5 lock
+connection timeouts; R6 `/schedules/stop` response; R7 (PG) re-election
+leaves a live in-process run alone; R8 (PG) resolver skips while another
+same-role process is connected; R9 (PG) `run_scheduled_job` holds no
+transaction during the run; R10 the auto-refresh helper too; R11 (PG)
+statement timeout + abandon frees the lock; R12 (PG) no overlap after the
+leader's backend is terminated.
+
+## Not verified / open
+
+- Through the Cloud SQL Auth Proxy the server's TCP peer is the proxy, so
+  the per-session `tcp_keepalives_*` may not detect a dead leader host and
+  the lock could outlive it (no leader until the proxy session drops). Not
+  tested against Cloud SQL; check before cutover (PLAN_089).
+- Connection budget (Cloud SQL `max_connections=100`) is guidance only; the
+  GCP compose (Phase 1b) must set the pools.

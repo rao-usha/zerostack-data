@@ -457,13 +457,27 @@ async def _run_job_schedule(db: Session, schedule: IngestionSchedule) -> None:
 
 
 async def _execute_ingestion_job(db: Session, job: IngestionJob):
-    """Execute an ingestion job based on its source."""
+    """Execute an ingestion job based on its source.
+
+    The run happens in this process (no queue row) and uses its own session.
+    SPEC_160 review: the caller's commit expired ``job``, so reading
+    ``job.id`` here re-SELECTed the row and left ``db`` "idle in transaction"
+    for the whole run. Read the values, end that read, then await.
+    """
     from app.api.v1.jobs import run_ingestion_job
+    from app.core.database import end_read_transaction
+
+    job_id, source, config = job.id, job.source, job.config
+    try:
+        end_read_transaction(db)
+    except Exception as e:
+        logger.warning(f"Could not end the scheduler session's read before job {job_id}: {e}")
+        db.rollback()
 
     try:
-        await run_ingestion_job(job.id, job.source, job.config)
+        await run_ingestion_job(job_id, source, config)
     except Exception as e:
-        logger.error(f"Error executing job {job.id}: {e}", exc_info=True)
+        logger.error(f"Error executing job {job_id}: {e}", exc_info=True)
         # Job status should already be updated by run_ingestion_job
 
 

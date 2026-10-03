@@ -11,8 +11,11 @@ guards:
 - With it on, a process runs jobs only while it holds a session-level
   Postgres advisory lock on a dedicated long-lived connection. A standby
   retries every ``SCHEDULER_LEADER_RETRY_SECONDS``; the leader re-checks the
-  lock every ``SCHEDULER_LEADER_CHECK_SECONDS`` and pauses its scheduler if
-  the connection (and with it the lock) is gone.
+  lock every ``SCHEDULER_LEADER_CHECK_SECONDS`` (bounded by a timeout: a hung
+  check counts as a lost lock) and pauses its scheduler if the connection
+  (and with it the lock) is gone. A process that takes the lock waits one
+  check interval plus that timeout before it resumes the scheduler, so a
+  previous leader has stepped down by then.
 
 Every process starts APScheduler *paused* so that schedule edits made through
 the API still reach the shared job store; only the leader resumes it.
@@ -24,6 +27,8 @@ Which loops are leader-only and which run per process is documented in
 import asyncio
 import inspect
 import logging
+import threading
+from datetime import datetime
 from typing import Any, Callable, Dict, Optional
 
 from sqlalchemy import create_engine, text
@@ -48,6 +53,14 @@ _LOCK_SESSION_SETTINGS = (
     "SET tcp_keepalives_interval = 10",
     "SET tcp_keepalives_count = 3",
 )
+
+LOCK_TCP_USER_TIMEOUT_MS = 30_000
+LOCK_STATEMENT_TIMEOUT_MS = 10_000
+
+# Upper bound on one lock check from the leader (a hung socket counts as a
+# lost lock) and on one acquisition attempt (connect_timeout is 10 s).
+DEFAULT_CHECK_TIMEOUT_SECONDS = 10.0
+ACQUIRE_TIMEOUT_SECONDS = 30.0
 
 STALE_RUNNING_HOURS = 2
 STALE_RESOLVED_MESSAGE = "Stale job auto-resolved on startup"
@@ -107,6 +120,9 @@ class LeaderLock:
         self._engine = None
         self._conn = None
         self.backend_pid: Optional[int] = None
+        # Bumped by abandon(): a try_acquire still blocked in a worker thread
+        # when its caller gave up must not install its connection afterwards.
+        self._generation = 0
 
     def _get_engine(self):
         if self._engine is None:
@@ -120,6 +136,11 @@ class LeaderLock:
                     "keepalives_idle": 30,
                     "keepalives_interval": 10,
                     "keepalives_count": 3,
+                    # Keepalives do nothing while a query waits on unacked
+                    # data; this bounds that (libpq >= 12, TCP only).
+                    "tcp_user_timeout": LOCK_TCP_USER_TIMEOUT_MS,
+                    # Every lock query is instant; a stuck one is a dead link.
+                    "options": f"-c statement_timeout={LOCK_STATEMENT_TIMEOUT_MS}",
                 }
             self._engine = create_engine(self.url, poolclass=NullPool, connect_args=connect_args)
         return self._engine
@@ -129,6 +150,7 @@ class LeaderLock:
         if self._conn is not None:
             if self.is_held():
                 return True
+        generation = self._generation
         conn = self._get_engine().connect().execution_options(isolation_level="AUTOCOMMIT")
         try:
             for stmt in _LOCK_SESSION_SETTINGS:
@@ -139,10 +161,12 @@ class LeaderLock:
             got = bool(conn.execute(text("SELECT pg_try_advisory_lock(:k)"), {"k": self.key}).scalar())
             pid = conn.execute(text("SELECT pg_backend_pid()")).scalar() if got else None
         except Exception:
-            conn.close()
+            _close_quietly(conn)
             raise
-        if not got:
-            conn.close()
+        if not got or generation != self._generation:
+            # Not free, or the caller timed out and abandoned this attempt:
+            # closing the session drops a lock it may just have taken.
+            _close_quietly(conn)
             return False
         self._conn = conn
         self.backend_pid = pid
@@ -150,16 +174,33 @@ class LeaderLock:
 
     def is_held(self) -> bool:
         """True while our session is alive and still holds the lock."""
-        if self._conn is None:
+        conn = self._conn
+        if conn is None:
             return False
         try:
-            held = bool(self._conn.execute(text(_OWN_LOCK_SQL), _key_parts(self.key)).scalar())
+            held = bool(conn.execute(text(_OWN_LOCK_SQL), _key_parts(self.key)).scalar())
         except Exception as e:
             logger.warning(f"Scheduler leader lock connection lost: {type(e).__name__}: {e}")
             held = False
         if not held:
-            self._close()
+            if self._conn is conn:
+                self._close()
+            else:  # abandoned meanwhile; only this (dead) connection is ours to close
+                _close_quietly(conn)
         return held
+
+    def abandon(self) -> None:
+        """Forget the lock connection without waiting on it.
+
+        For a check or attempt that hung (dead socket): the caller has already
+        stepped down; the stuck worker thread closes the connection when its
+        call finally fails, and the server frees the lock with the session.
+        """
+        self._generation += 1
+        conn, self._conn, self.backend_pid = self._conn, None, None
+        if conn is not None:
+            threading.Thread(target=_close_quietly, args=(conn,), daemon=True,
+                             name="leader-lock-abandon").start()
 
     def holder(self) -> Optional[Dict[str, Any]]:
         """Who holds the lock (for the standby log line). Best effort."""
@@ -185,13 +226,17 @@ class LeaderLock:
     def _close(self) -> None:
         conn, self._conn, self.backend_pid = self._conn, None, None
         if conn is not None:
-            try:
-                conn.close()
-            except Exception:
-                try:
-                    conn.invalidate()
-                except Exception:
-                    pass
+            _close_quietly(conn)
+
+
+def _close_quietly(conn) -> None:
+    try:
+        conn.close()
+    except Exception:
+        try:
+            conn.invalidate()
+        except Exception:
+            pass
 
 
 async def _call(fn: Optional[Callable[[], Any]], what: str) -> None:
@@ -206,56 +251,91 @@ async def _call(fn: Optional[Callable[[], Any]], what: str) -> None:
 
 
 class SchedulerLeadership:
-    """Keeps trying to lead; runs ``on_elected`` / ``on_demoted`` on changes."""
+    """Keeps trying to lead; runs ``on_elected`` / ``on_demoted`` on changes.
+
+    Three states: standby (lock not held), *fencing* (lock held, waiting
+    ``fence_seconds`` before running anything) and leader. The fence closes
+    the overlap window: a previous leader that lost its lock notices within
+    one check interval plus the check timeout (a hung check counts as lost),
+    so a new leader that waits that long before resuming the scheduler does
+    not fire jobs alongside it. A process frozen whole (laptop sleep) is the
+    exception: on wake its scheduler may fire due jobs before its next check.
+    """
 
     def __init__(self, lock, on_elected: Optional[Callable[[], Any]] = None,
                  on_demoted: Optional[Callable[[], Any]] = None,
-                 retry_seconds: float = 120.0, check_seconds: float = 30.0):
+                 retry_seconds: float = 120.0, check_seconds: float = 30.0,
+                 check_timeout: Optional[float] = None,
+                 fence_seconds: Optional[float] = None,
+                 acquire_timeout: float = ACQUIRE_TIMEOUT_SECONDS):
         self.lock = lock
         self.on_elected = on_elected
         self.on_demoted = on_demoted
         self.retry_seconds = retry_seconds
         self.check_seconds = check_seconds
-        self._leader = False
+        self.check_timeout = (min(DEFAULT_CHECK_TIMEOUT_SECONDS, check_seconds)
+                              if check_timeout is None else check_timeout)
+        self.fence_seconds = (check_seconds + self.check_timeout
+                              if fence_seconds is None else fence_seconds)
+        self.acquire_timeout = acquire_timeout
+        self._held = False    # we hold the lock (fencing or leading)
+        self._leader = False  # elected: on_elected ran, the scheduler may fire
+        self.elections = 0
         self._task: Optional[asyncio.Task] = None
         self._stopping: Optional[asyncio.Event] = None
         self._last_holder: Any = object()
-        if retry_seconds <= check_seconds:
-            logger.warning(
-                "SCHEDULER_LEADER_RETRY_SECONDS (%s) should exceed SCHEDULER_LEADER_CHECK_SECONDS "
-                "(%s) so a leader that lost its lock pauses before a standby takes over",
-                retry_seconds, check_seconds,
-            )
+        # The fence, not retry > check, keeps leaders from overlapping, so any
+        # retry interval is safe. It assumes every host uses the same check
+        # settings (a new leader waits *its* check + timeout).
 
     @property
     def is_leader(self) -> bool:
         return self._leader
 
     async def start(self) -> bool:
-        """First attempt inline, then keep the loop running in the background."""
+        """First attempt inline, then keep the loop running in the background.
+
+        With a fence (the default) the election itself happens in the loop,
+        ``fence_seconds`` after the lock was taken.
+        """
         self._stopping = asyncio.Event()
-        await self._attempt()
+        if await self._attempt() and self.fence_seconds <= 0:
+            await self._elect()
         self._task = asyncio.create_task(self._run(), name="scheduler-leadership")
         return self._leader
 
+    def _abandon_lock(self) -> None:
+        abandon = getattr(self.lock, "abandon", None)
+        if abandon is not None:
+            try:
+                abandon()
+            except Exception as e:
+                logger.warning(f"Abandoning the scheduler leader lock connection failed: {e}")
+
     async def _attempt(self) -> bool:
         try:
-            got = await asyncio.to_thread(self.lock.try_acquire)
+            got = await asyncio.wait_for(asyncio.to_thread(self.lock.try_acquire),
+                                         timeout=self.acquire_timeout)
+        except asyncio.TimeoutError:
+            logger.warning(f"Scheduler leader lock attempt timed out after {self.acquire_timeout}s")
+            self._abandon_lock()
+            got = False
         except Exception as e:
             logger.warning(f"Scheduler leader lock attempt failed: {type(e).__name__}: {e}")
             got = False
         if got:
-            self._leader = True
+            self._held = True
             self._last_holder = object()
             logger.info(
-                "Scheduler leader lock acquired (key=%s, backend pid=%s): this process runs the scheduler",
+                "Scheduler leader lock acquired (key=%s, backend pid=%s); running the scheduler in %ss",
                 getattr(self.lock, "key", "?"), getattr(self.lock, "backend_pid", "?"),
+                max(self.fence_seconds, 0),
             )
-            await _call(self.on_elected, "on_elected")
             return True
         holder = None
         try:
-            holder = await asyncio.to_thread(self.lock.holder)
+            holder = await asyncio.wait_for(asyncio.to_thread(self.lock.holder),
+                                            timeout=self.acquire_timeout)
         except Exception:
             pass
         level = logging.INFO if holder != self._last_holder else logging.DEBUG
@@ -267,30 +347,59 @@ class SchedulerLeadership:
         )
         return False
 
-    async def _check(self) -> None:
+    async def _elect(self) -> None:
+        self._leader = True
+        self.elections += 1
+        logger.info("Elected scheduler leader: this process runs the scheduler")
+        await _call(self.on_elected, "on_elected")
+
+    async def _lock_still_held(self) -> bool:
+        """One bounded lock check; a check that hangs counts as a lost lock."""
         try:
-            held = await asyncio.to_thread(self.lock.is_held)
+            return bool(await asyncio.wait_for(asyncio.to_thread(self.lock.is_held),
+                                               timeout=self.check_timeout))
+        except asyncio.TimeoutError:
+            logger.error(
+                f"Scheduler leader lock check hung for {self.check_timeout}s; treating the lock as lost"
+            )
+            self._abandon_lock()
+            return False
         except Exception as e:
             logger.warning(f"Scheduler leader lock check failed: {e}")
-            held = False
-        if not held:
-            self._leader = False
+            return False
+
+    async def _check(self) -> None:
+        if await self._lock_still_held():
+            return
+        was_leader = self._leader
+        self._leader = False
+        self._held = False
+        if was_leader:
             logger.error("Lost the scheduler leader lock; pausing the scheduler and standing by")
             await _call(self.on_demoted, "on_demoted")
+        else:
+            logger.warning("Lost the scheduler leader lock before taking over; standing by")
 
     async def _run(self) -> None:
         while not self._stopping.is_set():
-            wait = self.check_seconds if self._leader else self.retry_seconds
+            if self._leader:
+                wait = self.check_seconds
+            elif self._held:
+                wait = self.fence_seconds
+            else:
+                wait = self.retry_seconds
             try:
                 await asyncio.wait_for(self._stopping.wait(), timeout=wait)
                 break
             except asyncio.TimeoutError:
                 pass
             try:
-                if self._leader:
+                if self._held:
                     await self._check()
-                else:
-                    await self._attempt()
+                    if self._held and not self._leader:
+                        await self._elect()  # fence over and the lock is still ours
+                elif await self._attempt() and self.fence_seconds <= 0:
+                    await self._elect()
             except Exception as e:  # never let the loop die
                 logger.error(f"Scheduler leadership loop error: {e}", exc_info=True)
 
@@ -306,8 +415,12 @@ class SchedulerLeadership:
 
     async def release(self) -> None:
         self._leader = False
+        self._held = False
         try:
-            await asyncio.to_thread(self.lock.release)
+            await asyncio.wait_for(asyncio.to_thread(self.lock.release), timeout=self.acquire_timeout)
+        except asyncio.TimeoutError:
+            logger.warning("Releasing the scheduler leader lock timed out; abandoning the connection")
+            self._abandon_lock()
         except Exception as e:
             logger.warning(f"Releasing the scheduler leader lock failed: {e}")
 
@@ -320,17 +433,64 @@ class SchedulerLeadership:
 # Resolver for jobs left RUNNING by a dead process
 # ---------------------------------------------------------------------------
 
+# Other processes of the same role ("nexdata-api@<host>:<pid>") that are
+# connected right now. Any of them may be running in-process ingestions
+# (BackgroundTasks, or the plain-source schedules of a demoted leader) that
+# have no queue row, so their RUNNING rows are indistinguishable from dead ones.
+_OTHER_LIVE_PROCESSES_SQL = """
+    SELECT DISTINCT application_name FROM pg_stat_activity
+    WHERE application_name LIKE :pattern AND application_name <> :me
+      AND pid <> pg_backend_pid()
+"""
 
-def resolve_stale_running_jobs(engine, hours: int = STALE_RUNNING_HOURS) -> int:
+
+def _like_escape(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def resolve_stale_running_jobs(
+    engine,
+    hours: int = STALE_RUNNING_HOURS,
+    *,
+    started_before: Optional[datetime] = None,
+    process_role: Optional[str] = None,
+    process_name: Optional[str] = None,
+) -> int:
     """Fail RUNNING ingestion jobs older than ``hours`` that nothing runs.
 
     Leader-only (an API restart or a second API process must not fail jobs a
     worker is in the middle of). Rows with a live linked queue job are left
     to the worker; rows whose queue job already ended are settled here or by
     the SPEC_121 orphan sweep, whichever comes first.
+
+    A RUNNING row with no queue row is an in-process run, and SQL cannot tell
+    a dead process's run from a live one's (SPEC_160 review). So:
+
+    - ``started_before`` (this process's boot time): rows started since then
+      may be this process's own live runs and are skipped.
+    - ``process_role`` / ``process_name``: if any other process of the same
+      role is connected, it may own such rows, and the resolver does nothing;
+      ``cleanup_stuck_jobs`` (per-source timeout) settles them later.
     """
     with engine.begin() as conn:
-        n = conn.execute(text(_RESOLVE_STALE_SQL), {"msg": STALE_RESOLVED_MESSAGE, "hours": hours}).rowcount
+        if process_role and process_name:
+            others = [r[0] for r in conn.execute(
+                text(_OTHER_LIVE_PROCESSES_SQL),
+                {"pattern": _like_escape(process_role) + "@%", "me": process_name},
+            ).all()]
+            if others:
+                logger.info(
+                    "Stale running-job resolver skipped: other live %s process(es) %s may own "
+                    "in-process RUNNING jobs; cleanup_stuck_jobs settles real orphans",
+                    process_role, others[:5],
+                )
+                return 0
+        sql = _RESOLVE_STALE_SQL
+        params: Dict[str, Any] = {"msg": STALE_RESOLVED_MESSAGE, "hours": hours}
+        if started_before is not None:
+            sql += "\n      AND ij.started_at < :started_before"
+            params["started_before"] = started_before
+        n = conn.execute(text(sql), params).rowcount
     if n:
         logger.warning(f"Resolved {n} stale RUNNING ingestion job(s) older than {hours}h with no live worker job")
     return n or 0
@@ -354,7 +514,8 @@ def _run_scheduler_setting() -> bool:
 
 
 def leader_status() -> Optional[bool]:
-    """True: this process runs the scheduler. False: standby. None: not taking part."""
+    """True: this process runs the scheduler. False: standby (or fencing).
+    None: not taking part."""
     if _leadership is None:
         return None
     return _leadership.is_leader
@@ -372,6 +533,17 @@ def may_run_jobs() -> bool:
     return _run_scheduler_setting()
 
 
+def _resolver_identity() -> Dict[str, Any]:
+    """This process's boot time and connection identity (app.core.database)."""
+    from app.core import database
+
+    return {
+        "started_before": database.PROCESS_STARTED_AT,
+        "process_role": database.process_role_name(),
+        "process_name": database.process_application_name(),
+    }
+
+
 async def start_scheduler_runtime(
     register_jobs: Callable[[], Any],
     *,
@@ -381,10 +553,14 @@ async def start_scheduler_runtime(
     engine=None,
     retry_seconds: Optional[float] = None,
     check_seconds: Optional[float] = None,
+    fence_seconds: Optional[float] = None,
+    check_timeout: Optional[float] = None,
 ) -> Optional[bool]:
     """Start APScheduler paused, then lead it if allowed and elected.
 
-    Returns the leader status (None when RUN_SCHEDULER is off).
+    Returns the leader status (None when RUN_SCHEDULER is off). With the
+    default fence the first election lands ``check + check timeout`` seconds
+    after the lock is taken, so this returns False and the loop elects.
     """
     global _leadership, _enabled
     from app.core import scheduler_service
@@ -409,13 +585,21 @@ async def start_scheduler_runtime(
         logger.info("RUN_SCHEDULER is off: this process registers and runs no scheduled jobs")
         return None
 
-    async def on_elected():
-        try:
-            from app.core.database import get_engine
+    resolved = {"done": False}
 
-            await asyncio.to_thread(resolve_stale_running_jobs, engine or get_engine())
-        except Exception as e:
-            logger.warning(f"Stale running-job resolver skipped: {e}")
+    async def on_elected():
+        # Once per process (SPEC_160 review): on a re-election this process's
+        # own in-process runs are alive, and a demoted leader's may be too.
+        if not resolved["done"]:
+            resolved["done"] = True
+            try:
+                from app.core.database import get_engine
+
+                await asyncio.to_thread(
+                    lambda: resolve_stale_running_jobs(engine or get_engine(), **_resolver_identity())
+                )
+            except Exception as e:
+                logger.warning(f"Stale running-job resolver skipped: {e}")
         try:
             register_jobs()
         except Exception as e:
@@ -431,6 +615,8 @@ async def start_scheduler_runtime(
         on_demoted=on_demoted,
         retry_seconds=retry_seconds,
         check_seconds=check_seconds,
+        check_timeout=check_timeout,
+        fence_seconds=fence_seconds,
     )
     return await _leadership.start()
 

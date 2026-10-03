@@ -125,6 +125,9 @@ services:
       # SPEC_160: one scheduler. 0 = this api never runs APScheduler jobs; with
       # 1, only the process holding the Postgres leader lock does.
       RUN_SCHEDULER: ${RUN_SCHEDULER:-1}
+      # standby retry / leader re-check (s); a new leader waits check + 10 s
+      SCHEDULER_LEADER_RETRY_SECONDS: ${SCHEDULER_LEADER_RETRY_SECONDS:-120}
+      SCHEDULER_LEADER_CHECK_SECONDS: ${SCHEDULER_LEADER_CHECK_SECONDS:-30}
       DB_POOL_SIZE: ${API_DB_POOL_SIZE:-5}
       DB_MAX_OVERFLOW: ${API_DB_MAX_OVERFLOW:-10}
       # Data watchdog (SPEC_128): Slack-compatible webhook + dead-man's ping URL

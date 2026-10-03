@@ -151,15 +151,11 @@ def _end_read_transaction(db: Session) -> None:
     SPEC_160: committing expires every ORM object, so the next attribute read
     (``job.payload``) re-SELECTs the row and opens a transaction that then sat
     "idle in transaction" through the rate-limit wait and the whole executor
-    run. Committing with expire_on_commit off returns the connection to the
-    pool and leaves the job's attributes readable without SQL.
+    run. See ``app.core.database.end_read_transaction``.
     """
-    previous = db.expire_on_commit
-    db.expire_on_commit = False
-    try:
-        db.commit()
-    finally:
-        db.expire_on_commit = previous
+    from app.core.database import end_read_transaction
+
+    end_read_transaction(db)
 
 
 class JobCancelledError(Exception):
