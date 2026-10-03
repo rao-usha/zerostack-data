@@ -4,8 +4,9 @@ Liveness, readiness and health probes (SPEC_128).
 - ``/livez``  -- the process is up. Never touches the database.
 - ``/readyz`` -- the database answers ``SELECT 1``; 503 otherwise.
 - ``/health`` -- backward-compatible summary (``status``, ``service``,
-  ``database``, ``worker``) plus worker liveness from ``worker_heartbeats``
-  and queue depth; 503 when the database is unreachable.
+  ``database``, ``worker``) plus worker liveness from ``worker_heartbeats``,
+  queue depth and ``scheduler_leader`` (SPEC_160); 503 when the database is
+  unreachable.
 
 The old ``/health`` closed its connection and then reused it, swallowed the
 error, and matched uppercase statuses the queue never stores -- so it always
@@ -87,6 +88,15 @@ def health_check():
     is unreachable; ``degraded`` when jobs go to the queue and no worker is alive.
     """
     health_status = {"status": "healthy", "service": "running", "database": "unknown", "worker": "unknown"}
+    # SPEC_160: does THIS process run APScheduler? True leader, False standby,
+    # None RUN_SCHEDULER off. Process-local, so it is reported even when the
+    # database is down.
+    try:
+        from app.core import scheduler_leader
+
+        health_status["scheduler_leader"] = scheduler_leader.leader_status()
+    except Exception:
+        health_status["scheduler_leader"] = None
 
     try:
         with get_engine().connect() as conn:

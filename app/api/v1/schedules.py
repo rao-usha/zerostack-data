@@ -124,9 +124,16 @@ def start_scheduler(db: Session = Depends(get_db)):
     """
     Start the scheduler and load all active schedules.
     """
+    from app.core import scheduler_leader
+
+    # SPEC_160: off-leader this leaves the scheduler paused (no double firing)
     scheduler_service.start_scheduler()
     count = scheduler_service.load_all_schedules(db)
-    return {"message": "Scheduler started", "schedules_loaded": count}
+    leader = scheduler_leader.leader_status()
+    message = "Scheduler started" if scheduler_leader.may_run_jobs() else (
+        "Schedules loaded; scheduler stays paused: this process is not the scheduler leader"
+    )
+    return {"message": message, "schedules_loaded": count, "scheduler_leader": leader}
 
 
 @router.post("/stop")

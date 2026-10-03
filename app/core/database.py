@@ -46,24 +46,42 @@ logger = logging.getLogger(__name__)
 _engine = None
 _SessionLocal = None
 
+# pg_stat_activity.application_name for this process unless DB_APPLICATION_NAME
+# overrides it (SPEC_160). The worker entry point sets "nexdata-worker".
+_process_role = "nexdata-api"
+
+
+def set_process_role(name: str) -> None:
+    """Name this process's connections; call before the engine is created."""
+    global _process_role
+    _process_role = name
+
 
 def get_engine():
     """
     Get the shared database engine (singleton).
 
     Uses connection pooling for efficiency. The engine is created once
-    and reused for the lifetime of the process.
+    and reused for the lifetime of the process. Pool size, overflow and
+    recycle come from DB_POOL_SIZE / DB_MAX_OVERFLOW / DB_POOL_RECYCLE.
     """
     global _engine
     if _engine is None:
         settings = get_settings()
+        kwargs = {}
+        if settings.database_url.startswith("postgresql"):
+            kwargs["connect_args"] = {
+                "application_name": settings.db_application_name or _process_role,
+            }
         _engine = create_engine(
             settings.database_url,
             poolclass=QueuePool,
-            pool_size=5,
-            max_overflow=10,
+            pool_size=settings.db_pool_size,
+            max_overflow=settings.db_max_overflow,
+            pool_recycle=settings.db_pool_recycle,
             pool_pre_ping=True,  # Verify connections before using
             echo=False,  # Set to True for SQL debugging
+            **kwargs,
         )
     return _engine
 

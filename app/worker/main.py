@@ -145,6 +145,23 @@ def claim_job(db: Session) -> Optional[JobQueue]:
     return job
 
 
+def _end_read_transaction(db: Session) -> None:
+    """End the session's open read transaction but keep loaded attributes.
+
+    SPEC_160: committing expires every ORM object, so the next attribute read
+    (``job.payload``) re-SELECTs the row and opens a transaction that then sat
+    "idle in transaction" through the rate-limit wait and the whole executor
+    run. Committing with expire_on_commit off returns the connection to the
+    pool and leaves the job's attributes readable without SQL.
+    """
+    previous = db.expire_on_commit
+    db.expire_on_commit = False
+    try:
+        db.commit()
+    finally:
+        db.expire_on_commit = previous
+
+
 class JobCancelledError(Exception):
     """Raised when a job is detected as cancelled mid-execution."""
     pass
@@ -265,7 +282,8 @@ async def execute_job(job: JobQueue, db: Session):
     db.commit()
 
     # Acquire rate limit for this source before executing
-    payload = job.payload or {}
+    payload = job.payload or {}  # reloads the row expired by the commit above
+    _end_read_transaction(db)  # ...and must not hold that read open (SPEC_160)
     source_name = payload.get("source")
     rate_limiter = None
     if source_name:
@@ -597,6 +615,11 @@ async def poll_loop():
 
 def main():
     """Entrypoint for python -m app.worker.main."""
+    # SPEC_160: name worker connections in pg_stat_activity (before any engine)
+    from app.core.database import set_process_role
+
+    set_process_role("nexdata-worker")
+
     # Apply migrations, then ensure tables exist (worker might start before API)
     from app.core.database import create_tables
     from app.core.migrate import run_migrations, verify_mapped_columns
