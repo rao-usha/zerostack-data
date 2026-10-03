@@ -1,0 +1,129 @@
+# Production compose for the PLAN_089 VM (SPEC_161). Not for the laptop.
+#
+#   - images only (Artifact Registry, tag = git sha); no build, no code mounts
+#   - no local postgres: Cloud SQL through cloud-sql-proxy, authenticating as
+#     the VM's service account via the metadata server (no ADC / key file)
+#   - one api process with RUN_SCHEDULER=1 (the only scheduler), 3 workers
+#   - app secrets come from /opt/nexdata/app.env, rendered at boot from Secret
+#     Manager by deploy/vm-startup.sh (see deploy/secrets.manifest)
+#   - data/raw, data/reports and data/kaggle live on the VM disk under
+#     /opt/nexdata/data (survive redeploys; only data/raw is synced to GCS)
+#   - needs an image with SPEC_160 (RUN_SCHEDULER, leader lock, DB_POOL_*):
+#     deploy/vm-startup.sh refuses dark and live mode otherwise
+#
+# Run on the VM (deploy/vm-startup.sh does this):
+#   docker compose -p nexdata -f docker-compose.gcp.yml --env-file /opt/nexdata/compose.env up -d
+# Dark start (api without scheduler, no workers): add -f deploy/compose.dark.yml
+# and start only `cloudsqlproxy api`. See deploy/RUNBOOK.md.
+#
+# Connection budget (Cloud SQL max_connections = 100), worst case, live
+# (laptop stack stopped):
+#   api    33 = main pool 5+10, SEC gate 1+1, APScheduler job store 5+10, LISTEN 1
+#   worker 17 = main pool 5+10, SEC gate 1+1          x 3 replicas = 51
+#   Cloud SQL superuser_reserved_connections                         3
+#   total                                                            87  (13 spare)
+# A 4th worker would reach 104: lower DB_POOL_SIZE / DB_MAX_OVERFLOW first.
+# Dark phase (laptop still live): the dark api is 23 (compose.dark.yml shrinks
+# its main pool to 2+3), but the laptop alone is 33 + 6 x 17 = 135 worst case,
+# so scale the laptop to 4 workers with WORKER_DB_POOL_SIZE=3 and
+# WORKER_DB_MAX_OVERFLOW=2 (33 + 4 x 7 = 61) before the dark start:
+# 61 + 23 + 3 = 87. See deploy/RUNBOOK.md "Connection budget".
+
+x-logging: &gcplogs
+  # Ships stdout/stderr to Cloud Logging (project/instance from the metadata
+  # server). Docker's dual logging keeps `docker compose logs` working.
+  driver: gcplogs
+  options:
+    mode: non-blocking
+    max-buffer-size: 4m
+
+x-app-env: &app-env
+  NEXDATA_ENV: cloud
+  LOG_LEVEL: INFO
+  MAX_CONCURRENCY: "4"
+  WORKER_MODE: "1"
+  # Access control (SPEC_127): auth on, signup closed
+  REQUIRE_AUTH: "true"
+  ALLOW_SIGNUP: "false"
+  BROWSER_HEADED: "0"
+  KAGGLE_DATA_DIR: /app/data/kaggle
+
+x-app-env-file: &app-env-file
+  # Rendered at boot by deploy/vm-startup.sh (mode 600, root). Overridable only
+  # so `docker compose config` can be run off the VM (tests).
+  - ${NEXDATA_APP_ENV:-/opt/nexdata/app.env}
+
+x-data-volumes: &data-volumes
+  - /opt/nexdata/data/raw:/app/data/raw
+  - /opt/nexdata/data/reports:/app/data/reports
+  # Kaggle downloads (KAGGLE_DATA_DIR) would otherwise land in the container
+  # layer and be lost on every redeploy
+  - /opt/nexdata/data/kaggle:/app/data/kaggle
+
+services:
+  cloudsqlproxy:
+    # Pinned (SPEC_121). No credentials file: on GCE the proxy takes the VM
+    # service account's token from the metadata server (needs cloudsql.client).
+    image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.22.1
+    command: >
+      --address 0.0.0.0 --port 5432
+      --health-check --http-address 0.0.0.0 --http-port 9090
+      --structured-logs
+      nexdata-cloud:us-central1:nexdata-pg
+    restart: unless-stopped
+    logging: *gcplogs
+    healthcheck:
+      test: ["CMD", "/cloud-sql-proxy", "wait", "--max", "5s"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  api:
+    image: us-central1-docker.pkg.dev/nexdata-cloud/nexdata/api:${TAG:?TAG must be set (the image's git sha)}
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    env_file: *app-env-file
+    environment:
+      <<: *app-env
+      # The one scheduler (PLAN_089 Phase 5). Never set on workers. The dark
+      # start overrides this to 0 (deploy/compose.dark.yml).
+      RUN_SCHEDULER: "1"
+      # SPEC_160 pool knobs, set explicitly so the budget above is the config
+      DB_POOL_SIZE: "5"
+      DB_MAX_OVERFLOW: "10"
+    ports:
+      # Loopback only (SPEC_127): reach it over an IAP tunnel, or put a proxy in front.
+      - "127.0.0.1:8001:8000"
+    volumes: *data-volumes
+    depends_on:
+      cloudsqlproxy:
+        condition: service_healthy
+    restart: unless-stopped
+    logging: *gcplogs
+
+  worker:
+    image: us-central1-docker.pkg.dev/nexdata-cloud/nexdata/worker:${TAG:?TAG must be set (the image's git sha)}
+    command: ["python", "-m", "app.worker.main"]
+    env_file: *app-env-file
+    environment:
+      <<: *app-env
+      WORKER_POLL_INTERVAL: "2.0"
+      WORKER_MAX_CONCURRENT: "6"
+      DB_POOL_SIZE: "5"
+      DB_MAX_OVERFLOW: "10"
+    volumes: *data-volumes
+    depends_on:
+      cloudsqlproxy:
+        condition: service_healthy
+    # The worker drains for WORKER_DRAIN_TIMEOUT (30 s) on SIGTERM; Docker's
+    # default 10 s would SIGKILL it mid-drain.
+    stop_grace_period: 45s
+    # The image HEALTHCHECK probes the api port; a worker serves no HTTP.
+    # Worker liveness is worker_heartbeats (GET /health on the api).
+    healthcheck:
+      disable: true
+    restart: unless-stopped
+    logging: *gcplogs
+    # 3 x WORKER_MAX_CONCURRENT 6 = 18 job slots; see the connection budget above
+    deploy:
+      replicas: 3

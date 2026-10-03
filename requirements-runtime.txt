@@ -1,0 +1,85 @@
+# Runtime dependencies: everything the api and worker containers import
+# (SPEC_161). The production image installs this file only.
+#   requirements-train.txt  = this file + the offline trainers (torch, ...)
+#   requirements-dev.txt    = test tooling
+#   requirements.txt        = all three, for local development
+
+# Core dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+sqlalchemy==2.0.23
+alembic==1.13.1
+psycopg2-binary==2.9.9
+pydantic==2.5.0
+pydantic-settings==2.1.0
+python-dotenv==1.0.0
+python-multipart==0.0.21
+
+# HTTP client
+httpx==0.25.2
+aiohttp>=3.9.0,<4.0.0
+tenacity>=8.2.0,<10.0.0
+
+# Utilities
+python-dateutil==2.8.2
+
+# Scheduling
+apscheduler==3.10.4
+
+# Data processing (for IRS SOI Excel/CSV parsing)
+pandas==2.1.3
+openpyxl==3.1.2
+
+# Kaggle API
+kaggle==1.6.17
+
+# Website contact extraction
+beautifulsoup4==4.12.2
+lxml>=5.1.0,<6.0.0
+phonenumbers==8.13.27
+robotexclusionrulesparser==1.7.1
+
+# Agentic Portfolio Research (for LLM-powered extraction in Phase 3)
+openai>=1.0.0,<3.0.0
+anthropic>=0.5.0,<1.0.0
+pdfplumber>=0.10.0,<1.0.0
+pytesseract>=0.3.10,<1.0.0
+pdf2image>=1.16.0,<2.0.0
+PyPDF2>=3.0.0,<4.0.0
+weasyprint>=61.0,<70.0
+python-pptx>=0.6.23,<1.0.0
+yfinance>=0.2.0,<1.0.0
+
+# JS-rendered page support (browsers only with INSTALL_BROWSERS=1)
+playwright>=1.40.0,<2.0.0
+
+# GraphQL API
+strawberry-graphql[fastapi]>=0.220.0,<1.0.0
+
+# Encryption (for API key storage)
+cryptography>=42.0.0,<45.0.0
+
+# Authentication
+PyJWT>=2.8.0,<3.0.0
+bcrypt>=4.1.0,<5.0.0
+email-validator>=2.1.0,<3.0.0
+
+# DNS verification (for email MX checks)
+dnspython>=2.4.0,<3.0.0
+
+# Geospatial (for Site Intelligence Platform)
+geoalchemy2>=0.14.0,<1.0.0
+shapely>=2.0.0,<3.0.0
+
+# Statistical validation (synthetic data checks, transaction-probability calibration)
+scipy>=1.11.0,<2.0.0
+
+# Parquet export (app/core/export_service.py) and synthetic-data artifacts
+pyarrow>=14.0.0,<20.0.0
+
+# LightGBM: synthetic consumer crowd model (app/api/v1/synthetic_crowd.py) and
+# the transaction-probability model; served at runtime, so not a training-only dep
+lightgbm>=4.0.0,<5.0.0
+
+# scikit-learn: distillation helpers (app/services/synthetic/consumer_crowd/distiller.py)
+scikit-learn>=1.3.0,<2.0.0

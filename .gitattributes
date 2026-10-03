@@ -1,0 +1,5 @@
+# Files that run on Linux (the VM, containers) must keep LF endings on any checkout (SPEC_161).
+*.sh text eol=lf
+deploy/** text eol=lf
+Dockerfile text eol=lf
+docker-compose*.yml text eol=lf
