@@ -44,15 +44,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-py311-pip-${{ hashFiles('requirements.txt') }}
+          key: ${{ runner.os }}-py311-pip-${{ hashFiles('requirements-runtime.txt', 'requirements-dev.txt') }}
           restore-keys: |
             ${{ runner.os }}-py311-pip-
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest pytest-asyncio pytest-cov
+          # runtime + dev only (SPEC_161): proves the app and tests need no torch
+          pip install -r requirements-runtime.txt -r requirements-dev.txt
 
       - name: Create spec-test database
         run: |
@@ -149,7 +149,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build Docker image
-        run: docker build -t nexdata-api .
+        run: docker build --target runtime -t nexdata-api .
 
       - name: Smoke test the image
         # The app must import and build its routes inside the image. No DB is

@@ -1,0 +1,32 @@
+# Build context for the Dockerfile (SPEC_161). The image copies app/, scripts/,
+# alembic/, data/reference/, deploy/ and docker-compose.gcp.yml; everything
+# else stays out of the context (data/raw alone is ~7 GB, and .env holds secrets).
+.git
+.github
+.claude
+.cursor
+.env
+.env.*
+*.env
+venv
+.venv
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.coverage
+htmlcov
+data
+!data/reference
+docs
+frontend
+k8s
+memory
+demo
+tests
+backup
+*.png
+*.log
+*.txt
+!requirements*.txt
+cloud-sql-proxy*
+gcloud-auth.cmd

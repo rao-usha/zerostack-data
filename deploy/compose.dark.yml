@@ -1,0 +1,10 @@
+# Dark start override (SPEC_161, PLAN_089 Phase 3): the VM api runs without the
+# scheduler while the laptop stack still owns it. Use with ONLY the proxy and
+# the api; workers stay down so nothing on the VM claims jobs:
+#   docker compose -p nexdata -f docker-compose.gcp.yml -f deploy/compose.dark.yml \
+#     --env-file /opt/nexdata/compose.env up -d cloudsqlproxy api
+# Requires an image that honours RUN_SCHEDULER (SPEC_160). See deploy/RUNBOOK.md.
+services:
+  api:
+    environment:
+      RUN_SCHEDULER: "0"

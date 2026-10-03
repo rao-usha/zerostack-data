@@ -1,0 +1,17 @@
+# Nightly copy of the raw bulk archive to GCS (SPEC_161, PLAN_089 Phase 4).
+# Installed by deploy/vm-startup.sh; triggered by nexdata-raw-sync.timer.
+# Copy-only: objects removed locally stay in the bucket (rsync is never told
+# to delete destination objects); the bucket's lifecycle rules move
+# old objects to Nearline. Runs as root with the VM service account
+# (storage.objectAdmin on gs://nexdata-raw-usc1).
+[Unit]
+Description=Nexdata data/raw -> gs://nexdata-raw-usc1/raw
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=6h
+ExecStart=/usr/bin/gcloud storage rsync --recursive /opt/nexdata/data/raw gs://nexdata-raw-usc1/raw

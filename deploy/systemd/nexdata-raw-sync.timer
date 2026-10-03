@@ -1,0 +1,14 @@
+# Nightly at 07:30 UTC: after the 05:10-06:20 UTC bulk window (PLAN_089 Phase 5),
+# so the day's new raw files are on disk. Persistent: a run missed while the VM
+# was down happens at next boot.
+[Unit]
+Description=Nightly Nexdata raw archive sync to GCS
+
+[Timer]
+OnCalendar=*-*-* 07:30:00 UTC
+RandomizedDelaySec=10min
+Persistent=true
+Unit=nexdata-raw-sync.service
+
+[Install]
+WantedBy=timers.target

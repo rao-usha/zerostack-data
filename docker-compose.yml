@@ -100,6 +100,9 @@ services:
   api:
     build:
       context: .
+      # SPEC_161: the local api keeps torch for the PLAN_062 GPU trainers (see the
+      # GPU reservation below). Production runs the slim `runtime` target.
+      target: train
       args:
         # Set to 1 to install Playwright browsers (~500MB) for JS-rendered page scraping
         INSTALL_BROWSERS: ${INSTALL_BROWSERS:-0}
@@ -170,6 +173,7 @@ services:
   worker:
     build:
       context: .
+      target: runtime   # SPEC_161: workers never import the trainers
       args:
         INSTALL_BROWSERS: ${INSTALL_BROWSERS:-0}
     environment:

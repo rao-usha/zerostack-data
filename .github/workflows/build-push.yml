@@ -1,0 +1,166 @@
+name: Build, push and deploy
+
+# SPEC_161 / PLAN_089 Phase 2. After CI passes on a push to main: build the
+# runtime image, smoke it, push api:<sha> and worker:<sha> to Artifact
+# Registry. Deploying to the VM waits for a reviewer to approve the
+# `production` environment. workflow_dispatch redeploys an existing tag
+# (rollback = the previous sha).
+#
+# Configure in GitHub (Settings -> Secrets and variables -> Actions -> Variables),
+# none of which this repo creates:
+#   GCP_WIF_PROVIDER            projects/<number>/locations/global/workloadIdentityPools/<pool>/providers/<provider>
+#   GCP_PUSH_SERVICE_ACCOUNT    e.g. gh-push@nexdata-cloud.iam.gserviceaccount.com   (artifactregistry.writer on repo nexdata)
+#   GCP_DEPLOY_SERVICE_ACCOUNT  e.g. gh-deploy@nexdata-cloud.iam.gserviceaccount.com (compute.instanceAdmin.v1 on the VM,
+#                               compute.osAdminLogin, iap.tunnelResourceAccessor, iam.serviceAccountUser on nexdata-runtime,
+#                               artifactregistry.reader)
+#   NEXDATA_VM_NAME / NEXDATA_VM_ZONE (optional; default nexdata-vm / us-central1-c)
+# and an Environment named `production` with required reviewers (the manual approval).
+# No JSON keys anywhere: both service accounts are reached through Workload Identity Federation.
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag already in Artifact Registry (a git sha) to deploy; rollback = the previous sha"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write   # OIDC token for Workload Identity Federation
+
+concurrency:
+  group: build-push-deploy
+  cancel-in-progress: false
+
+env:
+  PROJECT_ID: nexdata-cloud
+  REGISTRY: us-central1-docker.pkg.dev
+  IMAGE_BASE: us-central1-docker.pkg.dev/nexdata-cloud/nexdata
+  VM_NAME: ${{ vars.NEXDATA_VM_NAME || 'nexdata-vm' }}
+  VM_ZONE: ${{ vars.NEXDATA_VM_ZONE || 'us-central1-c' }}
+
+jobs:
+  build:
+    # only for a green CI run that was triggered by a push (to main, see branches)
+    if: >-
+      github.event_name == 'workflow_run'
+      && github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Image tag
+        id: meta
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: echo "tag=${HEAD_SHA}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build the runtime image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runtime
+          load: true
+          push: false
+          tags: |
+            ${{ env.IMAGE_BASE }}/api:${{ steps.meta.outputs.tag }}
+            ${{ env.IMAGE_BASE }}/worker:${{ steps.meta.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test the image
+        env:
+          IMG: ${{ env.IMAGE_BASE }}/api:${{ steps.meta.outputs.tag }}
+          DB: postgresql://nobody:x@127.0.0.1:1/none
+        run: |
+          docker run --rm -e DATABASE_URL="$DB" "$IMG" \
+            python -c "import app.main as m; n = len(m.app.routes); assert n > 100, n; print('routes', n)"
+          docker run --rm -e DATABASE_URL="$DB" "$IMG" \
+            python -c "import app.worker.main; print('worker import ok')"
+          # the runtime image must not carry the trainers' deps
+          if docker run --rm "$IMG" python -c "import torch" 2>/dev/null; then
+            echo "::error::torch is installed in the runtime image"; exit 1
+          fi
+          test "$(docker run --rm "$IMG" id -u)" != "0" || { echo "::error::image runs as root"; exit 1; }
+          docker image ls "$IMG" --format 'image size: {{.Size}}'
+
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_PUSH_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Push to Artifact Registry
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          gcloud auth configure-docker "$REGISTRY" --quiet
+          docker push "$IMAGE_BASE/api:$TAG"
+          docker push "$IMAGE_BASE/worker:$TAG"
+          echo "pushed $IMAGE_BASE/{api,worker}:$TAG" >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    needs: build
+    # after a successful build, or on a manual dispatch (build is skipped then)
+    if: >-
+      always()
+      && (needs.build.result == 'success'
+          || (github.event_name == 'workflow_dispatch' && needs.build.result == 'skipped'))
+    runs-on: ubuntu-latest
+    environment:
+      name: production   # required reviewers on this environment = manual approval
+
+    steps:
+      - name: Resolve tag
+        id: tag
+        env:
+          BUILT: ${{ needs.build.outputs.tag }}
+          REQUESTED: ${{ inputs.tag }}
+        run: |
+          TAG="${BUILT:-$REQUESTED}"
+          [[ "$TAG" =~ ^[A-Za-z0-9._-]{1,128}$ ]] || { echo "::error::bad tag '$TAG'"; exit 1; }
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Check the image exists
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          gcloud artifacts docker images describe "$IMAGE_BASE/api:$TAG" --format 'value(image_summary.digest)'
+          gcloud artifacts docker images describe "$IMAGE_BASE/worker:$TAG" --format 'value(image_summary.digest)'
+
+      - name: Point the VM at the tag and rerun its startup script over IAP
+        # The VM's nexdata-mode metadata (off|dark|live) is left alone: cutover is
+        # a human step (deploy/RUNBOOK.md). The startup script refuses to recreate
+        # workers while jobs run (rerun later, or set NEXDATA_FORCE=1 by hand).
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          gcloud compute instances add-metadata "$VM_NAME" --zone "$VM_ZONE" --project "$PROJECT_ID" \
+            --metadata "nexdata-tag=$TAG"
+          gcloud compute ssh "$VM_NAME" --zone "$VM_ZONE" --project "$PROJECT_ID" \
+            --tunnel-through-iap --quiet \
+            --command "sudo google_metadata_script_runner startup"
+          echo "deployed $TAG to $VM_NAME" >> "$GITHUB_STEP_SUMMARY"

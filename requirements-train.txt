@@ -1,0 +1,14 @@
+# Offline training dependencies (SPEC_161): the PLAN_062 W3 trainers under
+# app/services/synthetic/training/. Nothing the api or worker imports needs
+# these; they are built only into the Dockerfile `train` target.
+-r requirements-runtime.txt
+
+# PyTorch with CUDA 12.x support. On linux/x86_64 PyPI ships CUDA wheels by default.
+# Driver: Windows host 591.86, CUDA 13.1 visible; backward-compatible w/ CUDA 12.x torch.
+torch>=2.4.0,<3.0.0
+
+# Tensor shape manipulation: TabDDPM denoising net + Diffusion-TS transformer
+einops>=0.7.0,<1.0.0
+
+# Training experiment tracking (offline-friendly; can run without WANDB_API_KEY)
+wandb>=0.16.0,<1.0.0
