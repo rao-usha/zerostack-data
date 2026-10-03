@@ -124,3 +124,43 @@ add a line when one is provisioned).
 | T14 | test_vm_startup_script | bash syntax, renders from manifest, dark default |
 | T15 | test_raw_sync_units | rsync target bucket, timer |
 | T16 | test_build_push_workflow | WIF, AR, environment approval, IAP |
+
+## Fix round (review findings, 2026-10-03)
+
+Review found that dark mode, the default, was unsafe on any image without SPEC_160, and that the
+deploy path could report success after a refusal or leave the VM pointing at a tag it never ran.
+
+- **Scheduler gate (findings 1, 2, 5).** `deploy/check_scheduler_gate.py` (stdlib, static, no DB)
+  runs inside the image before anything switches. It requires the `run_scheduler` /
+  `db_pool_size` / `db_max_overflow` Settings fields, `app/core/scheduler_leader.py`
+  (`start_scheduler_runtime`, `resolve_stale_running_jobs`), and a `main.py` with no direct
+  `start_scheduler()` call and no unconditional stale-job UPDATE. `vm-startup.sh` refuses dark and
+  live without it. An image without the probe is refused too. `NEXDATA_SKIP_SCHEDULER_GATE=1` is
+  honoured in live mode only.
+- **Stage, check, then commit (finding 6).** The script pulls the images, checks digests and stages
+  `compose.new` and `app.env.new`. It then runs the gate, the busy check (live) and the secret
+  render, and only after those swaps the staged files in and writes `compose.env`. A refusal changes
+  nothing. Runs are serialised with `flock`. There is no `compose pull` after the digest check.
+- **Exit status and tag ordering (finding 3).** The deploy job runs the script directly over IAP
+  (`sudo env NEXDATA_TAG=... bash <script>`), so its exit status reaches the job. It passes the AR
+  digests and sets the `nexdata-tag` metadata only after the script succeeded.
+- **Trigger (finding 4).** CI on main has failed on every run since 2026-04, checked through the
+  public GitHub API. `build-push.yml` therefore runs on push to main behind its own `gate` job
+  (SPEC_161/160/120/121/128 tests with Postgres) instead of `workflow_run` with success.
+- **WIF scoping (finding 7).** The provider `attribute_condition` and the per-SA `principal://` subject
+  bindings (`ref:refs/heads/main` for push, `environment:production` for deploy) are documented in the
+  workflow header and the RUNBOOK, along with AR immutable tags and a main-only deploy.
+- **Dark-phase budget (finding 8).** `compose.dark.yml` sets `DB_POOL_SIZE=2` and `DB_MAX_OVERFLOW=3`,
+  which brings the dark api to 23 connections. The RUNBOOK shows the laptop today plus the dark api
+  at 161 and the target of 87, reached with 4 laptop workers at pool 3+2. `docker-compose.gcp.yml`
+  sets `DB_POOL_SIZE` and `DB_MAX_OVERFLOW` explicitly.
+- **Scope gap.** `/opt/nexdata/data/kaggle` is mounted at `/app/data/kaggle`.
+
+| ID | Test | Verifies |
+|----|------|----------|
+| F1 | TestSchedulerGate::* | probe passes a gated tree, refuses each missing piece, matches this tree, stdlib-only, ships in the image |
+| F2 | test_main_gates_scheduler_on_run_scheduler | strict xfail until SPEC_160 is merged, then must pass |
+| F3 | TestStartupOrdering::* | stage → gate → busy → render → commit → units → up; gate covers dark+live; no re-pull |
+| F4 | TestStartupBehaviour::* | Git Bash run with stubs: switch on success; refusals (gate, busy, missing secret, digest) leave compose/, app.env and compose.env unchanged and exit non-zero |
+| F5 | test_deploy_propagates_exit_and_sets_tag_last / test_wif_trust_is_scoped | workflow ordering, digests, WIF docs |
+| F6 | test_dark_phase_connection_budget | 23 / 161 / 87 numbers match compose + RUNBOOK |

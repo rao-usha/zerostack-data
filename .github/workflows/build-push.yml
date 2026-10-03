@@ -1,10 +1,16 @@
 name: Build, push and deploy
 
-# SPEC_161 / PLAN_089 Phase 2. After CI passes on a push to main: build the
-# runtime image, smoke it, push api:<sha> and worker:<sha> to Artifact
+# SPEC_161 / PLAN_089 Phase 2. On a push to main: run the deploy gate tests,
+# build the runtime image, smoke it, push api:<sha> and worker:<sha> to Artifact
 # Registry. Deploying to the VM waits for a reviewer to approve the
 # `production` environment. workflow_dispatch redeploys an existing tag
 # (rollback = the previous sha).
+#
+# Why not "after CI is green" (workflow_run on CI): the full suite in ci.yml has
+# failed on every main run since 2026-04 (live-service and drift tests), so that
+# trigger would never fire. The `gate` job below runs the tests that guard what
+# this workflow ships (image, compose, deploy scripts, scheduler/worker/health).
+# Switch back to workflow_run once ci.yml's test job is green on main.
 #
 # Configure in GitHub (Settings -> Secrets and variables -> Actions -> Variables),
 # none of which this repo creates:
@@ -14,13 +20,25 @@ name: Build, push and deploy
 #                               compute.osAdminLogin, iap.tunnelResourceAccessor, iam.serviceAccountUser on nexdata-runtime,
 #                               artifactregistry.reader)
 #   NEXDATA_VM_NAME / NEXDATA_VM_ZONE (optional; default nexdata-vm / us-central1-c)
-# and an Environment named `production` with required reviewers (the manual approval).
-# No JSON keys anywhere: both service accounts are reached through Workload Identity Federation.
+# and an Environment named `production` with required reviewers (the manual
+# approval) and deployment branches limited to `main`.
+#
+# Workload Identity Federation trust (who may mint tokens for which SA). The
+# exact gcloud commands are in deploy/RUNBOOK.md "GitHub -> GCP trust":
+#   provider attribute_condition:  assertion.repository == 'rao-usha/zerostack-data'
+#   provider attribute mapping:    google.subject = assertion.sub
+#   push SA   roles/iam.workloadIdentityUser on
+#     principal://iam.googleapis.com/projects/<number>/locations/global/workloadIdentityPools/<pool>/subject/repo:rao-usha/zerostack-data:ref:refs/heads/main
+#   deploy SA roles/iam.workloadIdentityUser on
+#     principal://iam.googleapis.com/projects/<number>/locations/global/workloadIdentityPools/<pool>/subject/repo:rao-usha/zerostack-data:environment:production
+# Never a repo-wide principalSet: any branch's workflow could then reach the
+# deploy SA (root on the VM via startup-script metadata) without the approval.
+# The AR repo uses immutable tags, and the VM checks the pulled digests against
+# the ones this workflow read from AR.
+# No JSON keys anywhere: both service accounts are reached through WIF.
 
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
+  push:
     branches: [main]
   workflow_dispatch:
     inputs:
@@ -45,26 +63,77 @@ env:
   VM_ZONE: ${{ vars.NEXDATA_VM_ZONE || 'us-central1-c' }}
 
 jobs:
+  gate:
+    # The deploy gate: tests for what this workflow ships. Runtime + dev deps
+    # only, like the image.
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: nexdata_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://test:test@localhost:5432/nexdata_test
+      TEST_PG_URL: postgresql://test:test@localhost:5432/nexdata_spec
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-runtime.txt -r requirements-dev.txt
+
+      - name: Create spec-test database
+        run: |
+          python - <<'EOF'
+          from sqlalchemy import create_engine, text
+          engine = create_engine("postgresql://test:test@localhost:5432/nexdata_test",
+                                 isolation_level="AUTOCOMMIT")
+          with engine.connect() as conn:
+              conn.execute(text("DROP DATABASE IF EXISTS nexdata_spec"))
+              conn.execute(text("CREATE DATABASE nexdata_spec"))
+          EOF
+
+      - name: Deploy gate tests
+        # SPEC_161 (image, compose, deploy scripts, this workflow), SPEC_160
+        # (one scheduler) when present, SPEC_120/121/128 (scheduler, job
+        # reliability, health).
+        run: |
+          shopt -s nullglob
+          files=(tests/test_spec_161_*.py tests/test_spec_160_*.py \
+                 tests/test_spec_120_*.py tests/test_spec_121_*.py tests/test_spec_128_*.py)
+          echo "gate: ${files[*]}"
+          pytest --tb=short -q "${files[@]}"
+
   build:
-    # only for a green CI run that was triggered by a push (to main, see branches)
-    if: >-
-      github.event_name == 'workflow_run'
-      && github.event.workflow_run.conclusion == 'success'
-      && github.event.workflow_run.event == 'push'
+    needs: gate
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.meta.outputs.tag }}
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Image tag
         id: meta
-        env:
-          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-        run: echo "tag=${HEAD_SHA}" >> "$GITHUB_OUTPUT"
+        run: echo "tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v3
 
@@ -95,6 +164,10 @@ jobs:
             echo "::error::torch is installed in the runtime image"; exit 1
           fi
           test "$(docker run --rm "$IMG" id -u)" != "0" || { echo "::error::image runs as root"; exit 1; }
+          # what the VM checks before dark/live (informational here: an image
+          # without SPEC_160 still builds, the VM refuses to run it)
+          docker run --rm --network none "$IMG" python /app/deploy/check_scheduler_gate.py /app \
+            || echo "::warning::image does not pass the scheduler gate (SPEC_160); the VM will refuse it"
           docker image ls "$IMG" --format 'image size: {{.Size}}'
 
       - name: Authenticate to Google Cloud (Workload Identity Federation)
@@ -116,9 +189,10 @@ jobs:
 
   deploy:
     needs: build
-    # after a successful build, or on a manual dispatch (build is skipped then)
+    # after a successful build, or on a manual dispatch from main (build is skipped then)
     if: >-
       always()
+      && github.ref == 'refs/heads/main'
       && (needs.build.result == 'success'
           || (github.event_name == 'workflow_dispatch' && needs.build.result == 'skipped'))
     runs-on: ubuntu-latest
@@ -144,23 +218,45 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v2
 
-      - name: Check the image exists
+      - name: Check the images exist and read their digests
+        id: digest
         env:
           TAG: ${{ steps.tag.outputs.tag }}
         run: |
-          gcloud artifacts docker images describe "$IMAGE_BASE/api:$TAG" --format 'value(image_summary.digest)'
-          gcloud artifacts docker images describe "$IMAGE_BASE/worker:$TAG" --format 'value(image_summary.digest)'
+          api="$(gcloud artifacts docker images describe "$IMAGE_BASE/api:$TAG" --format 'value(image_summary.digest)')"
+          worker="$(gcloud artifacts docker images describe "$IMAGE_BASE/worker:$TAG" --format 'value(image_summary.digest)')"
+          for d in "$api" "$worker"; do
+            [[ "$d" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "::error::bad digest '$d'"; exit 1; }
+          done
+          echo "api=$api" >> "$GITHUB_OUTPUT"
+          echo "worker=$worker" >> "$GITHUB_OUTPUT"
+          echo "api $api, worker $worker" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Point the VM at the tag and rerun its startup script over IAP
-        # The VM's nexdata-mode metadata (off|dark|live) is left alone: cutover is
-        # a human step (deploy/RUNBOOK.md). The startup script refuses to recreate
-        # workers while jobs run (rerun later, or set NEXDATA_FORCE=1 by hand).
+      - name: Run the VM startup script with the new tag over IAP
+        # Runs the script directly (not google_metadata_script_runner, which
+        # logs the script's exit status but exits 0 itself), so any refusal
+        # (scheduler gate, running jobs, missing secret, api not ready) fails
+        # this step. The VM's nexdata-mode metadata (off|dark|live) is left
+        # alone: cutover is a human step (deploy/RUNBOOK.md).
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          API_DIGEST: ${{ steps.digest.outputs.api }}
+          WORKER_DIGEST: ${{ steps.digest.outputs.worker }}
+        run: |
+          # TAG and the digests were validated above (no quotes or spaces possible)
+          MD=http://metadata.google.internal/computeMetadata/v1/instance/attributes
+          REMOTE="f=\$(mktemp) && curl -fsS -H 'Metadata-Flavor: Google' -o \"\$f\" $MD/startup-script"
+          REMOTE="$REMOTE && sudo env NEXDATA_TAG=$TAG NEXDATA_API_DIGEST=$API_DIGEST NEXDATA_WORKER_DIGEST=$WORKER_DIGEST bash \"\$f\""
+          REMOTE="$REMOTE; rc=\$?; rm -f \"\$f\"; exit \$rc"
+          gcloud compute ssh "$VM_NAME" --zone "$VM_ZONE" --project "$PROJECT_ID" \
+            --tunnel-through-iap --quiet --command "$REMOTE"
+
+      - name: Record the tag on the VM (only after it runs it)
+        # Set last, so a refused or failed deploy never leaves the new tag in
+        # metadata for the next reboot to pick up unchecked.
         env:
           TAG: ${{ steps.tag.outputs.tag }}
         run: |
           gcloud compute instances add-metadata "$VM_NAME" --zone "$VM_ZONE" --project "$PROJECT_ID" \
             --metadata "nexdata-tag=$TAG"
-          gcloud compute ssh "$VM_NAME" --zone "$VM_ZONE" --project "$PROJECT_ID" \
-            --tunnel-through-iap --quiet \
-            --command "sudo google_metadata_script_runner startup"
           echo "deployed $TAG to $VM_NAME" >> "$GITHUB_STEP_SUMMARY"

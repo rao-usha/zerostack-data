@@ -10,19 +10,40 @@ and its job store is shared in Cloud SQL, so two api processes with the schedule
 fire every schedule twice. The VM api only runs the scheduler in `live` mode, and `live` is only
 switched on in the cutover below, after the laptop stack is stopped.
 
+**Hard prerequisite: SPEC_160 in the image.** Before SPEC_160 the api ignores `RUN_SCHEDULER`,
+always starts APScheduler, and on every start marks `running` jobs older than 2 h as `failed`.
+`vm-startup.sh` therefore runs `deploy/check_scheduler_gate.py` inside the image it is about to
+start and refuses `dark` and `live` unless the image has the `RUN_SCHEDULER` setting, the
+Postgres leader lock (`app/core/scheduler_leader.py`), the leader-only stale-job resolver and the
+`DB_POOL_SIZE` / `DB_MAX_OVERFLOW` knobs. An image without the probe (built before it existed)
+is refused too. The only bypass is `NEXDATA_SKIP_SCHEDULER_GATE=1`, honoured in `live` mode only,
+for when no other api (the laptop) uses the database at all.
+
+Helper used below to run the startup script by hand with its exit status (the guest agent's
+`google_metadata_script_runner startup` logs the status but does not return it):
+
+```bash
+run_startup() {  # usage: run_startup [VAR=value ...]   (on the VM)
+  local f; f="$(mktemp)"
+  curl -fsS -H 'Metadata-Flavor: Google' -o "$f" \
+    http://metadata.google.internal/computeMetadata/v1/instance/attributes/startup-script \
+    && sudo env "$@" bash "$f"; local rc=$?; rm -f "$f"; return $rc
+}
+```
+
 ## Moving parts
 
 | Piece | Where | What it does |
 |---|---|---|
 | `deploy/vm-startup.sh` | instance metadata `startup-script` | every boot (and every deploy): install/upgrade Docker, AR auth, extract compose files from the image, render `/opt/nexdata/app.env`, install the raw-sync timer, `docker compose up` |
-| `nexdata-tag` metadata | instance | image tag (git sha) to run |
+| `nexdata-tag` metadata | instance | image tag (git sha) to run on boot; the deploy job sets it only after the VM ran that tag successfully |
 | `nexdata-mode` metadata | instance | `off` (stack down) / `dark` (default: proxy + api with `RUN_SCHEDULER=0`, no workers) / `live` (api with `RUN_SCHEDULER=1` + 3 workers) |
-| `docker-compose.gcp.yml`, `deploy/compose.dark.yml`, `deploy/secrets.manifest`, `deploy/systemd/*` | baked into the image at `/app/deploy/`, extracted to `/opt/nexdata/compose/` | the compose files always match the image tag; the previous set stays in `/opt/nexdata/compose.prev/` |
+| `docker-compose.gcp.yml`, `deploy/compose.dark.yml`, `deploy/secrets.manifest`, `deploy/check_scheduler_gate.py`, `deploy/systemd/*` | baked into the image at `/app/deploy/`, staged in `/opt/nexdata/compose.new/`, swapped into `/opt/nexdata/compose/` only after every check passed | the compose files always match the image tag; the previous set stays in `/opt/nexdata/compose.prev/` |
 | `/opt/nexdata/app.env` | VM, root 600 | app secrets from Secret Manager, one `NAME='value'` per manifest line |
 | `/opt/nexdata/compose.env` | VM, root 600 | `TAG=<sha>` for compose interpolation |
 | image `api:<sha>` = `worker:<sha>` | Artifact Registry | Dockerfile target `runtime`: no torch, no compiler, uid 1000, ≈1.6 GB on disk / ≈380 MB compressed (measured 2026-10-03; the laptop's `nexdata-api` image is 9.57 GB) |
 | `nexdata-raw-sync.timer` | systemd | 07:30 UTC nightly `gcloud storage rsync --recursive /opt/nexdata/data/raw gs://nexdata-raw-usc1/raw` (copy only, never deletes) |
-| `.github/workflows/build-push.yml` | GitHub | green CI on main -> build runtime image -> push `api:<sha>`, `worker:<sha>` -> (approval) set `nexdata-tag`, rerun the startup script over IAP |
+| `.github/workflows/build-push.yml` | GitHub | push to main -> deploy gate tests -> build runtime image -> push `api:<sha>`, `worker:<sha>` -> (approval) run the startup script over IAP with that tag and the AR digests -> on success set `nexdata-tag` |
 
 Handy on the VM (`gcloud compute ssh nexdata-vm --zone us-central1-c --tunnel-through-iap`):
 
@@ -40,8 +61,11 @@ API from the laptop: `gcloud compute start-iap-tunnel nexdata-vm 8001 --local-ho
 
 ## Connection budget
 
-Cloud SQL `max_connections = 100`. Pools are hard-coded today (`app/core/database.py`, `app/core/sec_gate.py`);
-worst case, every pool at `pool_size + max_overflow`:
+Cloud SQL `max_connections = 100`. Worst case, every pool at `pool_size + max_overflow`. The main
+pool is `DB_POOL_SIZE` + `DB_MAX_OVERFLOW` (SPEC_160; set explicitly in `docker-compose.gcp.yml`),
+the SEC gate pool (`app/core/sec_gate.py`) and the APScheduler job store engine are fixed.
+
+**Live (after cutover, laptop stopped):**
 
 | Process | Pools | Each | Count | Total |
 |---|---|---|---|---|
@@ -50,11 +74,40 @@ worst case, every pool at `pool_size + max_overflow`:
 | Cloud SQL `superuser_reserved_connections` | | | | 3 |
 | **Worst case** | | | | **87** |
 
-13 left for psql, `alembic`, the monitoring connection and the laptop while it still runs. 3 workers ×
+13 left for psql, `alembic` and the monitoring connection, **not** for the laptop: in live mode the
+laptop stack is down (cutover step 6). 3 workers ×
 `WORKER_MAX_CONCURRENT=6` = 18 job slots (the laptop ran 6 × 6 = 36). A 4th worker would make it 104:
 first make the pool configurable and smaller (`DB_POOL_SIZE` / `DB_MAX_OVERFLOW`, SPEC_160), then
 recompute this table and `tests/test_spec_161_production_image.py::test_workers_and_connection_budget`.
 `app/api/v1/agentic_research.py` builds a throwaway engine per background portfolio run (+1 per run in flight).
+
+**Dark phase (laptop live, VM api dark):** everything shares the same Cloud SQL.
+
+| Process | Pools | Each | Count | Total |
+|---|---|---|---|---|
+| laptop api (unchanged) | main 5+10, SEC gate 2, job store 15, LISTEN 1 | 33 | 1 | 33 |
+| laptop workers, as they run today | main 5+10, SEC gate 2 | 17 | 6 | 102 |
+| VM dark api (`compose.dark.yml`: `DB_POOL_SIZE=2`, `DB_MAX_OVERFLOW=3`) | main 2+3, SEC gate 2, job store 15, LISTEN 1 | 23 | 1 | 23 |
+| reserved | | | | 3 |
+| **Worst case as the laptop runs today** | | | | **161** |
+
+The laptop alone (135 + 3) is already over 100 in the worst case; adding the dark api makes it
+worse. Before the dark start, with SPEC_160 on the laptop too, run the laptop with 4 workers at a
+smaller pool:
+
+```bash
+WORKER_DB_POOL_SIZE=3 WORKER_DB_MAX_OVERFLOW=2 docker-compose up -d --scale worker=4 worker
+```
+
+| Process | Each | Count | Total |
+|---|---|---|---|
+| laptop api | 33 | 1 | 33 |
+| laptop workers (main 3+2, SEC gate 2) | 7 | 4 | 28 |
+| VM dark api | 23 | 1 | 23 |
+| reserved | | | 3 |
+| **Dark-phase worst case** | | | **87** |
+
+Restore the laptop's worker count only if the dark start is rolled back (VM `nexdata-mode=off`).
 
 ## Secrets
 
@@ -93,16 +146,56 @@ script (below); the containers whose environment changed are recreated.
 - AR repo `us-central1-docker.pkg.dev/nexdata-cloud/nexdata` (keep-last-10 cleanup policy); bucket
   `gs://nexdata-raw-usc1` (regional, uniform access, soft delete, Nearline after 30 days).
 - Firewall: SSH (22) only from IAP's range `35.235.240.0/20`; nothing else inbound.
+- AR repo with immutable tags (`gcloud artifacts repositories update nexdata --location us-central1
+  --immutable-tags`): a pushed `api:<sha>` can never be repointed. The deploy job also passes the
+  digests it read from AR, and the VM refuses images whose digests differ.
 - GitHub: variables `GCP_WIF_PROVIDER`, `GCP_PUSH_SERVICE_ACCOUNT`, `GCP_DEPLOY_SERVICE_ACCOUNT`
-  (optional `NEXDATA_VM_NAME`, `NEXDATA_VM_ZONE`), environment `production` with required reviewers.
-  Roles are listed in the workflow header.
-- The image must include SPEC_160 (`RUN_SCHEDULER` honoured) before the VM api starts while the laptop
-  runs. Without it the dark api still runs a scheduler: do not start it until cutover.
+  (optional `NEXDATA_VM_NAME`, `NEXDATA_VM_ZONE`), environment `production` with required reviewers
+  and deployment branches limited to `main`. Roles are listed in the workflow header.
+- The image must include SPEC_160 (see the top of this page); `vm-startup.sh` enforces it.
+- Merge SPEC_160 to main before SPEC_161 (or together): every push to main builds an image the
+  deploy job can roll out, and a pre-SPEC_160 image is refused by the VM in dark and live mode.
+
+### GitHub -> GCP trust (Workload Identity Federation)
+
+Scope each service account to exactly one kind of GitHub token. A repo-wide `principalSet` would
+let any workflow on any branch impersonate the deploy SA, which can set `startup-script` metadata
+(root on the VM, so every secret) without passing the `production` approval.
+
+```bash
+PROJECT_NUMBER=$(gcloud projects describe nexdata-cloud --format 'value(projectNumber)')
+POOL=github; PROVIDER=zerostack-data; REPO=rao-usha/zerostack-data
+gcloud iam workload-identity-pools create $POOL --project nexdata-cloud --location global
+gcloud iam workload-identity-pools providers create-oidc $PROVIDER --project nexdata-cloud \
+  --location global --workload-identity-pool $POOL \
+  --issuer-uri https://token.actions.githubusercontent.com \
+  --attribute-mapping 'google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.ref=assertion.ref' \
+  --attribute-condition "assertion.repository == '$REPO'"
+P=principal://iam.googleapis.com/projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/$POOL/subject
+# push SA: only the main branch (the build job has no environment, so sub = ...:ref:refs/heads/main)
+gcloud iam service-accounts add-iam-policy-binding gh-push@nexdata-cloud.iam.gserviceaccount.com \
+  --role roles/iam.workloadIdentityUser --member "$P/repo:$REPO:ref:refs/heads/main"
+# deploy SA: only jobs running in the approved `production` environment
+gcloud iam service-accounts add-iam-policy-binding gh-deploy@nexdata-cloud.iam.gserviceaccount.com \
+  --role roles/iam.workloadIdentityUser --member "$P/repo:$REPO:environment:production"
+```
+
+`GCP_WIF_PROVIDER` is then `projects/$PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/zerostack-data`.
 
 ## Dark start (PLAN_089 Phase 3)
 
 The VM runs the api against Cloud SQL with the scheduler off and no workers, while the laptop stays
 the system of record.
+
+Before step 1:
+
+- The tag must be an image with SPEC_160; otherwise the boot stops at `scheduler gate` and nothing
+  starts. (Pre-SPEC_160, a dark api would have fired every schedule a second time and, on every
+  boot and every approved deploy, failed the laptop's jobs running for over 2 h.)
+- Shrink the laptop's connection use (Connection budget, dark phase).
+- Every dark api start still runs `alembic upgrade head` from the VM image against the shared
+  Cloud SQL. Deploy to the VM only commits the laptop already runs, or whose migrations the
+  laptop's code tolerates.
 
 1. Create the VM (once):
    ```bash
@@ -136,9 +229,12 @@ Window of about 2 h. Avoid 05:10-06:20 UTC and the 4th-10th of the month (monthl
 4. Switch the VM to live (this is the only place `nexdata-mode=live` is set):
    ```bash
    gcloud compute instances add-metadata nexdata-vm --zone us-central1-c --metadata nexdata-mode=live
-   gcloud compute ssh nexdata-vm --zone us-central1-c --tunnel-through-iap --command 'sudo google_metadata_script_runner startup'
+   gcloud compute ssh nexdata-vm --zone us-central1-c --tunnel-through-iap
+   # on the VM: define run_startup (top of this page), then
+   run_startup NEXDATA_MODE=live; echo "exit $?"
    ```
-   The api is recreated with `RUN_SCHEDULER=1` and three workers start.
+   The api is recreated with `RUN_SCHEDULER=1` and three workers start. A non-zero exit means
+   nothing was switched if it stopped before `VM now points at tag` (gate, running jobs, secrets).
 5. Verify: `/health` -> `workers_alive: 3`; the api log shows the scheduler starting with the
    jobs from `apscheduler_jobs` (35 on 2026-09-29) exactly once; `GET /api/v1/watchdog` is clean; the
    `HEARTBEAT_PING_URL` check (healthchecks.io) receives its ping; the next scheduled bulk job is
@@ -147,22 +243,28 @@ Window of about 2 h. Avoid 05:10-06:20 UTC and the 4th-10th of the month (monthl
    `docker-compose down` and remove any autostart (Docker Desktop "start on login", `scripts/start_service.*`).
    From now on the laptop never runs `docker-compose up` against Cloud SQL with the scheduler on.
 
-Note: every api start marks running jobs older than 2 h as failed (`app/main.py`, until SPEC_160
-gates it). Step 1 is what makes the api recreation in step 4 safe.
+Note: with SPEC_160 the stale-job resolver runs only in the scheduler leader and skips jobs whose
+queue row is still live; step 1 is still what makes recreating the api and workers in step 4 safe.
 
 ## Deploying a new version
 
-Push to main -> CI green -> `Build, push and deploy` builds and pushes `<sha>` -> approve the
-`production` environment -> the VM's `nexdata-tag` becomes `<sha>` and the startup script reruns
-in the current mode. The script refuses to recreate workers while `/health` reports running jobs
-(the deploy job fails; rerun it later). To override on the VM, accepting that running jobs are
-restarted by stale-heartbeat recovery, run the script directly with the override set:
+Push to main -> deploy gate tests -> `Build, push and deploy` builds and pushes `<sha>` -> approve the
+`production` environment -> the job runs the startup script over IAP with `NEXDATA_TAG=<sha>` and the
+AR digests, in the VM's current mode -> only if that exits 0 does it set `nexdata-tag=<sha>` (what
+the next reboot runs).
+
+The script stages everything first and changes nothing the stack uses until all checks pass
+(digests, scheduler gate, running jobs in live mode, every required secret). A refusal fails the
+deploy job and leaves `/opt/nexdata/compose`, `app.env`, `compose.env` and the `nexdata-tag`
+metadata on the running version; rerun the job later. To override the running-jobs check on the VM,
+accepting that running jobs are restarted by stale-heartbeat recovery:
 
 ```bash
-curl -s -H 'Metadata-Flavor: Google' \
-  http://metadata.google.internal/computeMetadata/v1/instance/attributes/startup-script \
-  | sudo NEXDATA_FORCE=1 bash
+run_startup NEXDATA_TAG=<sha> NEXDATA_FORCE=1
+gcloud compute instances add-metadata nexdata-vm --zone us-central1-c --metadata nexdata-tag=<sha>
 ```
+
+A boot run and a deploy run never overlap (`flock` on `/opt/nexdata/.startup.lock`).
 
 ## Docker Engine upgrades
 
@@ -177,7 +279,7 @@ stack stops and Docker is upgraded on that run), then set the mode back and reru
   previous sha (`gcloud artifacts docker images list us-central1-docker.pkg.dev/nexdata-cloud/nexdata/api --include-tags`).
   The compose files come from that image, so they roll back with it.
 - **Back to the laptop (reverse cutover):** wait for no running jobs; set `nexdata-mode=dark` (or `off`) and
-  rerun the startup script, which removes the workers and restarts the api without the scheduler; check
+  rerun the startup script (`run_startup`), which removes the workers and restarts the api without the scheduler; check
   `pg_stat_activity`; then `docker-compose up -d` on the laptop. Raw files written on the VM since cutover
   are in `gs://nexdata-raw-usc1/raw` after the nightly sync (run `sudo systemctl start nexdata-raw-sync`
   first to copy them now); pull them to the laptop with `gcloud storage rsync`.
@@ -187,4 +289,9 @@ stack stops and Docker is upgraded on that run), then set the mode back and reru
 ## Not covered here
 
 TLS / public exposure (Caddy, IAP for HTTP, or Cloudflare Tunnel), the frontend (nginx serving
-`frontend/`), Cloud Monitoring alerts and snapshot schedules (PLAN_089 Phases 6-7).
+`frontend/`, PLAN_089 Phase 8), Cloud Monitoring alerts and snapshot schedules (PLAN_089 Phases 6-7).
+`data/kaggle` is on the VM disk (`/opt/nexdata/data/kaggle`) but not synced to GCS: it is a
+re-downloadable cache. Nothing reads `data/seeds` at runtime.
+
+Unverified until the first real VM / GitHub run: the script has only been checked with `bash -n`
+and static tests; the gcplogs driver, OS Login over IAP and the WIF bindings have not run.

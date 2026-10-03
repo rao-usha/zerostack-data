@@ -1,8 +1,11 @@
 """SPEC_161 -- production image, GCP compose and CI build (PLAN_089 Phases 1-2).
 
-All checks are static: requirement files, Dockerfile, the VM compose file, the
+Mostly static: requirement files, Dockerfile, the VM compose file, the
 deploy/ scripts and the build-push workflow. ``docker compose config`` runs
 only when Docker is on PATH (it parses, it never touches a running stack).
+The fix round adds behaviour tests: deploy/check_scheduler_gate.py against
+fake app trees, and deploy/vm-startup.sh under Git Bash with docker, gcloud
+and curl stubbed and ROOT pointed at a temp dir (never /opt, never Docker).
 """
 
 from __future__ import annotations
@@ -319,6 +322,32 @@ def _docker_compose_available() -> bool:
         return False
 
 
+APSCHEDULER_STORE = 5 + 10   # SQLAlchemyJobStore(url=...) builds its own default-pool engine
+LISTEN = 1                   # app/core/pg_listener.py psycopg2.connect
+RESERVED = 3                 # Cloud SQL superuser_reserved_connections
+
+
+def _main_pool(svc: dict) -> int:
+    """Worst-case main pool of a service: DB_POOL_SIZE + DB_MAX_OVERFLOW (SPEC_160)."""
+    env = _env(svc)
+    return int(env["DB_POOL_SIZE"]) + int(env["DB_MAX_OVERFLOW"])
+
+
+def _hardcoded_main_pool():
+    """(size, overflow) while database.py still hard-codes them (pre-SPEC_160), else None."""
+    db = (REPO / "app/core/database.py").read_text(encoding="utf-8")
+    size = re.search(r"pool_size=(\d+)", db)
+    over = re.search(r"max_overflow=(\d+)", db)
+    if size and over:
+        return int(size.group(1)), int(over.group(1))
+    return None
+
+
+def _sec_gate_pool() -> int:
+    gate = (REPO / "app/core/sec_gate.py").read_text(encoding="utf-8")
+    return int(re.search(r"pool_size=(\d+)", gate).group(1)) + int(re.search(r"max_overflow=(\d+)", gate).group(1))
+
+
 @pytest.mark.unit
 class TestGcpCompose:
     def test_gcp_compose_parses(self, gcp, dark):
@@ -388,21 +417,36 @@ class TestGcpCompose:
         grace = int(re.match(r"(\d+)s", str(worker["stop_grace_period"])).group(1))
         assert grace > 30
 
-        # pool sizes are hard-coded today; recompute from source so a bump fails here
-        db = (REPO / "app/core/database.py").read_text(encoding="utf-8")
-        gate = (REPO / "app/core/sec_gate.py").read_text(encoding="utf-8")
-        main_pool = int(re.search(r"pool_size=(\d+)", db).group(1)) + int(re.search(r"max_overflow=(\d+)", db).group(1))
-        gate_pool = int(re.search(r"pool_size=(\d+)", gate).group(1)) + int(re.search(r"max_overflow=(\d+)", gate).group(1))
-        apscheduler_store = 5 + 10   # SQLAlchemyJobStore(url=...) builds its own default-pool engine
-        listen = 1                   # app/core/pg_listener.py psycopg2.connect
-        reserved = 3                 # Cloud SQL superuser_reserved_connections
-        api = main_pool + gate_pool + apscheduler_store + listen
-        workers = replicas * (main_pool + gate_pool)
-        total = api + workers + reserved
-        assert (main_pool, gate_pool, api, workers, total) == (15, 2, 33, 51, 87)
+        hard = _hardcoded_main_pool()
+        if hard is not None:   # the env is ignored until SPEC_160: it must say the truth
+            for name in ("api", "worker"):
+                env = _env(gcp["services"][name])
+                assert (int(env["DB_POOL_SIZE"]), int(env["DB_MAX_OVERFLOW"])) == hard, name
+        api_main = _main_pool(gcp["services"]["api"])
+        worker_main = _main_pool(worker)
+        gate_pool = _sec_gate_pool()
+        api = api_main + gate_pool + APSCHEDULER_STORE + LISTEN
+        workers = replicas * (worker_main + gate_pool)
+        total = api + workers + RESERVED
+        assert (api_main, gate_pool, api, workers, total) == (15, 2, 33, 51, 87)
         assert total <= 100
         runbook = RUNBOOK.read_text(encoding="utf-8")
         assert "87" in runbook and "max_connections" in runbook
+
+    def test_dark_phase_connection_budget(self, gcp, dark):
+        # Finding: the laptop (still live) + the dark VM api share Cloud SQL.
+        merged = {**_env(gcp["services"]["api"]), **_env(dark["services"]["api"])}
+        dark_api = _main_pool({"environment": merged}) + _sec_gate_pool() + APSCHEDULER_STORE + LISTEN
+        assert dark_api == 23
+        laptop_api = 15 + _sec_gate_pool() + APSCHEDULER_STORE + LISTEN
+        laptop_today = laptop_api + 6 * (15 + _sec_gate_pool())
+        assert laptop_today + dark_api + RESERVED == 161 > 100
+        laptop_shrunk = laptop_api + 4 * ((3 + 2) + _sec_gate_pool())   # 4 workers, pool 3+2
+        assert laptop_shrunk + dark_api + RESERVED == 87 <= 100
+        runbook = RUNBOOK.read_text(encoding="utf-8")
+        assert "Dark phase" in runbook and "161" in runbook
+        assert "WORKER_DB_POOL_SIZE=3" in runbook and "--scale worker=4" in runbook
+        assert "laptop while it still runs" not in runbook
 
     def test_restart_logging_env_raw(self, gcp):
         for name, svc in gcp["services"].items():
@@ -415,6 +459,9 @@ class TestGcpCompose:
             paths = [e if isinstance(e, str) else e["path"] for e in env_files]
             assert any("app.env" in p for p in paths), name
             assert "/opt/nexdata/data/raw:/app/data/raw" in svc.get("volumes", []), name
+            # scope gap: Kaggle downloads must survive a redeploy
+            assert "/opt/nexdata/data/kaggle:/app/data/kaggle" in svc.get("volumes", []), name
+            assert _env(svc)["DB_POOL_SIZE"] == "5" and _env(svc)["DB_MAX_OVERFLOW"] == "10", name
             deps = svc["depends_on"]
             assert deps["cloudsqlproxy"]["condition"] == "service_healthy"
             # secrets come only from the env_file: an environment: entry would shadow it
@@ -545,15 +592,22 @@ class TestBuildPushWorkflow:
 
     def test_build_push_workflow(self, wf):
         on = wf.get("on", wf.get(True))
-        ci_name = yaml.safe_load((REPO / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))["name"]
-        assert on["workflow_run"]["workflows"] == [ci_name]
-        assert on["workflow_run"]["branches"] == ["main"]
+        # Finding: main's full CI has failed on every run since 2026-04, so a
+        # workflow_run(conclusion == success) trigger would never fire. The
+        # workflow runs on push to main behind its own deploy gate job.
+        assert "workflow_run" not in on
+        assert on["push"]["branches"] == ["main"]
         assert "workflow_dispatch" in on
         assert wf["permissions"]["id-token"] == "write"
 
         jobs = wf["jobs"]
-        build, deploy = jobs["build"], jobs["deploy"]
-        assert "conclusion == 'success'" in build["if"]
+        gate, build, deploy = jobs["gate"], jobs["build"], jobs["deploy"]
+        gate_run = " ".join(str(s.get("run", "")) for s in gate["steps"])
+        assert "pytest" in gate_run
+        for spec in ("161", "160", "120", "121", "128"):
+            assert f"tests/test_spec_{spec}_" in gate_run, spec
+        assert "requirements-runtime.txt" in gate_run and "torch" not in gate_run
+        assert build["needs"] == "gate" or build["needs"] == ["gate"]
         steps = build["steps"]
         auth = [s for s in steps if str(s.get("uses", "")).startswith("google-github-actions/auth@")]
         assert auth and "workload_identity_provider" in auth[0]["with"]
@@ -565,6 +619,354 @@ class TestBuildPushWorkflow:
 
         assert deploy["environment"]["name"] == "production"   # required reviewers = approval
         assert "build" in deploy["needs"]
+        assert "refs/heads/main" in deploy["if"]
         runs = " ".join(str(s.get("run", "")) for s in deploy["steps"])
         assert "gcloud compute ssh" in runs and "--tunnel-through-iap" in runs
         assert "nexdata-tag" in runs
+
+    def test_deploy_propagates_exit_and_sets_tag_last(self, wf):
+        # Finding: google_metadata_script_runner exits 0 whatever the script
+        # did, and the tag used to be written before the script ran.
+        steps = wf["jobs"]["deploy"]["steps"]
+        runs = [str(s.get("run", "")) for s in steps]
+        ssh_i = next(i for i, r in enumerate(runs) if "gcloud compute ssh" in r)
+        tag_i = next(i for i, r in enumerate(runs) if "add-metadata" in r)
+        assert tag_i > ssh_i, "nexdata-tag must be set only after the VM ran the tag"
+        assert all("add-metadata" not in r for r in runs[:ssh_i])
+        ssh = runs[ssh_i]
+        assert "google_metadata_script_runner" not in ssh
+        assert "NEXDATA_TAG=" in ssh and "startup-script" in ssh and "exit" in ssh
+        assert "NEXDATA_API_DIGEST=" in ssh and "NEXDATA_WORKER_DIGEST=" in ssh
+        digest = next(s for s in steps if s.get("id") == "digest")
+        assert "sha256:[0-9a-f]{64}" in digest["run"]
+
+    def test_wif_trust_is_scoped(self):
+        text = (REPO / ".github" / "workflows" / "build-push.yml").read_text(encoding="utf-8")
+        runbook = RUNBOOK.read_text(encoding="utf-8")
+        for doc in (text, runbook):
+            assert "assertion.repository == " in doc
+            assert ":ref:refs/heads/main" in doc
+            assert ":environment:production" in doc
+        assert "--immutable-tags" in runbook
+        assert "principalSet" not in runbook.replace("A repo-wide `principalSet`", "")
+
+
+
+# ---------------------------------------------------------------------------
+# Fix round: scheduler gate (SPEC_160 precondition, enforced on the VM)
+# ---------------------------------------------------------------------------
+
+GATE_SCRIPT = REPO / "deploy" / "check_scheduler_gate.py"
+STARTUP = REPO / "deploy" / "vm-startup.sh"
+
+
+def _run_gate(root: Path) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [sys.executable, str(GATE_SCRIPT), str(root)], capture_output=True, text=True, timeout=60
+    )
+
+
+def _fake_app(root: Path, *, settings=True, leader=True, main_runtime=True,
+              main_direct=False, main_stale=False) -> Path:
+    core = root / "app" / "core"
+    core.mkdir(parents=True)
+    fields = "    run_scheduler: bool = True\n    db_pool_size: int = 5\n    db_max_overflow: int = 10\n"
+    (core / "config.py").write_text(
+        "class Settings:\n    database_url: str = ''\n" + (fields if settings else ""), encoding="utf-8"
+    )
+    if leader:
+        (core / "scheduler_leader.py").write_text(
+            "def resolve_stale_running_jobs(engine):\n    pass\n\n"
+            "async def start_scheduler_runtime(register):\n    pass\n",
+            encoding="utf-8",
+        )
+    body = ["async def lifespan(app):"]
+    if main_runtime:
+        body += ["    from app.core.scheduler_leader import start_scheduler_runtime",
+                 "    await start_scheduler_runtime(None)"]
+    if main_direct:
+        body += ["    from app.core import scheduler_service", "    scheduler_service.start_scheduler()"]
+    if main_stale:
+        body += ["    sql = \"UPDATE ingestion_jobs SET error_message = 'Stale job auto-resolved on startup'\""]
+    body += ["    yield"]
+    (root / "app" / "main.py").write_text("\n".join(body) + "\n", encoding="utf-8")
+    return root
+
+
+@pytest.mark.unit
+class TestSchedulerGate:
+    def test_gated_image_passes(self, tmp_path):
+        res = _run_gate(_fake_app(tmp_path))
+        assert res.returncode == 0, res.stderr
+        assert "ok" in res.stdout
+
+    @pytest.mark.parametrize("kwargs, reason", [
+        ({"settings": False}, "Settings lacks"),
+        ({"leader": False}, "scheduler_leader.py missing"),
+        ({"main_runtime": False}, "start_scheduler_runtime"),
+        ({"main_direct": True}, "calls start_scheduler() directly"),
+        ({"main_stale": True}, "stale resolver not gated"),
+    ])
+    def test_ungated_image_refused(self, tmp_path, kwargs, reason):
+        res = _run_gate(_fake_app(tmp_path, **kwargs))
+        assert res.returncode == 3
+        assert reason in res.stderr
+
+    def test_empty_root_refused(self, tmp_path):
+        assert _run_gate(tmp_path).returncode == 3
+
+    def test_probe_matches_this_tree(self):
+        """The probe's verdict on this checkout matches what main.py really does."""
+        res = _run_gate(REPO)
+        main = (REPO / "app" / "main.py").read_text(encoding="utf-8")
+        gated = "start_scheduler_runtime" in main and "scheduler_service.start_scheduler()" not in main
+        assert (res.returncode == 0) == gated, res.stderr
+
+    @pytest.mark.xfail(
+        condition=not (REPO / "app" / "core" / "scheduler_leader.py").exists(),
+        reason="SPEC_160 (RUN_SCHEDULER gating) not merged into this branch yet",
+        strict=True,
+    )
+    def test_main_gates_scheduler_on_run_scheduler(self):
+        """Finding: the compose RUN_SCHEDULER values must have code behind them."""
+        assert _run_gate(REPO).returncode == 0
+        config = (REPO / "app" / "core" / "config.py").read_text(encoding="utf-8")
+        leader = (REPO / "app" / "core" / "scheduler_leader.py").read_text(encoding="utf-8")
+        assert "run_scheduler" in config and "run_scheduler" in leader
+
+    def test_probe_ships_in_the_runtime_image(self):
+        dockerfile = (REPO / "Dockerfile").read_text(encoding="utf-8")
+        runtime = dockerfile[dockerfile.index("AS runtime"):]
+        assert "COPY deploy/ ./deploy/" in runtime
+        ignore = (REPO / ".dockerignore").read_text(encoding="utf-8").split()
+        assert "deploy" not in ignore and "*.py" not in ignore
+        src = GATE_SCRIPT.read_text(encoding="utf-8")
+        tree = ast.parse(src)
+        imported = {a.name.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names}
+        imported |= {n.module.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module}
+        assert imported <= {"__future__", "ast", "sys", "pathlib"}, "stdlib only: no app import, no DB"
+
+
+@pytest.mark.unit
+class TestStartupOrdering:
+    def _main_body(self) -> str:
+        text = STARTUP.read_text(encoding="utf-8")
+        return text[text.index("\nmain() {"):]
+
+    def test_every_check_runs_before_anything_is_switched(self):
+        body = self._main_body()
+        order = ["stage_release", "scheduler_gate", "busy_check", "render_env",
+                 "commit_release", "install_units", "compose_up"]
+        pos = [body.index(f"\n  {step}\n") for step in order]
+        assert pos == sorted(pos), order
+        assert "trap cleanup_staged EXIT" in body
+
+    def test_gate_applies_to_dark_and_live(self):
+        text = STARTUP.read_text(encoding="utf-8")
+        fn = text[text.index("scheduler_gate() {"):text.index("\n}\n", text.index("scheduler_gate() {"))]
+        assert "/app/deploy/check_scheduler_gate.py" in fn
+        assert "--network none" in fn
+        # the only bypass is live-only
+        assert '[ "$MODE" = "live" ] && [ "${NEXDATA_SKIP_SCHEDULER_GATE:-0}" = "1" ]' in fn
+        assert "die " in fn
+
+    def test_compose_up_does_not_repull_or_write_state(self):
+        text = STARTUP.read_text(encoding="utf-8")
+        fn = text[text.index("compose_up() {"):text.index("\nmain() {")]
+        code = "\n".join(ln for ln in fn.splitlines() if not ln.strip().startswith("#"))
+        assert " pull" not in code, "images were pulled and digest-checked in stage_release"
+        assert "TAG=" not in code, "compose.env is written only by commit_release"
+
+    def test_runbook_dark_start_warns(self):
+        text = RUNBOOK.read_text(encoding="utf-8")
+        dark = text[text.index("## Dark start"):text.index("## Cutover")]
+        assert "SPEC_160" in dark and "2 h" in dark and "alembic" in dark
+        assert "google_metadata_script_runner startup'" not in text, "use run_startup (exit status)"
+
+
+# ---------------------------------------------------------------------------
+# Fix round: vm-startup.sh behaviour, with docker/gcloud/curl stubbed
+# ---------------------------------------------------------------------------
+
+def _git_bash():
+    bash = shutil.which("bash")
+    if not bash or "system32" in bash.lower():   # WSL's bash.exe is not a POSIX shell here
+        return None
+    return bash
+
+
+GOOD_API = "sha256:" + "a" * 64
+GOOD_WORKER = "sha256:" + "b" * 64
+
+STUBS = r"""
+log_call() { printf '%s\n' "$*" >> "$STUB_LOG"; }
+install_docker() { :; }
+flock() { :; }
+find() { :; }
+chown() { :; }
+sleep() { :; }
+systemctl() { log_call "systemctl $*"; }
+install() { log_call "install $*"; }
+curl() {
+  case "$*" in
+    *computeMetadata*) return 22 ;;
+    */health*) printf '{"queue": {"running": %s}}' "${STUB_RUNNING:-0}" ;;
+    */readyz*) return 0 ;;
+    *) return 7 ;;
+  esac
+}
+python3() { cat >/dev/null; echo "${STUB_RUNNING:-0}"; }
+gcloud() {
+  case "$1 $2" in
+    "auth configure-docker") return 0 ;;
+    "secrets versions") ;;
+    *) log_call "gcloud $*"; return 0 ;;
+  esac
+  local s
+  for a in "$@"; do case "$a" in --secret=*) s="${a#--secret=}" ;; esac; done
+  case " ${STUB_MISSING:-} " in *" $s "*) return 1 ;; esac
+  printf 'value-%s' "$s"
+}
+docker() {
+  case "$1" in
+    ps) [ "${STUB_STACK:-0}" = "1" ] && echo c0ffee; return 0 ;;
+    pull) log_call "docker $*"; return 0 ;;
+    image)
+      local ref="${@: -1}" repo
+      repo="${ref##*/}"; repo="${repo%%:*}"
+      if [ "$repo" = api ]; then echo "${IMAGE_BASE}/api@${STUB_API_DIGEST}"; else echo "${IMAGE_BASE}/worker@${STUB_WORKER_DIGEST}"; fi ;;
+    create) echo cid123 ;;
+    cp) cp -r "$STUB_IMAGE_DEPLOY/." "${@: -1}" ;;
+    rm) return 0 ;;
+    run) log_call "docker $*"; return "${STUB_GATE:-0}" ;;
+    compose) log_call "docker $*"; return 0 ;;
+    *) log_call "docker $*"; return 0 ;;
+  esac
+}
+"""
+
+
+@pytest.mark.unit
+@pytest.mark.skipif(_git_bash() is None, reason="POSIX bash not available")
+class TestStartupBehaviour:
+    @pytest.fixture
+    def vm(self, tmp_path):
+        root = tmp_path / "opt_nexdata"
+        image_deploy = tmp_path / "image_deploy"
+        shutil.copytree(REPO / "deploy", image_deploy)
+        shutil.copy(GCP_COMPOSE, image_deploy / "docker-compose.gcp.yml")
+        script = STARTUP.read_text(encoding="utf-8")
+        assert "ROOT=/opt/nexdata\n" in script and script.rstrip().endswith('main "$@"')
+        script = script.replace("ROOT=/opt/nexdata\n", f"ROOT='{root.as_posix()}'\n")
+        script = script.rstrip()[: -len('main "$@"')]
+        harness = tmp_path / "harness.sh"
+        harness.write_text(
+            script + "\n" + STUBS + '\nmain "$@"\n', encoding="utf-8", newline="\n"
+        )
+        log = tmp_path / "calls.log"
+        log.write_text("", encoding="utf-8")
+
+        def run(**env):
+            full = {
+                **os.environ,
+                "NEXDATA_TAG": "newsha",
+                "NEXDATA_MODE": "dark",
+                "STUB_LOG": log.as_posix(),
+                "STUB_IMAGE_DEPLOY": image_deploy.as_posix(),
+                "STUB_API_DIGEST": GOOD_API,
+                "STUB_WORKER_DIGEST": GOOD_WORKER,
+                **env,
+            }
+            log.write_text("", encoding="utf-8")
+            res = subprocess.run([_git_bash(), harness.as_posix()], capture_output=True,
+                                 text=True, timeout=120, env=full)
+            return res, log.read_text(encoding="utf-8")
+
+        def seed_running(tag="oldsha"):
+            (root / "compose").mkdir(parents=True)
+            (root / "compose" / "marker").write_text(tag, encoding="utf-8")
+            (root / "app.env").write_text("OLD=1\n", encoding="utf-8")
+            (root / "compose.env").write_text(f"TAG={tag}\n", encoding="utf-8")
+
+        def state():
+            return {
+                "marker": (root / "compose" / "marker").read_text(encoding="utf-8")
+                if (root / "compose" / "marker").exists() else None,
+                "app_env": (root / "app.env").read_text(encoding="utf-8") if (root / "app.env").exists() else None,
+                "compose_env": (root / "compose.env").read_text(encoding="utf-8")
+                if (root / "compose.env").exists() else None,
+                "staged": [p.name for p in root.glob("*.new")] if root.exists() else [],
+            }
+
+        return run, seed_running, state
+
+    def test_dark_with_gated_image_switches(self, vm):
+        run, seed, state = vm
+        seed()
+        res, calls = run(NEXDATA_API_DIGEST=GOOD_API, NEXDATA_WORKER_DIGEST=GOOD_WORKER)
+        assert res.returncode == 0, res.stderr + res.stdout
+        s = state()
+        assert s["compose_env"] == "TAG=newsha\n"
+        assert s["marker"] is None   # compose/ is the new image's set
+        assert "DATABASE_URL='value-nexdata-database-url'" in s["app_env"]
+        assert s["staged"] == []
+        assert "check_scheduler_gate.py" in calls
+        assert "compose.dark.yml" in calls and "up -d --remove-orphans cloudsqlproxy api" in calls
+        assert calls.index("docker run") < calls.index("docker compose")   # gate before compose
+        compose_lines = [ln for ln in calls.splitlines() if ln.startswith("docker compose")]
+        assert compose_lines and not any(" pull" in ln for ln in compose_lines)   # no re-pull
+
+    @pytest.mark.parametrize("mode", ["dark", "live"])
+    def test_ungated_image_refused_and_nothing_changes(self, vm, mode):
+        run, seed, state = vm
+        seed()
+        before = state()
+        res, calls = run(NEXDATA_MODE=mode, STUB_GATE="3")
+        assert res.returncode != 0
+        assert "SPEC_160" in res.stderr
+        assert state() == before
+        assert "docker compose" not in calls
+
+    def test_gate_bypass_is_live_only(self, vm):
+        run, seed, state = vm
+        seed()
+        res, _ = run(NEXDATA_MODE="dark", STUB_GATE="3", NEXDATA_SKIP_SCHEDULER_GATE="1")
+        assert res.returncode != 0
+        res, calls = run(NEXDATA_MODE="live", STUB_GATE="3", NEXDATA_SKIP_SCHEDULER_GATE="1")
+        assert res.returncode == 0, res.stderr
+        assert "gate skipped" in res.stdout
+        assert state()["compose_env"] == "TAG=newsha\n"
+
+    def test_busy_live_refusal_leaves_running_version(self, vm):
+        run, seed, state = vm
+        seed()
+        before = state()
+        res, calls = run(NEXDATA_MODE="live", STUB_STACK="1", STUB_RUNNING="2")
+        assert res.returncode != 0
+        assert "2 job(s) running" in res.stderr and "Nothing changed" in res.stderr
+        assert state() == before
+        assert "docker compose" not in calls
+        res, _ = run(NEXDATA_MODE="live", STUB_STACK="1", STUB_RUNNING="2", NEXDATA_FORCE="1")
+        assert res.returncode == 0, res.stderr
+        assert state()["compose_env"] == "TAG=newsha\n"
+
+    def test_missing_secret_leaves_running_version(self, vm):
+        run, seed, state = vm
+        seed()
+        before = state()
+        res, calls = run(STUB_MISSING="nexdata-database-url")
+        assert res.returncode != 0
+        assert "nexdata-database-url" in res.stderr
+        assert state() == before
+
+    def test_digest_mismatch_refused(self, vm):
+        run, seed, state = vm
+        seed()
+        before = state()
+        res, _ = run(NEXDATA_API_DIGEST="sha256:" + "c" * 64)
+        assert res.returncode != 0 and "tag moved" in res.stderr
+        assert state() == before
+        res, _ = run(NEXDATA_WORKER_DIGEST="sha256:" + "c" * 64)
+        assert res.returncode != 0
+        res, _ = run(NEXDATA_API_DIGEST="not-a-digest")
+        assert res.returncode != 0 and "invalid expected digest" in res.stderr

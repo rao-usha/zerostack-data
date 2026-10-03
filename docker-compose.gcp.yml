@@ -6,19 +6,28 @@
 #   - one api process with RUN_SCHEDULER=1 (the only scheduler), 3 workers
 #   - app secrets come from /opt/nexdata/app.env, rendered at boot from Secret
 #     Manager by deploy/vm-startup.sh (see deploy/secrets.manifest)
-#   - data/raw and data/reports live on the VM disk under /opt/nexdata/data
+#   - data/raw, data/reports and data/kaggle live on the VM disk under
+#     /opt/nexdata/data (survive redeploys; only data/raw is synced to GCS)
+#   - needs an image with SPEC_160 (RUN_SCHEDULER, leader lock, DB_POOL_*):
+#     deploy/vm-startup.sh refuses dark and live mode otherwise
 #
 # Run on the VM (deploy/vm-startup.sh does this):
 #   docker compose -p nexdata -f docker-compose.gcp.yml --env-file /opt/nexdata/compose.env up -d
 # Dark start (api without scheduler, no workers): add -f deploy/compose.dark.yml
 # and start only `cloudsqlproxy api`. See deploy/RUNBOOK.md.
 #
-# Connection budget (Cloud SQL max_connections = 100), worst case:
+# Connection budget (Cloud SQL max_connections = 100), worst case, live
+# (laptop stack stopped):
 #   api    33 = main pool 5+10, SEC gate 1+1, APScheduler job store 5+10, LISTEN 1
 #   worker 17 = main pool 5+10, SEC gate 1+1          x 3 replicas = 51
 #   Cloud SQL superuser_reserved_connections                         3
 #   total                                                            87  (13 spare)
-# A 4th worker would reach 104: shrink the pools first (DB_POOL_SIZE, SPEC_160).
+# A 4th worker would reach 104: lower DB_POOL_SIZE / DB_MAX_OVERFLOW first.
+# Dark phase (laptop still live): the dark api is 23 (compose.dark.yml shrinks
+# its main pool to 2+3), but the laptop alone is 33 + 6 x 17 = 135 worst case,
+# so scale the laptop to 4 workers with WORKER_DB_POOL_SIZE=3 and
+# WORKER_DB_MAX_OVERFLOW=2 (33 + 4 x 7 = 61) before the dark start:
+# 61 + 23 + 3 = 87. See deploy/RUNBOOK.md "Connection budget".
 
 x-logging: &gcplogs
   # Ships stdout/stderr to Cloud Logging (project/instance from the metadata
@@ -47,6 +56,9 @@ x-app-env-file: &app-env-file
 x-data-volumes: &data-volumes
   - /opt/nexdata/data/raw:/app/data/raw
   - /opt/nexdata/data/reports:/app/data/reports
+  # Kaggle downloads (KAGGLE_DATA_DIR) would otherwise land in the container
+  # layer and be lost on every redeploy
+  - /opt/nexdata/data/kaggle:/app/data/kaggle
 
 services:
   cloudsqlproxy:
@@ -76,6 +88,9 @@ services:
       # The one scheduler (PLAN_089 Phase 5). Never set on workers. The dark
       # start overrides this to 0 (deploy/compose.dark.yml).
       RUN_SCHEDULER: "1"
+      # SPEC_160 pool knobs, set explicitly so the budget above is the config
+      DB_POOL_SIZE: "5"
+      DB_MAX_OVERFLOW: "10"
     ports:
       # Loopback only (SPEC_127): reach it over an IAP tunnel, or put a proxy in front.
       - "127.0.0.1:8001:8000"
@@ -94,6 +109,8 @@ services:
       <<: *app-env
       WORKER_POLL_INTERVAL: "2.0"
       WORKER_MAX_CONCURRENT: "6"
+      DB_POOL_SIZE: "5"
+      DB_MAX_OVERFLOW: "10"
     volumes: *data-volumes
     depends_on:
       cloudsqlproxy:
