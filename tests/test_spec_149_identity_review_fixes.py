@@ -194,7 +194,7 @@ def pg_engine():
         conn.execute(text("CREATE TABLE sec_13f_other_managers (accession_number TEXT, cik TEXT, crd_number TEXT)"))
         conn.execute(text("""CREATE TABLE form_d_issuers (cik TEXT, entity_name TEXT,
             state_or_country TEXT, loaded_at TIMESTAMP DEFAULT NOW())"""))
-        conn.execute(text("""CREATE TABLE sec_filers (cik TEXT, name TEXT, ein TEXT,
+        conn.execute(text("""CREATE TABLE sec_filers (cik TEXT, name TEXT, ein TEXT, lei TEXT,
             state_of_incorporation TEXT, biz_state2 TEXT, biz_state_or_country TEXT, website TEXT,
             loaded_at TIMESTAMP DEFAULT NOW())"""))
         conn.execute(text("CREATE TABLE sec_8k_index (cik TEXT)"))

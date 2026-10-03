@@ -1,5 +1,5 @@
 {
- "dictionary_hash": "b517456c2c91e23f",
+ "dictionary_hash": "0149fcaebf63bf92",
  "format_version": 1,
  "package_columns": {
   "cms": {
@@ -12218,6 +12218,532 @@
    "origin": "ddl",
    "packages": [
     "glassdoor"
+   ]
+  },
+  "gleif_fetch": {
+   "columns": [
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "api_total",
+     "nullable": true,
+     "pg_type": "integer",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": "low",
+     "description": "Country name or code as published.",
+     "example": null,
+     "name": "country",
+     "nullable": false,
+     "pg_type": "varchar(2)",
+     "pii": "none",
+     "semantic_type": null,
+     "source": "glossary",
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "error",
+     "nullable": true,
+     "pg_type": "text",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "finished_at",
+     "nullable": true,
+     "pg_type": "timestamptz",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "golden_copy_publish_date",
+     "nullable": true,
+     "pg_type": "timestamptz",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": "low",
+     "description": "Surrogate row id assigned by the database; not stable across reloads.",
+     "example": null,
+     "name": "id",
+     "nullable": false,
+     "pg_type": "serial",
+     "pii": "none",
+     "semantic_type": null,
+     "source": "glossary",
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "outcome",
+     "nullable": false,
+     "pg_type": "varchar(16)",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "pages",
+     "nullable": true,
+     "pg_type": "integer",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "records",
+     "nullable": true,
+     "pg_type": "integer",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "report",
+     "nullable": true,
+     "pg_type": "jsonb",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "requests",
+     "nullable": true,
+     "pg_type": "integer",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "started_at",
+     "nullable": false,
+     "pg_type": "timestamptz",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "terms_citation",
+     "nullable": true,
+     "pg_type": "text",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "user_agent",
+     "nullable": false,
+     "pg_type": "text",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    }
+   ],
+   "datasets": [
+    "gleif_lei_records"
+   ],
+   "origin": "ddl",
+   "packages": [
+    "gleif"
+   ]
+  },
+  "gleif_lei_record": {
+   "columns": [
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "category",
+     "nullable": true,
+     "pg_type": "varchar(32)",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "corroboration_level",
+     "nullable": true,
+     "pg_type": "varchar(32)",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "entity_status",
+     "nullable": true,
+     "pg_type": "varchar(16)",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "golden_copy_publish_date",
+     "nullable": true,
+     "pg_type": "timestamptz",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": "low",
+     "description": "City name.",
+     "example": null,
+     "name": "hq_city",
+     "nullable": true,
+     "pg_type": "text",
+     "pii": "none",
+     "semantic_type": null,
+     "source": "glossary",
+     "unit": null
+    },
+    {
+     "confidence": "low",
+     "description": "Country name or code as published.",
+     "example": null,
+     "name": "hq_country",
+     "nullable": true,
+     "pg_type": "varchar(2)",
+     "pii": "none",
+     "semantic_type": null,
+     "source": "glossary",
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "hq_postal",
+     "nullable": true,
+     "pg_type": "varchar(32)",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "hq_region",
+     "nullable": true,
+     "pg_type": "varchar(16)",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": "low",
+     "description": "US state (USPS code or name, as published).",
+     "example": null,
+     "name": "hq_state",
+     "nullable": true,
+     "pg_type": "varchar(2)",
+     "pii": "none",
+     "semantic_type": "us_state",
+     "source": "glossary",
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "initial_registration_date",
+     "nullable": true,
+     "pg_type": "timestamptz",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "jurisdiction",
+     "nullable": true,
+     "pg_type": "varchar(16)",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "last_seen_run_id",
+     "nullable": true,
+     "pg_type": "integer",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "last_update_date",
+     "nullable": true,
+     "pg_type": "timestamptz",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": "low",
+     "description": "City name.",
+     "example": null,
+     "name": "legal_city",
+     "nullable": true,
+     "pg_type": "text",
+     "pii": "none",
+     "semantic_type": null,
+     "source": "glossary",
+     "unit": null
+    },
+    {
+     "confidence": "low",
+     "description": "Country name or code as published.",
+     "example": null,
+     "name": "legal_country",
+     "nullable": true,
+     "pg_type": "varchar(2)",
+     "pii": "none",
+     "semantic_type": null,
+     "source": "glossary",
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "legal_form_id",
+     "nullable": true,
+     "pg_type": "varchar(16)",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": "low",
+     "description": "Name of the organisation / entity as published by the source.",
+     "example": null,
+     "name": "legal_name",
+     "nullable": true,
+     "pg_type": "text",
+     "pii": "none",
+     "semantic_type": null,
+     "source": "glossary",
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "legal_postal",
+     "nullable": true,
+     "pg_type": "varchar(32)",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "legal_region",
+     "nullable": true,
+     "pg_type": "varchar(16)",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": "low",
+     "description": "US state (USPS code or name, as published).",
+     "example": null,
+     "name": "legal_state",
+     "nullable": true,
+     "pg_type": "varchar(2)",
+     "pii": "none",
+     "semantic_type": "us_state",
+     "source": "glossary",
+     "unit": null
+    },
+    {
+     "confidence": "low",
+     "description": "Legal Entity Identifier (ISO 17442, 20 characters).",
+     "example": null,
+     "name": "lei",
+     "nullable": false,
+     "pg_type": "varchar(20)",
+     "pii": "none",
+     "semantic_type": "lei",
+     "source": "glossary",
+     "unit": null
+    },
+    {
+     "confidence": "low",
+     "description": "Row audit timestamp: when Nexdata wrote or last touched this row (not an upstream date).",
+     "example": null,
+     "name": "loaded_at",
+     "nullable": false,
+     "pg_type": "timestamptz",
+     "pii": "none",
+     "semantic_type": null,
+     "source": "glossary",
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "managing_lou",
+     "nullable": true,
+     "pg_type": "varchar(20)",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "next_renewal_date",
+     "nullable": true,
+     "pg_type": "timestamptz",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "registered_as",
+     "nullable": true,
+     "pg_type": "text",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "registered_at",
+     "nullable": true,
+     "pg_type": "varchar(16)",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "registration_status",
+     "nullable": true,
+     "pg_type": "varchar(32)",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": "low",
+     "description": "US state (USPS code or name, as published).",
+     "example": null,
+     "name": "state",
+     "nullable": true,
+     "pg_type": "varchar(2)",
+     "pii": "none",
+     "semantic_type": "us_state",
+     "source": "glossary",
+     "unit": null
+    }
+   ],
+   "datasets": [
+    "gleif_lei_records"
+   ],
+   "origin": "ddl",
+   "packages": [
+    "gleif"
    ]
   },
   "government_unit": {

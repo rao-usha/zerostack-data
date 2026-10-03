@@ -20,6 +20,10 @@ EDGAR tags, a rename or legal-form conversion after the old CIK went dormant, a
 strategy-labelled or successor 13F CIK of one adviser). Names still never merge
 anything on their own: they only corroborate a shared strong key.
 
+SPEC_154: LEI and UEI are gated the same way (a shared LEI on two CIKs is a parent's
+LEI typed on a subsidiary as often as a duplicate filer account). GLEIF and USAspending
+records carry no CIK: they cluster on their LEI / UEI and attach by rule 5.
+
 Values are canonicalized before comparison, so EDGAR's zero-padded CIK
 ("0001002784") and the bare integer (1002784) are ONE key, and placeholder
 values made of one repeated digit are refused outright.
@@ -98,9 +102,16 @@ def _crd(raw):
     return _numeric_id(raw, 10)
 
 
+def _lei_checksum_ok(v):
+    """ISO 17442 / ISO 7064 MOD 97-10: letters A..Z read as 10..35, the number mod 97 is 1."""
+    return int("".join(str(int(c, 36)) for c in v)) % 97 == 1
+
+
 def _lei(raw):
+    # SPEC_154 review: the check digits are enforced. MEASURED 2026-10-03, 16 sec_filers values
+    # of 20 alphanumerics fail them (a trust's name, registry numbers, typos of real LEIs).
     v = _ALNUM.sub("", str(raw or "").upper())
-    return v if len(v) == 20 and not _degenerate(v) else None
+    return v if len(v) == 20 and not _degenerate(v) and _lei_checksum_ok(v) else None
 
 
 def _uei(raw):
@@ -190,7 +201,18 @@ def _extract_keys(rec):
     return out
 
 
-GATED_KEY_TYPES = ("ein", "crd")      # SPEC_150: these join two CIK groups only when corroborated
+# SPEC_150: these join two CIK groups only when corroborated. SPEC_154 adds LEI and UEI: MEASURED
+# 2026-10-03, 6 LEIs are typed on more than one sec_filers CIK (a parent's LEI on a subsidiary or
+# fund filer), so an LEI alone says "related" exactly as a shared EIN does. Records without a CIK
+# (GLEIF, USAspending) still cluster on them freely and attach by rule 5.
+GATED_KEY_TYPES = ("ein", "crd", "lei", "uei")
+# SPEC_154 review: a no-CIK cluster whose ONLY link to the CIK classes is one of these keys
+# attaches only when its name matches a CIK of the class (current or former EDGAR name). The
+# EDGAR side of an LEI is self-reported: MEASURED 2026-10-03, of 168 GLEIF records attached by
+# LEI alone, 6 named a different legal person (22C Capital LLC typed Bloomberg Finance L.P.'s
+# LEI; managers' LEIs typed on their funds and SPVs). Unmatched, the record stays its own
+# piece and, as the anchor, owns the LEI (rule 6), which is withheld from the filer.
+NAME_GATED_ATTACH_TYPES = ("lei", "uei")
 
 
 def _first_steps(records, bridge_edges, vetoes):
@@ -252,8 +274,8 @@ def _groups(rec_keys, xwalk_used):
     """SPEC_150 structure: ungated groups, their CIKs and gated keys, the no-CIK
     anchor clusters, and which CIK groups hold each gated key.
 
-    An UNGATED group is the records joined by CIK / LEI / UEI / state id (unchanged
-    rules). A group with a CIK is a "CIK group"; the rest are anchors (ADV, IAPD,
+    An UNGATED group is the records joined by CIK / state id (SPEC_154: LEI and UEI
+    are gated like EIN and CRD). A group with a CIK is a "CIK group"; the rest are anchors (ADV, IAPD,
     Form 5500, ...). Anchors sharing an EIN / CRD cluster freely: there is no CIK
     between them to protect.
     """
@@ -317,6 +339,18 @@ def _cluster_candidates(G, cluster):
     return cands
 
 
+def _squash(name):
+    """A name with spacing and punctuation gone ('TheGoodEarCompany, Inc.' == 'THE GOOD EAR
+    COMPANY, INC.'): the name-gated attach accepts it as equal (SPEC_154 review)."""
+    return re.sub(r"[^a-z0-9]", "", str(name or "").lower())
+
+
+def _cluster_name_gated(G, cluster):
+    """True when every key linking the cluster to a CIK group is an LEI / UEI (SPEC_154)."""
+    link = {k[0] for g in cluster for k in G["gkeys"].get(g, {}) if G["key_groups"].get(k)}
+    return bool(link) and link <= set(NAME_GATED_ATTACH_TYPES)
+
+
 def gated_ciks(records, bridge_edges, vetoes):
     """The CIKs whose filer profile the gate needs (SPEC_150): every CIK that shares
     an EIN / CRD / bridge CRD with a different CIK group, or is one of several
@@ -330,7 +364,7 @@ def gated_ciks(records, bridge_edges, vetoes):
                 out |= G["gciks"][g]
     for cluster in G["clusters"]:
         cands = _cluster_candidates(G, cluster)
-        if len(cands) > 1:
+        if len(cands) > 1 or (cands and _cluster_name_gated(G, cluster)):
             for g in cands:
                 out |= G["gciks"][g]
     return out
@@ -348,8 +382,8 @@ def _cap_list(block, name, items):
 def plan(records, bridge_edges, vetoes, profiles=None, crd_hints=()):
     """Compute the resolution. PURE: no DB, no clock, no randomness.
 
-    SPEC_150: CIK / LEI / UEI / state ids union records as always. An EIN or a CRD
-    (and a CIK<->CRD bridge edge) joins two CIK groups only when `gate.corroborate`
+    SPEC_150: CIK / state ids union records as always. An EIN, a CRD, an LEI or a UEI
+    (SPEC_154) (and a CIK<->CRD bridge edge) joins two CIK groups only when `gate.corroborate`
     says the pair is one legal person; records with no CIK attach to one class by
     rule 5; an EIN / CRD left on several pieces gets one owner. `profiles` maps a
     canonical CIK to its EDGAR filer profile; without one the gate sees only record
@@ -458,15 +492,25 @@ def plan(records, bridge_edges, vetoes, profiles=None, crd_hints=()):
         cands = sorted({ucb.find(g) for g in _cluster_candidates(G, cluster)})
         if not cands:
             continue
-        if len(cands) == 1:
+        rn, forms = set(), set()
+        for g in cluster:
+            for rk in members[g]:
+                rn |= gate.record_name_keys(by_key[rk].get("legal_name"))
+                forms.add(gate.legal_form(by_key[rk].get("legal_name")))
+        cc = {c: sorted(class_ciks[c]) for c in cands}
+        if len(cands) == 1 and _cluster_name_gated(G, cluster):
+            squashed = {_squash(by_key[rk].get("legal_name")) for g in cluster for rk in members[g]}
+            squashed.discard("")
+            if any(rn & F(x)["allkeys"] or _squash(F(x)["name"]) in squashed
+                   for x in cc[cands[0]]):
+                to, how = cands[0], "only_class"
+            else:
+                to, how = None, "own_entity_name_mismatch"
+                attach_ev.append({"record_key": members[cluster[0]][0], "how": how,
+                                  "candidates": 1})
+        elif len(cands) == 1:
             to, how = cands[0], "only_class"
         else:
-            rn, forms = set(), set()
-            for g in cluster:
-                for rk in members[g]:
-                    rn |= gate.record_name_keys(by_key[rk].get("legal_name"))
-                    forms.add(gate.legal_form(by_key[rk].get("legal_name")))
-            cc = {c: sorted(class_ciks[c]) for c in cands}
             named = [c for c in cands if any(rn & F(x)["allkeys"] for x in cc[c])]
             named_f = [c for c in named if any(F(x)["form"] in forms for x in cc[c])]
             ops = [c for c in cands if any(gate.operating(F(x)) for x in cc[c])]
@@ -836,6 +880,11 @@ def assign_ids(comps, prior, dissolved_claim=None):
 # nothing else strong, so most of them share no key with anyone; their only
 # other handle is the sponsor name and state.
 WEAK_SOURCES = ("dol5500",)
+# SPEC_154: GLEIF LEI records get their own name+state call (lei_conflict instead of ein_conflict)
+WEAK_LEI_SOURCES = ("gleif",)
+# records of a weak source are never candidates in any weak call: the dol5500 rows stay exactly
+# what they were before GLEIF existed, and two weak sources never vouch for each other
+WEAK_EXCLUDED_CANDIDATES = WEAK_SOURCES + WEAK_LEI_SOURCES
 WEAK_TIER = "name_state"
 # Distinct candidate identities (entities or lone records) kept per sponsor. A
 # common name can match dozens; the rest are counted, never silently dropped.
@@ -849,7 +898,7 @@ def _source_of(rec):
 
 
 def weak_name_state(records, rec_keys, comps, sources=WEAK_SOURCES,
-                    cap=WEAK_CANDIDATE_CAP):
+                    cap=WEAK_CANDIDATE_CAP, exclude=WEAK_EXCLUDED_CANDIDATES):
     """Name+state candidates for records of `sources`. PURE, and it changes no
     component: the resolver stays identifier-only (module docstring). Every row
     is evidence for a reviewer, with its contradictions written down.
@@ -861,22 +910,29 @@ def weak_name_state(records, rec_keys, comps, sources=WEAK_SOURCES,
       corroborates  the candidate sits in the sponsor's own strong component
       conflict      a contradiction with strong evidence, listed in `conflicts`:
                     ein_conflict (the candidate's identity carries EINs and none
-                    is the sponsor's) and/or strong_match_elsewhere (the sponsor
-                    is already strongly matched to a different component)
+                    is the sponsor's), lei_conflict (SPEC_154, the same for LEIs)
+                    and/or strong_match_elsewhere (the sponsor is already strongly
+                    matched to a different component)
       ambiguous     no conflict, but the name+state names >1 foreign identity
       candidate     exactly one foreign identity, no conflict
+
+    Records of `sources` and of `exclude` (every weak source, SPEC_154) are
+    never candidates.
 
     -> {"rows": [...], "metrics": {...}}; row["candidate_comp"] is an index
     into `comps` or None.
     """
     sources = set(sources)
+    not_candidates = sources | set(exclude or ())
     comp_of = {rk: i for i, c in enumerate(comps) for rk in c["members"]}
     comp_eins = {i: sorted({v for t, v in c["keys"] if t == "ein"})
+                 for i, c in enumerate(comps)}
+    comp_leis = {i: sorted({v for t, v in c["keys"] if t == "lei"})
                  for i, c in enumerate(comps)}
 
     index = {}
     for rec in records:
-        if _source_of(rec) in sources:
+        if _source_of(rec) in not_candidates:
             continue
         nn, st = rec.get("name_norm"), rec.get("state")
         if nn and st:
@@ -903,6 +959,7 @@ def weak_name_state(records, rec_keys, comps, sources=WEAK_SOURCES,
         own = comp_of.get(rk)
         own_ident = ("comp", own) if own is not None else None
         own_eins = sorted({v for t, v in rec_keys.get(rk, ()) if t == "ein"})
+        own_leis = sorted({v for t, v in rec_keys.get(rk, ()) if t == "lei"})
         # the sponsor's own component first, then a stable order
         idents = sorted({identity(c) for c in cands},
                         key=lambda i: (i != own_ident, str(i)))
@@ -926,6 +983,11 @@ def weak_name_state(records, rec_keys, comps, sources=WEAK_SOURCES,
                 if cand_eins and own_eins and not set(own_eins) & set(cand_eins):
                     conflicts.append({"reason": "ein_conflict", "sponsor_ein": own_eins[0],
                                       "candidate_eins": cand_eins[:12]})
+                cand_leis = (comp_leis[ci] if ci is not None else
+                             sorted({v for t, v in rec_keys.get(c, ()) if t == "lei"}))
+                if cand_leis and own_leis and not set(own_leis) & set(cand_leis):
+                    conflicts.append({"reason": "lei_conflict", "record_lei": own_leis[0],
+                                      "candidate_leis": cand_leis[:12]})
                 if own is not None:
                     conflicts.append({"reason": "strong_match_elsewhere",
                                       "sponsor_component_first_member":
@@ -957,7 +1019,8 @@ def weak_name_state(records, rec_keys, comps, sources=WEAK_SOURCES,
     }}
 
 
-def source_metrics(records, rec_keys, comps, weak, new_components=(), source="dol5500"):
+def source_metrics(records, rec_keys, comps, weak, new_components=(), source="dol5500",
+                   key_type="ein"):
     """How one source fared in this resolve -> dict. PURE, so a dry run reports
     exactly what a real run does."""
     new_components = set(new_components)
@@ -969,7 +1032,7 @@ def source_metrics(records, rec_keys, comps, weak, new_components=(), source="do
     unmatched = []
     for r in mine:
         rk = r["record_key"]
-        if any(t == "ein" for t, _v in rec_keys.get(rk, ())):
+        if any(t == key_type for t, _v in rec_keys.get(rk, ())):
             with_ein += 1
         ci = comp_of.get(rk)
         if ci is not None and any(_source_of(by_key[m]) != source
@@ -993,8 +1056,8 @@ def source_metrics(records, rec_keys, comps, weak, new_components=(), source="do
     weak_rks = {row["record_key"] for row in weak["rows"]}
     return {
         "records_fed": len(mine),
-        "with_ein_key": with_ein,
-        "matched_strong_ein": matched,
+        f"with_{key_type}_key": with_ein,
+        f"matched_strong_{key_type}": matched,
         "unmatched_singletons": len(unmatched),
         "in_new_entities": in_new,
         "strong_components": len(strong_comps),

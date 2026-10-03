@@ -29,7 +29,8 @@ PLAN_EVIDENCE = REPO / "docs" / "plans" / "PLAN_088_evidence.json"
 LOOSENED_WITH_REVIEW: set = set()
 # datasets added after the baseline snapshot (each split out of a baseline dataset; the
 # fix-round tests pin their rights)
-ADDED_AFTER_BASELINE = {"zip_medspa_scores", "ats_boards"}  # ats_boards: SPEC_151, a new source
+ADDED_AFTER_BASELINE = {"zip_medspa_scores", "ats_boards",  # ats_boards: SPEC_151, a new source
+                        "gleif_lei_records"}                   # SPEC_154: GLEIF LEI records
 
 STORAGE_FLAGGED = {"yelp_businesses", "fred_series", "kaggle_m5", "prediction_markets", "si_zoning_districts",
                    "si_internet_exchanges", "si_warehouse_listings", "medspa_prospects"}
@@ -274,7 +275,9 @@ class TestMonotonicity:
 class TestProposals:
     def test_expected_proposals(self):
         props = {s.key: s.proposed_rights for s in _catalog() if s.proposed_rights}
-        assert {"realestate_osm_buildings", "fred_series", "dunl_reference", "intl_imf"} <= set(props)
+        # SPEC_154 closed the dunl_reference "loosen if CC BY" proposal: neither licence S&P names is CC BY
+        assert {"realestate_osm_buildings", "fred_series", "intl_imf"} <= set(props)
+        assert "dunl_reference" not in props
         osm = props["realestate_osm_buildings"]
         assert osm.change == "loosen" and osm.redistribution == "attribution" and osm.share_alike
         assert props["fred_series"].redistribution == "open"
@@ -434,7 +437,7 @@ class TestQueueAndReport:
         rep = build_report(None, live=False)
         sm = rep["summary"]
         assert sm["datasets"] == len(_catalog()) and sm["reviewed"] == len(_in_force()) > 0
-        assert sm["gated"] >= len(STORAGE_FLAGGED) and sm["proposals"] >= 4
+        assert sm["gated"] >= len(STORAGE_FLAGGED) and sm["proposals"] >= 3   # SPEC_154: dunl closed
         assert rep["live"] is False
         keys = {h["key"] for h in rep["storage_holdings"]}
         assert STORAGE_FLAGGED <= keys

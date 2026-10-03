@@ -309,7 +309,7 @@ def pg_engine():
             state_or_country TEXT, loaded_at TIMESTAMP DEFAULT NOW())""")
         )
         conn.execute(
-            text("""CREATE TABLE sec_filers (cik TEXT, name TEXT, ein TEXT,
+            text("""CREATE TABLE sec_filers (cik TEXT, name TEXT, ein TEXT, lei TEXT,
             state_of_incorporation TEXT, biz_state2 TEXT, biz_state_or_country TEXT, website TEXT,
             loaded_at TIMESTAMP DEFAULT NOW())""")
         )
@@ -394,7 +394,8 @@ def test_feeds_without_workbench_table_pg(pg_engine):
     assert counts["dol5500"] == 0
     assert "dol5500" in counts["skipped"]
     assert set(counts["skipped"]) - {"dol5500"} <= {"pefirm", "industrial", "peportco", "portco", "threepl",
-                                                    "famoffice", "lpfund"}
+                                                    "famoffice", "lpfund",
+                                                    "gleif", "usasp"}  # SPEC_154 feeds
     with pg_engine.connect() as conn:
         keys = {r[0] for r in conn.execute(text("SELECT record_key FROM core.source_record"))}
     assert "edgar:0000000042" in keys and "edgar:0000000777" not in keys

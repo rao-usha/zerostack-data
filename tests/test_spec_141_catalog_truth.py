@@ -774,7 +774,8 @@ class TestReviewFixes:
         assert set(unverified) == {"census_cbp", "census_acs_county_tract",
                                    "census_cbp_county_yearly",
                                    "zip_medspa_scores",  # SPEC_142 fix: split out of medspa_prospects
-                                   "ats_boards"}  # SPEC_151: new gated board lane
+                                   "ats_boards",  # SPEC_151: new gated board lane
+                                   "gleif_lei_records"}  # SPEC_154: GLEIF LEI records
         for s in _catalog():
             assert s.verified_at and s.data_state is not None, s.key
 

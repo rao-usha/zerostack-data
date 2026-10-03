@@ -52,5 +52,23 @@
     "verdict": "allowed",
     "reviewed": "2026-10-02",
     "citation": "Terms reviewed for the public job posting API (api.ashbyhq.com/posting-api/job-board/<org>?includeCompensation=true; SPEC_151). Ashby Customer Terms of Service, last updated September 29, 2025 (https://www.ashbyhq.com/terms): effective when a Customer 'first completes a purchase ... or logs into the Service' -- customers only; no clause on automated access or scraping. developers.ashbyhq.com/docs/public-job-posting-api documents the endpoint with no use restriction. NOTE: api.ashbyhq.com/robots.txt answers 401 Unauthorized to every user agent (2026-10-02); open_web treats 401 as disallow-all, so the gate refuses the API and nothing is fetched until that changes or the owner decides otherwise."
+  },
+  {
+    "host": "gleif.org",
+    "verdict": "allowed",
+    "citation": "GLEIF LEI data terms of use (https://www.gleif.org/en/meta/lei-data-terms-of-use, fetched 2026-10-03): 'The Access Service on the website http(s)://www.gleif.org is provided for free. The data available through the Access Service are provided under the CC0 licence'. SPEC_154 uses api.gleif.org only (robots.txt: 'User-agent: * / Disallow:'); goldencopy.gleif.org/robots.txt answers 403, which the gate reads as disallow-all, so the Golden Copy zips are not fetched. GLEIF's API allows 60 requests per minute; the connector paces at >= 2 s.",
+    "reviewed": "2026-10-03"
+  },
+  {
+    "host": "dunl.org",
+    "verdict": "refused",
+    "citation": "S&P Global DUNL: the site footer names CC BY-NC-SA 4.0 ('By using this site, you confirm your acceptance of the terms of this license'), the company dataset metadata names CC BY-SA 4.0 and the 2025-09-11 press release limits use to 'free internal organizational use'. Conflicting non-commercial / share-alike terms: no request until S&P confirms commercial use in writing (SPEC_154, reviewed 2026-10-03). The existing dunl reference-data client does not use this gate.",
+    "reviewed": "2026-10-03"
+  },
+  {
+    "host": "spglobal.com",
+    "verdict": "refused",
+    "citation": "Covers api.datamgmt.spglobal.com (the keyless DUNL paging / resolve API) and www.spglobal.com: same conflicting DUNL licence (CC BY-NC-SA 4.0 site, CC BY-SA 4.0 metadata, 'internal organizational use'), and the S&P Terms of Use (https://www.spglobal.com/en/terms-of-use) returned an error page on 2026-10-03, so no clause on automated access could be read (SPEC_154).",
+    "reviewed": "2026-10-03"
   }
 ]

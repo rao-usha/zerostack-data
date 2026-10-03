@@ -35,6 +35,10 @@ APPROVED = {
     "treasury_auctions": TREASURY_URL,
     "bls_series": BLS_URL,
 }
+# Datasets added after the batch-1 snapshot (each carries its own cited block and spec).
+ADDED_AFTER = {"ats_boards": "SPEC_151", "gleif_lei_records": "SPEC_154"}
+# Blocks a later spec TIGHTENED (never loosened): pinned field by field in the test below.
+TIGHTENED_AFTER = {"dunl_reference": "SPEC_154: S&P licence conflict recorded, 'loosen if CC BY' closed"}
 HELD_FDIC = {"fdic_bank_financials", "fdic_institutions", "fdic_failed_banks", "fdic_summary_deposits"}
 
 # fields that decide (hashed) plus the citation fields that document the block
@@ -115,9 +119,20 @@ class TestNothingElseChanged:
         to differ; their diff is pinned field by field (sign-off included) in
         ``test_only_deciding_terms_and_citations_changed``."""
         before, cat = _before(), _catalog()
-        assert set(cat) == set(before)
-        changed = sorted(k for k, s in cat.items() if _now(s) != before[k])
-        assert set(changed) == set(APPROVED), changed
+        assert set(cat) == set(before) | set(ADDED_AFTER)
+        changed = sorted(k for k, s in cat.items() if k in before and _now(s) != before[k])
+        assert set(changed) == set(APPROVED) | set(TIGHTENED_AFTER), changed
+
+    def test_later_tightening_only(self):
+        """SPEC_154 dunl: same redistribution / pii, proposal closed, commercial use restricted."""
+        before, cat = _before(), _catalog()
+        for key in TIGHTENED_AFTER:
+            b, n = before[key], _now(cat[key])
+            assert n["redistribution"] == b["redistribution"] == "restricted", key
+            assert n["effective_redistribution"] == b["effective_redistribution"], key
+            assert b["proposed"] is not None and n["proposed"] is None, key
+            assert n["commercial_use"] == "restricted" and n["share_alike"] is True, key
+            assert n["reviewed"] is False, key
 
     def test_fdic_held(self):
         before, cat = _before(), _catalog()
@@ -139,6 +154,9 @@ class TestNothingElseChanged:
         """None -> allowed is an assessment only when a full citation backs it."""
         before, cat = _before(), _catalog()
         for key, s in cat.items():
+            if key in ADDED_AFTER:
+                assert s.citation_url and s.citation_quote and s.rights_confidence, key
+                continue
             for f in ("storage", "commercial_use"):
                 if before[key][f] is None and getattr(s, f) is not None:
                     assert s.citation_url and s.citation_quote and s.rights_confidence, (key, f)

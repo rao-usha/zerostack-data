@@ -1,6 +1,11 @@
 """
 Feeds: SEC bulk tables (and Form 5500 sponsors) -> core.source_record (SPEC_116, SPEC_147).
 
+SPEC_154: EDGAR records carry `sec_filers.lei`; GLEIF LEI records (`gleif_lei_record`, CC0) and
+USAspending recipient UEIs (`usaspending_awards`) are fed one record per LEI / UEI. LEI and UEI
+are gated keys in the resolver (resolve_core.GATED_KEY_TYPES): they join two CIKs only when the
+SPEC_150 gate corroborates the pair. Either table absent -> that feed is skipped and reported.
+
 One row per (source, native id). Only identifiers travel; names ride along for
 the canonical row and aliases but never merge anything.
 
@@ -44,7 +49,7 @@ from sqlalchemy import text
 
 from app.core.copy_loader import copy_rows, create_staging, drop_staging, merge_staging
 from app.entities import domains, norm
-from app.entities.resolve_core import _cik, _crd, ein_is_placeholder
+from app.entities.resolve_core import _cik, _crd, _lei, _uei, ein_is_placeholder
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +88,8 @@ class Feed:
     native_ein: bool = False
     # SPEC_148: keys only attach a domain claim; rows without a kept domain dropped
     attach_only: bool = False
+    # SPEC_154: native_id IS this identifier ('lei' | 'uei'): canonicalized, rows without one dropped
+    native_key: Optional[str] = None
 
 
 # The CIK universe we care about: everything referenced by an adviser-side or
@@ -222,6 +229,7 @@ def _edgar_feed(relevant_ciks: str) -> Feed:
                NULL::TEXT AS crd,
                f.cik,
                f.ein,
+               f.lei,
                COALESCE(f.state_of_incorporation, f.biz_state2, f.biz_state_or_country) AS state,
                f.website AS domain,
                f.loaded_at AS observed_at
@@ -260,6 +268,59 @@ DOL5500 = Feed(
 )
 
 
+GLEIF_TABLE = "public.gleif_lei_record"
+USASP_TABLE = "public.usaspending_awards"
+
+# SPEC_154: one record per LEI from the GLEIF API load (CC0). DUPLICATE / ANNULLED registrations
+# are invalid LEIs (GLEIF: another LEI is the real one, or the LEI was issued in error): not fed.
+# `state` is the US jurisdiction state, else the legal-address state (app/sources/gleif/client.py).
+GLEIF = Feed(
+    "gleif",
+    """
+    SELECT lei AS native_id,
+           legal_name,
+           NULL::TEXT AS crd,
+           NULL::TEXT AS cik,
+           NULL::TEXT AS ein,
+           lei,
+           state,
+           NULL::TEXT AS domain,
+           golden_copy_publish_date::TIMESTAMP AS observed_at
+    FROM gleif_lei_record
+    WHERE COALESCE(registration_status, '') NOT IN ('DUPLICATE', 'ANNULLED')
+    """,
+    "gleif",
+    requires=GLEIF_TABLE,
+    native_key="lei",
+)
+
+# SPEC_154: one record per distinct USAspending recipient UEI (the latest award names it). No
+# state: the table holds the place of performance, not the recipient's address.
+USASP = Feed(
+    "usasp",
+    """
+    SELECT DISTINCT ON (upper(trim(recipient_uei)))
+           upper(trim(recipient_uei)) AS native_id,
+           recipient_name AS legal_name,
+           NULL::TEXT AS crd,
+           NULL::TEXT AS cik,
+           NULL::TEXT AS ein,
+           recipient_uei AS uei,
+           NULL::TEXT AS state,
+           NULL::TEXT AS domain,
+           ingested_at::TIMESTAMP AS observed_at
+    FROM usaspending_awards
+    WHERE recipient_uei IS NOT NULL
+    ORDER BY upper(trim(recipient_uei)), ingested_at DESC, award_id
+    """,
+    "usasp",
+    requires=USASP_TABLE,
+    native_key="uei",
+)
+
+_NATIVE_CANON = {"lei": _lei, "uei": _uei}
+
+
 def _ein9(raw) -> Optional[str]:
     """9-digit EIN with its leading zeros, or None.
 
@@ -292,8 +353,12 @@ def _row(feed: Feed, raw: dict) -> Optional[tuple]:
     cik = _cik(raw.get("cik"))
     crd = _crd(raw.get("crd"))
     ein = _ein9(raw.get("ein"))
+    lei = _lei(raw.get("lei"))
+    uei = _uei(raw.get("uei"))
     if feed.native_ein:
         native_id = _ein9(raw.get("native_id")) or ""
+    elif feed.native_key:
+        native_id = _NATIVE_CANON[feed.native_key](raw.get("native_id")) or ""
     else:
         native_id = str(raw.get("native_id") or "").strip()
     if not native_id:
@@ -312,8 +377,8 @@ def _row(feed: Feed, raw: dict) -> Optional[tuple]:
         ein,
         cik,
         crd,
-        None,  # lei: not carried by these sources yet
-        None,  # uei
+        lei,   # SPEC_154: EDGAR sec_filers.lei, GLEIF
+        uei,   # SPEC_154: USAspending recipient UEI
         None,  # state_entity_id
         norm.state2(raw.get("state")),
         _zip5(raw.get("zip5")),
@@ -375,7 +440,7 @@ def feeds_for(conn) -> Tuple[List[Feed], List[str]]:
     expansion needs the Form 5500 table too; without it the SEC feeds run
     exactly as before."""
     run, skipped = [], []
-    for feed in FEEDS + [DOL5500] + ATTACH_FEEDS:
+    for feed in FEEDS + [DOL5500, GLEIF, USASP] + ATTACH_FEEDS:
         if feed.requires and not _relation_exists(conn, feed.requires):
             logger.warning(f"[entities:feeds] {feed.requires} not found: {feed.name} feed skipped")
             skipped.append(feed.name)

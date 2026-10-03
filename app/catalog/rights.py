@@ -321,20 +321,39 @@ SOURCE_RIGHTS: Dict[str, SourceRights] = {
                 "personal use for non-commercial purposes only ... Non-commercial use does not include ... "
                 "providing archived or cached data sets containing Kalshi Data to another person or entity",
                 "medium-high")),
+    # SPEC_154 (verified 2026-10-03): S&P's three licence statements conflict and none is CC BY,
+    # so the SPEC_142 "loosen if CC BY" proposal is closed. Only commodity reference data is
+    # fetched (app/sources/dunl/client.py); the company file (CIQ ids) is NOT loaded.
     "dunl": SourceRights(
-        "S&P Global DUNL licence terms", "restricted", "none", "official",
-        notes="The licence page did not render; the Creative Commons variant is unverified.",
-        proposed=RightsProposal(
-            "loosen",
-            "If the DUNL licence is CC BY (not CC BY-NC), move to attribution. Verify the exact variant first.",
-            license="DUNL open data (Creative Commons; variant to verify)", redistribution="attribution",
-            attribution="Source: S&P Global DUNL (dunl.org)",
-            **_cite("https://press.spglobal.com/2025-09-11-S-P-Global-ushers-new-era-of-open-data-access-Introduces-S-P-Capital-IQ-Identifiers-on-DUNL-org",
-                    "transparent licensing with Creative Commons licensing enabling free internal "
-                    "organizational use (search excerpt)", "low")),
-        **_cite("https://press.spglobal.com/2025-09-11-S-P-Global-ushers-new-era-of-open-data-access-Introduces-S-P-Capital-IQ-Identifiers-on-DUNL-org",
-                "transparent licensing with Creative Commons licensing enabling free internal organizational use "
-                "(search excerpt)", "low")),
+        "S&P Global DUNL: CC BY-NC-SA 4.0 (site) / CC BY-SA 4.0 (dataset metadata) -- conflicting",
+        "restricted", "none", "official",
+        storage="allowed", commercial_use="restricted", share_alike=True,
+        license_url="https://creativecommons.org/licenses/by-nc-sa/4.0/",
+        notes="Three conflicting S&P statements (verified 2026-10-03): the dunl.org footer and landing "
+              "page name CC BY-NC-SA 4.0 ('By using this site, you confirm your acceptance of the terms "
+              "of this license'); dunl.org/assets/datasets/company/parquet/company.parquet-metadata.json "
+              "names CC BY-SA 4.0; the 2025-09-11 press release says 'free internal organizational use'. "
+              "All carry ShareAlike, none is plain CC BY; the S&P Terms of Use the footer links returned "
+              "an error page (unread). Not usable for commercial bulk loading without S&P's written "
+              "clearance (owner to ask dunl@spglobal.com). The S&P Capital IQ company file is not loaded.",
+        **_cite("https://dunl.org/main-DAZ2NPE4.js",
+                "DUNL (Data Unlocked) - Open Data Portal © 2026 by S&P Global Inc. is licensed under "
+                "CC BY-NC-SA 4.0", "high")),
+    # SPEC_154: GLEIF LEI reference data (CC0). Only lei / entity / registration fields are
+    # requested; the third-party mapping fields (spglobal, ocid, bic ...) are never fetched.
+    "gleif": SourceRights(
+        "CC0 1.0 Universal (GLEIF LEI data)", "open", "business_contact", "official",
+        storage="allowed", commercial_use="allowed", license_url=CC0_URL,
+        attribution="Source: Global Legal Entity Identifier Foundation (GLEIF)",
+        notes="Legal entity names and addresses; sole proprietors' names appear as legal or trading "
+              "names. Whether CC0 also covers the S&P CIQ-to-LEI pairs GLEIF shows (field 'spglobal') "
+              "is unconfirmed: that field is not fetched. Terms IV(c): never imply GLEIF provides, "
+              "supports or endorses anything beyond the original LEI data, and no GLEIF logo without "
+              "permission (liquidated damages CHF 100,000 per case).",
+        **_cite("https://www.gleif.org/en/meta/lei-data-terms-of-use",
+                "The Access Service on the website http(s)://www.gleif.org is provided for free. The data "
+                "available through the Access Service are provided under the CC0 licence, see CC0 1.0 "
+                "Universal (CC0 1.0).", "high")),
     "github": SourceRights("GitHub API terms of service", "restricted", "personal", "official",
                            notes="Contributor logins are personal data. No selling users' personal information.",
                            **_cite("https://docs.github.com/en/site-policy/acceptable-use-policies/github-acceptable-use-policies",

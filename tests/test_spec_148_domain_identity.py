@@ -543,7 +543,7 @@ SOURCE_DDL = {
                        "filing_manager_state_or_country TEXT, filing_date DATE",
     "sec_13f_other_managers": "accession_number TEXT, cik TEXT, crd_number TEXT",
     "form_d_issuers": "cik TEXT, entity_name TEXT, state_or_country TEXT, loaded_at TIMESTAMP DEFAULT NOW()",
-    "sec_filers": "cik TEXT, name TEXT, ein TEXT, state_of_incorporation TEXT, biz_state2 TEXT, "
+    "sec_filers": "cik TEXT, name TEXT, ein TEXT, lei TEXT, state_of_incorporation TEXT, biz_state2 TEXT, "
                   "biz_state_or_country TEXT, website TEXT, loaded_at TIMESTAMP DEFAULT NOW()",
     "sec_8k_index": "cik TEXT",
     "sec_insider_owners": "rptowner_cik TEXT",

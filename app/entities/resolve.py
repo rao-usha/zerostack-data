@@ -35,6 +35,7 @@ from sqlalchemy import text
 from app.core.copy_loader import copy_rows, create_staging, drop_staging, merge_staging
 from app.entities.resolve_core import (
     ATTACH_ONLY_SOURCES,
+    WEAK_LEI_SOURCES,
     BRIDGE_TIERS_ACCEPTED,
     RESOLVER_VERSION,
     assign_ids,
@@ -623,6 +624,16 @@ def resolve(conn, dry_run: bool = False) -> Dict[str, Any]:
     metrics["dol5500"] = _flat(source_metrics(
         records, result["record_keys"], comps, weak, new_components=ids["new_entities"]
     ))
+    # SPEC_154: GLEIF records get their own name+state call (lei_conflict); USAspending UEIs carry
+    # no state, so they have no weak tier. Both report how they resolved.
+    weak_lei = weak_name_state(records, result["record_keys"], comps, sources=WEAK_LEI_SOURCES)
+    metrics["weak_gleif"] = _flat(weak_lei["metrics"])
+    metrics["gleif"] = _flat(source_metrics(
+        records, result["record_keys"], comps, weak_lei, new_components=ids["new_entities"],
+        source="gleif", key_type="lei"))
+    metrics["usasp"] = _flat(source_metrics(
+        records, result["record_keys"], comps, {"rows": [], "metrics": {"sponsors_by_status": {}}},
+        new_components=ids["new_entities"], source="usasp", key_type="uei"))
     domain_plan = domain_links(all_records, result["record_keys"], comps, _load_probes(conn),
                                key_owner=result["key_owner"])
     metrics["domains"] = _flat(domain_plan["metrics"])
@@ -690,7 +701,7 @@ def resolve(conn, dry_run: bool = False) -> Dict[str, Any]:
 
     # component i was written as entity_rows[i] (same order as comps)
     comp_entity = [row[0] for row in entity_rows]
-    metrics["weak"].update(_write_weak(conn, weak["rows"], comp_entity, now))
+    metrics["weak"].update(_write_weak(conn, weak["rows"] + weak_lei["rows"], comp_entity, now))
     metrics["domains"].update(_write_domains(conn, domain_plan["rows"], comp_entity, now))
 
     metrics["memberships_removed"] = removed_memberships

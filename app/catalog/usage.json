@@ -2383,6 +2383,15 @@
     ]
    }
   ],
+  "gleif_lei_record": [
+   {
+    "kind": "entity",
+    "path": "app/entities/feeds.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
   "google_places_cache": [
    {
     "kind": "service",
@@ -3479,6 +3488,13 @@
     "path": "app/core/job_queue_service.py",
     "via": [
      "orm"
+    ]
+   },
+   {
+    "kind": "core_service",
+    "path": "app/core/scheduler_leader.py",
+    "via": [
+     "sql"
     ]
    },
    {
@@ -7460,6 +7476,13 @@
    }
   ],
   "usaspending_awards": [
+   {
+    "kind": "entity",
+    "path": "app/entities/feeds.py",
+    "via": [
+     "sql"
+    ]
+   },
    {
     "kind": "report",
     "path": "app/reports/templates/market_intelligence_pack.py",

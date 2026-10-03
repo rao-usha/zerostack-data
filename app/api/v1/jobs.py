@@ -575,6 +575,12 @@ SOURCE_DISPATCH: Dict[str, Tuple[str, str, List[str]]] = {
         "ingest_ats_boards",
         ["preset", "ciks", "industrial_ids", "apply"],
     ),
+    # SPEC_154: GLEIF LEI records (CC0) through the open_web gate; dry run unless apply
+    "gleif": (
+        "app.sources.gleif.ingest",
+        "ingest_gleif",
+        ["apply", "max_pages", "country"],
+    ),
     # ── openFDA ─────────────────────────────────────────────────────────
     "fda": (
         "app.sources.fda.ingest",

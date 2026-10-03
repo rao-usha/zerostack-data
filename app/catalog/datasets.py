@@ -116,6 +116,7 @@ _KEYWORDS: Dict[str, Tuple[str, ...]] = {
     "cftc_cot": ("markets", "finance"),
     "usda": ("macro",),
     "dunl": ("markets",),
+    "gleif": ("entity", "company"),
     "job_postings": ("labor", "company"),
     "fda": ("health", "company"),
     "sam_gov": ("government", "company"),
@@ -453,6 +454,8 @@ _DERIVED: List[DatasetSpec] = [
         "job:entity_resolve#feeds", "monthly",
         tables=("core.source_record",), primary_key=("record_key",),
         inputs=("sec_edgar_submissions", "sec_form_d", "sec_13f", "sec_insider", "sec_iapd_feed", "sec_adv_roster",
+                # SPEC_154: LEI records (GLEIF API load) and USAspending recipient UEIs
+                "gleif_lei_records", "usaspending_awards",
                 # SPEC_148 attach-only website feeds (collection jobs, not bulk: no input gate)
                 "pe_collection", "people_org_charts", "lp_collection", "family_offices",
                 "agentic_portfolios", "si_3pl_companies"),
@@ -467,7 +470,10 @@ _DERIVED: List[DatasetSpec] = [
                      "lpfund; SPEC_148) are company tables fed for their website alone: their keys "
                      "attach a domain claim, they never resolve into entities. Their datasets are "
                      "collection jobs, not bulk releases, so the input gate does not check their "
-                     "freshness."),
+                     "freshness.",
+                     "GLEIF LEI records (source gleif) and USAspending recipient UEIs (source usasp; "
+                     "SPEC_154) are dispatch loads, not bulk releases: the input gate does not check "
+                     "their freshness. DUPLICATE / ANNULLED LEIs are not fed."),
         notes="There is no separate insider feed: insider owners enter as sec_filers rows in the "
               "EDGAR feed; sec_insider scopes that CIK set. The EDGAR feed also takes every "
               "sec_filers CIK whose EIN is a Form 5500 sponsor EIN carried by no other sec_filers "
@@ -511,6 +517,10 @@ _DERIVED: List[DatasetSpec] = [
                      "evidence with a status and its conflicts, never a merge (SPEC_147).",
                      "A sponsor whose EIN no other record carries stays a keyed singleton "
                      "in core.source_record, not an entity.",
+                     "SPEC_154: LEI and UEI are gated like EIN / CRD (a shared LEI joins two CIKs only "
+                     "when corroborated). A GLEIF or USAspending record whose LEI / UEI no other record "
+                     "carries stays a keyed singleton; GLEIF records also get name+state candidates in "
+                     "core.weak_match (lei_conflict when the candidate carries a different LEI).",
                      "Web domains (SPEC_148) never merge: core.domain_link holds every domain link "
                      "with its claims; strong (two independent source families agree) links alone "
                      "reach core.identifier (id_type 'domain') and core.entity.canonical_domain. "
@@ -1356,7 +1366,33 @@ _DISPATCH: List[DatasetSpec] = [
               primary_key=("currency_code",),
               coverage_sql="SELECT max(ingested_at)::date FROM dunl_currencies",
               coverage_basis="as_of",
-              limitations=("dunl_uom_conversions is empty.",)),
+              limitations=("dunl_uom_conversions is empty.",
+                           "The S&P Capital IQ company identifiers (CIQ ids) DUNL publishes are NOT "
+                           "loaded: S&P's licence statements conflict (CC BY-NC-SA 4.0 site, CC BY-SA "
+                           "4.0 metadata, 'internal organizational use'); see rights 'dunl' (SPEC_154).")),
+    # GLEIF (SPEC_154)
+    _dispatch("gleif_lei_records", "gleif", "GLEIF legal entity identifiers (US)",
+              "Legal Entity Identifiers (ISO 17442) for entities with a US legal address, read from "
+              "the GLEIF API (CC0): legal name, legal and headquarters address, jurisdiction, "
+              "registration authority ids, legal form, entity and registration status. Fed to the "
+              "entity resolver as LEI records.",
+              "reference", "one row per LEI; one ledger row per applied run", "dispatch:gleif", "ad_hoc",
+              tables=("gleif_lei_record", "gleif_fetch"),
+              primary_key=("lei",),
+              # the declared clock: the golden copy a complete run read (a partial run never moves it)
+              coverage_sql=("SELECT max(golden_copy_publish_date)::date FROM gleif_fetch "
+                            "WHERE outcome = 'complete'"),
+              coverage_basis="as_of",
+              data_state="ok", verified_at="2026-10-03",
+              limitations=("US legal addresses only (filter[entity.legalAddress.country]=US); an entity "
+                           "with a US headquarters but a foreign legal address is not loaded (the API "
+                           "cannot filter on the headquarters country).",
+                           "Level 2 parent relationships are not loaded: the API has no bulk "
+                           "relationship endpoint and goldencopy.gleif.org/robots.txt answers 403.",
+                           "GLEIF's third-party mapping fields (S&P CIQ id 'spglobal', OpenCorporates "
+                           "'ocid', BIC) are never requested.",
+                           "LEIs cover regulated / financially active entities: thin for small private "
+                           "companies.")),
     # Job postings
     _dispatch("job_postings", "job_postings", "Company job postings",
               "Open roles collected from company applicant-tracking boards, with daily "
