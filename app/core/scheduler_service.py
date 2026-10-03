@@ -425,10 +425,18 @@ async def _run_job_schedule(db: Session, schedule: IngestionSchedule) -> None:
     job_type = schedule.source[len(SCHEDULE_JOB_PREFIX):]
     config = schedule.config or {}
 
+    # SPEC_153 review fix: a `job:ingestion` row names the dispatched source in its config. The
+    # ingestion_jobs row must carry THAT source and config (as batch-queued ingestion jobs do):
+    # recorded as 'job:ingestion', a retry re-ran run_ingestion_job('job:ingestion') -> "Unknown
+    # source", and the job ledger never showed the source's run.
+    job_source, job_config = schedule.source, config
+    if job_type == "ingestion" and config.get("source"):
+        job_source, job_config = config["source"], config.get("config") or {}
+
     job = IngestionJob(
-        source=schedule.source,
+        source=job_source,
         status=JobStatus.PENDING,
-        config=config,
+        config=job_config,
         schedule_id=schedule.id,
         trigger="scheduled",
     )
@@ -869,6 +877,35 @@ def get_schedule_history(
 # Default Schedule Templates
 # =============================================================================
 
+# SPEC_153 (owner call 2026-10-02): the gated ATS board lane, weekly. `job:ingestion` queues a
+# WORKER ingestion job (not an in-process API run); the executor reads `source` + `config` from
+# the payload. Preset `active` refreshes every verified Greenhouse / Lever board, stored token only;
+# Ashby (robots.txt 401) and every non-active board are never fetched.
+ATS_BOARDS_WEEKLY: Dict[str, Any] = {
+    "name": "ATS boards refresh (weekly)",
+    "source": "job:ingestion",
+    "config": {"source": "ats_boards", "config": {"preset": "active", "apply": True}},
+    "frequency": ScheduleFrequency.WEEKLY,
+    "hour": 3,
+    "day_of_week": 1,  # Tuesday 03:00 UTC
+    "description": "SPEC_153: re-fetch every active Greenhouse/Lever board through the open_web gate "
+                   "(hiring velocity: first_seen / closed). Ashby stays refused (robots.txt 401).",
+    "priority": 5,
+}
+
+
+def install_ats_boards_weekly(db: Session) -> Dict[str, Any]:
+    """Create the live weekly ats_boards schedule (ACTIVE: owner-approved) unless it exists."""
+    t = ATS_BOARDS_WEEKLY
+    existing = db.query(IngestionSchedule).filter(IngestionSchedule.name == t["name"]).first()
+    if existing:
+        return {"created": False, "schedule_id": existing.id}
+    sched = create_schedule(db=db, name=t["name"], source=t["source"], config=t["config"],
+                            frequency=t["frequency"], hour=t["hour"], day_of_week=t["day_of_week"],
+                            description=t["description"], is_active=True, priority=t["priority"])
+    return {"created": True, "schedule_id": getattr(sched, "id", None)}
+
+
 DEFAULT_SCHEDULES = [
     # =========================================================================
     # TIER 1 — DAILY (3 schedules, 10:00-11:00 UTC)
@@ -976,7 +1013,8 @@ DEFAULT_SCHEDULES = [
         "priority": 3,
     },
     # "Job Postings All Sources - Monthly" (job_postings:all) removed 2026-10-02: the old run is
-    # retired (SPEC_152). Its successor ats_boards is not scheduled (owner call).
+    # retired (SPEC_152). Its successor ats_boards runs WEEKLY (SPEC_153, ATS_BOARDS_WEEKLY).
+    ATS_BOARDS_WEEKLY,
     {
         "name": "BEA GDP/Income - Monthly",
         "source": "bea",

@@ -104,8 +104,9 @@ TIER_3 = Tier(
         SourceDef("fcc_broadband:all_states"),
         # app_rankings — no ingest function implemented yet
         # job_postings:all retired 2026-10-02 (SPEC_152): it fetched Ashby despite robots.txt 401
-        # and its ATS detector hit company websites ungated. Successor: ats_boards (not scheduled;
-        # owner call). The live DB also carries a batch_source_tier_overrides row (enabled=false).
+        # and its ATS detector hit company websites ungated. Successor: ats_boards, WEEKLY via
+        # ingestion_schedules (SPEC_153), not a batch tier: tiers launch nightly. The live DB also
+        # carries a batch_source_tier_overrides row (enabled=false).
     ],
 )
 

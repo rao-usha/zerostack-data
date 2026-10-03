@@ -1,7 +1,7 @@
 """
 ATS boards -- job-path entry point and company loading (SPEC_151).
 
-Dispatch key ``ats_boards`` (app/api/v1/jobs.py). Config: ``preset`` ("pilot" | "migrated"), ``ciks``,
+Dispatch key ``ats_boards`` (app/api/v1/jobs.py). Config: ``preset`` ("pilot" | "migrated" | "active"), ``ciks``,
 ``industrial_ids`` (comma-separated or lists), ``apply`` (default False: a dry run that
 writes nothing). The job FAILS (raises) when no board could be fetched at all, so a lane
 that collected nothing never reports success.
@@ -10,10 +10,17 @@ Preset ``migrated`` (SPEC_152): the retired ``job_postings:all`` run's Greenhous
 whose board this lane verified (seeds keyed by ``industrial_company_id``); the seeded token only,
 no slug discovery. Seeds with ``blocked`` (Ashby: robots.txt 401) are never offered to the
 fetcher; ``record_blocked`` records them as ``ats_board.status = 'refused'`` without a request.
+
+Preset ``active`` (SPEC_153, the WEEKLY schedule): every board the lane already verified
+(``ats_board.status = 'active'``, Greenhouse / Lever only), its stored token only, no slug
+discovery, in chunks of at most ``discover.MAX_COMPANIES`` companies (the per-run cap is
+unchanged). Ashby rows (robots.txt 401) and refused / not_found / unverified rows are never read.
+``collect.run`` is blocking HTTP, so it runs in a worker thread: the worker heartbeat keeps ticking.
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from pathlib import Path
@@ -22,7 +29,7 @@ from typing import Any, Dict, List, Optional, Sequence, Union
 from sqlalchemy import text
 
 from app.entities import domains
-from app.sources.ats_boards import collect
+from app.sources.ats_boards import collect, discover
 from app.sources.ats_boards.collect import Company
 
 logger = logging.getLogger(__name__)
@@ -100,6 +107,57 @@ def _aliases(db, entity_id: int) -> List[str]:
         "SELECT DISTINCT name FROM core.alias WHERE entity_id = :e AND name IS NOT NULL"), {"e": entity_id})]
 
 
+# SPEC_153: the weekly refresh reads only boards already verified on Greenhouse / Lever. A constant
+# statement: no parameter, nothing string-built.
+ACTIVE_BOARDS_SQL = text(
+    "SELECT id, ats_type, board_token, company_name, core_entity_id, cik, industrial_company_id "
+    "FROM ats_board WHERE status = 'active' AND ats_type IN ('greenhouse', 'lever') "
+    "ORDER BY id")
+
+
+def active_companies(db) -> List[Company]:
+    """SPEC_153: one Company per ACTIVE BOARD, its stored token only.
+
+    Per board, not per company: ``collect.run`` stops at a company's first fetched board, so a
+    company holding two active boards (a Lever -> Greenhouse move) had the second one never
+    re-read and its postings never closed (review fix T11)."""
+    seeds = load_seeds()
+    blocked = _blocked_keys(seeds)
+    by_key: Dict[tuple, Company] = {}
+    for bid, ats, token, name, eid, cik, iid in db.execute(ACTIVE_BOARDS_SQL).fetchall():
+        if (ats, token.lower()) in blocked:
+            continue
+        key = bid
+        co = by_key.get(key)
+        if co is None:
+            co = Company(name=name, core_entity_id=eid, cik=cik, industrial_company_id=iid)
+            if eid:
+                co.aliases = [a for a in _aliases(db, eid) if a != name]
+            for s in seeds:
+                if not s.get("blocked") and (
+                        (s.get("cik") and cik and s["cik"] == cik)
+                        or (s.get("industrial_company_id") and s["industrial_company_id"] == iid)):
+                    co.aliases += [a for a in s.get("aliases") or [] if a not in co.aliases]
+            by_key[key] = co
+        co.tokens.append((ats, token, "refresh", {"ats_board.id": bid}))
+    return list(by_key.values())
+
+
+def run_chunked(db, companies: Sequence[Company], apply: bool = False, slugs: bool = True) -> Dict[str, Any]:
+    """``collect.run`` over at most ``discover.MAX_COMPANIES`` companies at a time; one merged report."""
+    merged: Dict[str, Any] = {"apply": bool(apply), "companies": 0, "attempts": [], "boards": [],
+                              "boards_fetched": 0, "requests": 0, "chunks": 0}
+    for i in range(0, len(companies), discover.MAX_COMPANIES):
+        rep = collect.run(db, companies[i:i + discover.MAX_COMPANIES], apply=bool(apply), slugs=slugs)
+        merged["chunks"] += 1
+        merged["companies"] += rep.get("companies") or 0
+        merged["attempts"] += rep.get("attempts") or []
+        merged["boards"] += rep.get("boards") or []
+        merged["boards_fetched"] += rep.get("boards_fetched") or 0
+        merged["requests"] += rep.get("requests") or 0
+    return merged
+
+
 def _companies(db, preset: Optional[str] = None, ciks=None, industrial_ids=None) -> List[Company]:
     cik_list = _list(ciks)
     ind_list = [int(x) for x in _list(industrial_ids)]
@@ -109,6 +167,11 @@ def _companies(db, preset: Optional[str] = None, ciks=None, industrial_ids=None)
         ind_list += [i for i in PILOT_INDUSTRIAL_IDS if i not in ind_list]
     elif preset == "migrated":
         ind_list += [i for i in migrated_industrial_ids() if i not in ind_list]
+    elif preset == "active":
+        out = active_companies(db)
+        if cik_list or ind_list:
+            raise ValueError("preset 'active' takes no ciks / industrial_ids")
+        return out
     elif preset:
         raise ValueError(f"unknown preset {preset!r}")
     blocked = _blocked_keys(seeds)
@@ -153,8 +216,16 @@ def _companies(db, preset: Optional[str] = None, ciks=None, industrial_ids=None)
 
 async def ingest_ats_boards(db, job_id: Optional[int] = None, preset: Optional[str] = None, ciks=None,
                             industrial_ids=None, apply: bool = False, **config) -> Dict[str, Any]:
-    companies = _companies(db, preset=preset, ciks=ciks, industrial_ids=industrial_ids)
-    rep = collect.run(db, companies, apply=bool(apply), slugs=preset != "migrated")
+    if preset == "active":
+        companies = active_companies(db)
+    else:
+        companies = _companies(db, preset=preset, ciks=ciks, industrial_ids=industrial_ids)
+    slugs = preset not in ("migrated", "active")
+    # blocking HTTP: off the event loop so the worker heartbeat keeps ticking (SPEC_153)
+    if preset == "active":
+        rep = await asyncio.to_thread(run_chunked, db, companies, bool(apply), slugs)
+    else:
+        rep = await asyncio.to_thread(collect.run, db, companies, apply=bool(apply), slugs=slugs)
     logger.info(f"ats_boards job {job_id}: {rep['boards_fetched']} boards fetched of {len(companies)} companies, "
                 f"{len(rep['attempts'])} attempts, apply={bool(apply)}")
     if rep["boards_fetched"] == 0:

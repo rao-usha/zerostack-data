@@ -53,6 +53,11 @@ BATCH_SCHEDULED_DISPATCH = frozenset({
     "international_econ:worldbank_countries", "realestate", "usda:annual_summary",
 })
 
+# Dispatch keys run by an ingestion_schedules template instead of the nightly batch
+# (app/core/scheduler_service.py). SPEC_153: ats_boards weekly (ATS_BOARDS_WEEKLY);
+# tests/test_spec_153_ats_boards_weekly.py re-derives it from the template.
+SCHEDULE_DISPATCH = frozenset({"ats_boards"})
+
 # SOURCE_REGISTRY / API_REGISTRY keys that are served by another catalog source.
 SOURCE_ALIASES: Dict[str, str] = {
     "worldbank": "international_econ",
@@ -233,9 +238,10 @@ def _ds(
 
 
 def _dormant(*producers: str) -> str:
-    """internal if the nightly batch runs any of these dispatch keys, else archival."""
+    """internal if the nightly batch or a schedule template runs any of these dispatch keys,
+    else archival."""
     keys = {p.split(":", 1)[1] for p in producers if p.startswith("dispatch:")}
-    return "internal" if keys & BATCH_SCHEDULED_DISPATCH else "archival"
+    return "internal" if keys & (BATCH_SCHEDULED_DISPATCH | SCHEDULE_DISPATCH) else "archival"
 
 
 # ---------------------------------------------------------------------------
@@ -1371,13 +1377,16 @@ _DISPATCH: List[DatasetSpec] = [
               "entity, with first/last seen and closed dates for hiring velocity and pay parsed from "
               "structured fields or pay-transparency text (snippet and confidence kept).",
               "timeseries", "one row per posting per board; one fetch row per board per run",
-              "dispatch:ats_boards", "ad_hoc",
+              "dispatch:ats_boards", "weekly",
+              # SPEC_153: scheduled weekly through ingestion_schedules (SCHEDULE_DISPATCH)
               tables=("ats_board", "ats_posting", "ats_board_fetch"),
               primary_key=("board_id", "external_id"),
               coverage_sql="SELECT max(fetched_at)::date FROM ats_board_fetch WHERE outcome = 'fetched'",
               coverage_basis="as_of",
               data_state="ok", verified_at="2026-10-02",
-              limitations=("Pilot scope: boards are discovered for at most 25 named companies per run.",
+              limitations=("Discovery is pilot scope: new boards are found for at most 25 named companies "
+                           "per run. The weekly refresh (SPEC_153) re-fetches only boards already "
+                           "verified (status active), in chunks of 25, Tuesday 03:00 UTC.",
                            "Ashby boards are not fetched: api.ashbyhq.com/robots.txt answers 401 and the "
                            "open_web gate treats that as disallow-all.",
                            "Pay from text is parsed (pay_source = 'text'); read pay_snippet and "

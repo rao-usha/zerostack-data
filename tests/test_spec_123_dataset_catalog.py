@@ -437,7 +437,7 @@ class TestRightsAndStatus:
 
     def test_dormant_api_sources_are_archival(self):
         from app.catalog import get_spec
-        from app.catalog.datasets import BATCH_SCHEDULED_DISPATCH
+        from app.catalog.datasets import BATCH_SCHEDULED_DISPATCH, SCHEDULE_DISPATCH
 
         # SPEC_141: a dataset whose producer never produced usable data is
         # archival even when scheduled (empty, phantom, unusable, seed-only)
@@ -450,7 +450,9 @@ class TestRightsAndStatus:
         for s in _catalog():
             keys = {p.split(":", 1)[1] for p in s.producers if p.startswith("dispatch:")}
             if s.producer_kind == "dispatch":
-                expected = "internal" if keys & BATCH_SCHEDULED_DISPATCH else "archival"
+                # SPEC_153: a schedule template (not a batch tier) also keeps a dataset live
+                expected = ("internal" if keys & (BATCH_SCHEDULED_DISPATCH | SCHEDULE_DISPATCH)
+                            else "archival")
                 assert s.status_public == expected or demoted(s), (s.key, s.status_public)
             if s.producer_kind in ("bulk", "collector") or s.producer.startswith(
                     ("job:pe_mart_build", "job:entity_resolve")):

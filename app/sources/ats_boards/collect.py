@@ -24,6 +24,8 @@ A failed fetch closes nothing.
     python -m app.sources.ats_boards.collect --preset migrated [--apply]   # SPEC_152: the retired
         job_postings:all run's verified Greenhouse / Lever boards (seeded token only, no slugs);
         with --apply the blocked Ashby seeds are recorded as status 'refused' (no request)
+    python -m app.sources.ats_boards.collect --preset active [--apply]     # SPEC_153: the weekly
+        refresh -- every active Greenhouse / Lever board, stored token only, chunks of <= 25
 """
 
 from __future__ import annotations
@@ -329,23 +331,31 @@ def store(db, br: BoardResult) -> Dict[str, Optional[int]]:
 # ---------------------------------------------------------------------------
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def _session():
     from app.core.database import get_session_factory
-    from app.sources.ats_boards.ingest import _companies, record_blocked
+
+    return get_session_factory()()
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    from app.sources.ats_boards import ingest
 
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--preset", choices=("pilot", "migrated"))
+    ap.add_argument("--preset", choices=("pilot", "migrated", "active"))
     ap.add_argument("--ciks", help="comma-separated CIKs (resolved to core entities)")
     ap.add_argument("--industrial-ids", help="comma-separated industrial_companies ids")
     ap.add_argument("--apply", action="store_true", help="write (default: dry run, writes nothing)")
     ap.add_argument("--json", help="write the full report to this path")
     a = ap.parse_args(argv)
-    db = get_session_factory()()
+    db = _session()
     try:
-        companies = _companies(db, preset=a.preset, ciks=a.ciks, industrial_ids=a.industrial_ids)
-        rep = run(db, companies, apply=a.apply, slugs=a.preset != "migrated")
+        if a.preset == "active":
+            rep = ingest.run_chunked(db, ingest.active_companies(db), apply=a.apply, slugs=False)
+        else:
+            companies = ingest._companies(db, preset=a.preset, ciks=a.ciks, industrial_ids=a.industrial_ids)
+            rep = run(db, companies, apply=a.apply, slugs=a.preset != "migrated")
         if a.preset == "migrated":
-            rep["blocked_recorded"] = record_blocked(db, apply=a.apply)
+            rep["blocked_recorded"] = ingest.record_blocked(db, apply=a.apply)
     finally:
         db.close()
     if a.json:
