@@ -157,6 +157,74 @@ _SEC_MARKS_NOTE = ("Do not use the SEC seal, logos or EDGAR trademarks (SEC, EDG
                    "trademark or domain; SEC asks for citation as the source. Filings are authored by filers "
                    "but are public records.")
 
+# Rights review batch 2 (2026-10-03, approved by the reviewer of record): 30 federal
+# datasets, every quote re-fetched live by an independent verifier. bts_vmt is HELD (its
+# Socrata id is not a VMT dataset), so the "bts" family entry is untouched and only
+# bts_border_crossing / bts_faf_regional get dataset entries. The constants above (_EIA,
+# _FEMA, _FCC, _CENSUS, _OPENFEMA_NOTICE) still back the unreviewed site_intel collectors.
+_CENSUS_LICENSE = ("US Government work (17 U.S.C. §105), public domain; access governed by Census Bureau Data "
+                   "API Terms of Service")
+_BEA_LICENSE = ("US Government work (17 U.S.C. §105), public domain; use of the API is governed by the BEA API "
+                "Terms of Service")
+_BEA_NOTICE = ("This product uses the Bureau of Economic Analysis (BEA) Data API but is not endorsed or "
+               "certified by BEA. Source: U.S. Bureau of Economic Analysis")
+_BEA_TOS = "https://apps.bea.gov/API/_pdf/bea_api_tos.pdf"
+_BEA_QUOTE = ("All services, which utilize or access the API, should display the following notice prominently "
+              "within the application: \"This product uses the Bureau of Economic Analysis (BEA) Data API but "
+              "is not endorsed or certified by BEA.\"")
+_BEA_NOTE = ("BEA API ToS: 'You may not modify or falsely represent content accessed through the API and still "
+             "claim the source is the BEA' -- label derived or transformed values as Nexdata calculations, never "
+             "as BEA figures. No use of the BEA name to imply endorsement. Public-domain status rests on "
+             "17 U.S.C. §105 (no explicit bea.gov statement found).")
+_CENSUS_TOS = "https://www.census.gov/data/developers/about/terms-of-service.html"
+_CENSUS_ATTRIBUTION_QUOTE = ("All services, which utilize or access the API, should display the following notice "
+                             "prominently within the application: 'This product uses the Census Bureau Data API "
+                             "but is not endorsed or certified by the Census Bureau.'")
+_CENSUS_TOS_NOTE = ("Census Data API ToS: display the API notice prominently wherever the data is surfaced; no "
+                    "use of the Census Bureau name to imply endorsement; do not modify or falsely represent "
+                    "content and still claim the Census Bureau as the source. Re-identification ban: never use "
+                    "the data, alone or combined with any other data, to identify a person, household, business "
+                    "or other entity. The ToS is silent on storage (allowed rests on 17 U.S.C. §105); Census may "
+                    "terminate API access at its discretion.")
+_EIA_LICENSE = ("US Government work (17 U.S.C. §105), public domain; EIA API Terms of Service apply to API "
+                "access")
+_EIA_DATED = "Source: U.S. Energy Information Administration (<publication/retrieval date>)"
+_EIA_REUSE = _cite("https://www.eia.gov/about/copyrights_reuse.php",
+                   "U.S. government publications are in the public domain and are not subject to copyright "
+                   "protection. You may use and/or distribute any of our data, files, databases, reports, graphs, "
+                   "charts, and other information products that are on our website or that you receive through "
+                   "our email distribution service. However, if you use or reproduce any of our information "
+                   "products, you should use an acknowledgment, which includes the publication date, such as: "
+                   "\"Source: U.S. Energy Information Administration (Oct 2008).\"", "high")
+_EIA_NOTE = ("The acknowledgment must carry the publication (or retrieval) date. EIA API ToS: no use of the EIA "
+             "names to imply endorsement, do not modify content and still claim EIA as the source; the EIA logo "
+             "is trademarked. Third-party carve-out: Refinitiv (LSEG) spot prices redistributed by EIA "
+             "(petroleum/pri/spt; Henry Hub spot, natural-gas/pri/fut) are not EIA works -- exclude them or tag "
+             "them restricted if a custom route ever loads them. The default routes are EIA's own surveys.")
+_OPENFEMA_NOTICE_FULL = ("This product uses the Federal Emergency Management Agency's OpenFEMA API, but is not "
+                         "endorsed by FEMA. The Federal Government or FEMA cannot vouch for the data or analyses "
+                         "derived from these data after the data have been retrieved from the Agency's "
+                         "website(s).")
+_OPENFEMA_TERMS = "https://www.fema.gov/about/openfema/terms-conditions"
+_FEMA_NOTE = ("OpenFEMA terms: storage is allowed but revocable -- 'cease using the data and destroy any copy' "
+              "if FEMA requests (keep a purge path). No re-identification of individuals whose data is "
+              "aggregated (do not try to identify individual property owners); no determinations affecting an "
+              "individual's rights or benefits eligibility. Do not modify content and still claim FEMA as the "
+              "source; no FEMA/DHS logos or seals. Cite the API endpoint + version and the access date/time. "
+              "The terms also say the data 'will be used solely for statistical research or as a reporting "
+              "record' (ambiguous): commercial use rests on 'does not include controls over its end use' + "
+              "17 U.S.C. §105 -- flagged to legal.")
+
+
+
+def _b2(license: str, redistribution: str, pii: str, attribution: str, notes: str, citation_url: str,
+        citation_quote: str, confidence: str, commercial_use: str = "allowed") -> SourceRights:
+    """A batch-2 block: official federal source, storage assessed as allowed on the cited terms."""
+    return SourceRights(license, redistribution, pii, "official", attribution=attribution, notes=notes,
+                        storage="allowed", commercial_use=commercial_use,
+                        **_cite(citation_url, citation_quote, confidence))
+
+
 _STORAGE_FORBIDDEN_NOTE = ("Flagged only (PLAN_088 decision 3): the rows are kept until the purge / "
                            "licence decision; samples are refused to non-admins.")
 
@@ -167,9 +235,28 @@ SOURCE_RIGHTS: Dict[str, SourceRights] = {
                 "Filings name natural persons (insiders, related persons, signatories); "
                 "per-dataset pii_class overrides apply. Do not use the SEC seal or EDGAR marks.", **_SEC),
     "treasury": _usg("U.S. Department of the Treasury, Fiscal Data", **_ALLOWED_TERMS, **_TREASURY),
-    "usaspending": _usg("USAspending.gov", "business_contact", **_FEDERAL),
-    "eia": _usg("U.S. Energy Information Administration",
-                notes="Excludes third-party items EIA licenses (none identified in the loaded series).", **_EIA),
+    # Rights review batch 2: usaspending_awards is the family's only dataset.
+    "usaspending": _b2(
+        "Open data, explicitly licensed for commercial and non-commercial reuse by Treasury/Bureau of the Fiscal "
+        "Service (US Government work), SUBJECT TO the Dun & Bradstreet limitation on D&B-supplied entity data",
+        "attribution", "business_contact",
+        "Source: USAspending.gov (U.S. Department of the Treasury, Bureau of the Fiscal Service). Recipient "
+        "business name/address data may include data supplied by Dun & Bradstreet, Inc. (D&B).",
+        "D&B limitation (usaspending.gov/db_info): 'D&B Open Data' (business name, street address, city, "
+        "state, country, county code, ZIP) needs written D&B attribution and may not be accessed, used or "
+        "disseminated in bulk as an original source or substitute for D&B; no other D&B data for commercial, "
+        "resale or marketing use. We store Recipient Name (D&B Open Data), UEI (SAM.gov-issued since April "
+        "2022) and agency-reported place-of-performance city/state/ZIP5 -- no DUNS, no street address. Never "
+        "resell or bulk-export recipient-name lists as a firmographic product; keep the D&B attribution on "
+        "any export of recipient names. Quote taken from the site's official source (the About page is a JS "
+        "app); confidence medium-high in substance.",
+        "https://www.usaspending.gov/about",
+        "The U.S. Department of the Treasury, Bureau of the Fiscal Service is committed to providing open "
+        "data to enable effective tracking of federal spending.  The data on this site is available to copy, "
+        "adapt, redistribute, or otherwise use for non-commercial or for commercial purposes, subject to the "
+        "Limitation on Permissible Use of Dun & Bradstreet, Inc. Data noted on the homepage.", "medium"),
+    # Rights review batch 2: all five eia datasets approved; eia_steo has its own entry.
+    "eia": _b2(_EIA_LICENSE, "attribution", "none", _EIA_DATED, _EIA_NOTE, **_EIA_REUSE),
     "noaa": _usg("NOAA National Centers for Environmental Information",
                  notes="WMO Resolution 40: for non-U.S. locations, GHCN data or any derived product shall not "
                        "be provided to other users or used for the re-export of commercial services. Restrict "
@@ -182,9 +269,15 @@ SOURCE_RIGHTS: Dict[str, SourceRights] = {
                          attribution="Source: U.S. DOE Alternative Fuels Data Center (NREL)",
                          notes=_NREL_NOTE, **_NREL),
     "bls": _usg("U.S. Bureau of Labor Statistics", **_ALLOWED_TERMS, **_BLS),
-    "bea": _usg("U.S. Bureau of Economic Analysis", **_cite("https://www.bea.gov/", None, "medium-high")),
-    "fema": _usg("FEMA (OpenFEMA)", attribution=f"Source: FEMA (OpenFEMA). {_OPENFEMA_NOTICE}",
-                 notes="OpenFEMA terms also bind users not to re-identify individuals.", **_FEMA),
+    # Rights review batch 2: all four bea datasets approved (BEA API ToS).
+    "bea": _b2(_BEA_LICENSE, "attribution", "none", _BEA_NOTICE, _BEA_NOTE, _BEA_TOS, _BEA_QUOTE, "high"),
+    # Rights review batch 2: all three fema datasets approved (full OpenFEMA notice).
+    "fema": _b2("OpenFEMA API Terms and Conditions (US Government work, 17 U.S.C. §105)", "attribution", "none",
+                _OPENFEMA_NOTICE_FULL, _FEMA_NOTE, _OPENFEMA_TERMS,
+                "Data accessed through FEMA's API does not include controls over its end use. However, as the "
+                "data owner, FEMA retains version control. Once the data has been downloaded from the API, FEMA "
+                "cannot verify the quality and/or timeliness of any analysis conducted using data retrieved.",
+                "high"),
     "fdic": _usg("Federal Deposit Insurance Corporation",
                  notes="Terms page not fetched: confirm the FDIC website policy before sign-off.",
                  **_cite("https://www.fdic.gov/", None, "medium")),
@@ -197,16 +290,60 @@ SOURCE_RIGHTS: Dict[str, SourceRights] = {
                           "The information disclosed on the NPI Registry and in the downloadable files are "
                           "FOIA-disclosable ... There is no charge to download the NPPES file", "high")),
     "fbi_crime": _usg("FBI Crime Data Explorer", **_FEDERAL),
-    "irs_soi": _usg("IRS Statistics of Income", **_FEDERAL),
-    "fcc_broadband": _usg("Federal Communications Commission",
-                          notes="Block-level aggregates only; never ingest the BSL Location Fabric "
-                                "(CostQuest-licensed).", **_FCC),
-    "us_trade": _usg("U.S. Census Bureau, international trade",
-                     attribution=f"Source: U.S. Census Bureau, international trade. {_CENSUS_NOTICE}", **_CENSUS),
+    # Rights review batch 2 (irs_soi, fcc_broadband, us_trade, cftc_cot, usda): every dataset in
+    # each family approved. "bts" is NOT: bts_vmt is held (dataset entries below).
+    "irs_soi": _b2(USG, "open", "none", "Source: IRS Statistics of Income",
+                   "No dedicated IRS/SOI reuse page: the cite is the Internal Revenue Manual (an internal "
+                   "publishing manual, not a public licence); public domain rests on 17 U.S.C. §105. IRS "
+                   "suppresses small cells before release: never try to re-identify them. Do not imply IRS "
+                   "endorsement.",
+                   "https://www.irs.gov/irm/part1/irm_01-017-008",
+                   "Government publications that are prepared by Government Officers or employees as part of "
+                   "their official duties are not subject to copyright protection.", "medium"),
+    "fcc_broadband": _b2(
+        "US Government work, public domain. The opendata.fcc.gov dataset we query (4kuc-phrr) carries the "
+        "Socrata license \"Public Domain U.S. Government\" (USGOV_WORKS, termsLink "
+        "https://www.usa.gov/government-works).",
+        "attribution", "none",
+        "Source: Federal Communications Commission, Fixed Broadband Deployment Data (Form 477, June 2020 V1), "
+        "opendata.fcc.gov",
+        "Stored data is legacy Form 477 state aggregates (opendata.fcc.gov 4kuc-phrr, June 2020 V1; "
+        "superseded by BDC): no location_id, BSL lat/lon or address fields, so the CostQuest Fabric licence "
+        "does not apply. Guard rail: never call fetch_location_coverage or store BDC location-level "
+        "availability (the Fabric is CostQuest-licensed). The county path (broadbandmap.fcc.gov map/summary, "
+        "map/providers) has its own, unreviewed terms.",
+        "https://opendata.fcc.gov/api/views/4kuc-phrr.json",
+        "\"name\" : \"Fixed Broadband Deployment Data: June 2020 V1\" ... \"license\" : { \"name\" : "
+        "\"Public Domain U.S. Government\", \"termsLink\" : \"https://www.usa.gov/government-works\" }, "
+        "\"licenseId\" : \"USGOV_WORKS\"", "high"),
+    "us_trade": _b2(_CENSUS_LICENSE, "attribution", "none",
+                    f"Source: U.S. Census Bureau, international trade. {_CENSUS_NOTICE}",
+                    _CENSUS_TOS_NOTE + " Do not link state x HS (or port) cells to entity/company data to infer "
+                    "a single exporter or importer.", _CENSUS_TOS, _CENSUS_ATTRIBUTION_QUOTE, "high"),
     "bts": _usg("Bureau of Transportation Statistics", **_FEDERAL),
-    "cftc_cot": _usg("U.S. Commodity Futures Trading Commission", **_FEDERAL),
-    "usda": _usg("USDA National Agricultural Statistics Service",
-                 notes="The NASS API asks for a non-endorsement line.", **_FEDERAL),
+    "cftc_cot": _b2(USG, "attribution", "none",
+                    "Source: U.S. Commodity Futures Trading Commission, Commitments of Traders",
+                    "Acknowledgement is requested, not required. The site's third-party copyright carve-out "
+                    "does not reach the CFTC-produced COT reports. Aggregate trader-category positions; no PII.",
+                    "https://www.cftc.gov/WebPolicy/index.htm",
+                    "Government information at the CFTC website is in the public domain. Public domain "
+                    "information may be freely distributed and copied, but it is requested that in any "
+                    "subsequent use the CFTC be given appropriate acknowledgement.", "high"),
+    "usda": _b2(
+        "US Government work, public domain. Use of the Quick Stats API is governed by the NASS API Terms of "
+        "Service: required non-endorsement notice, no implied endorsement, no misrepresenting modified content "
+        "as NASS.",
+        "attribution", "none", "This product uses the NASS API but is not endorsed or certified by NASS.",
+        "Show the exact NASS notice prominently in every UI or export serving this data. Do not present "
+        "derived or modified figures as NASS estimates: label derived metrics as Nexdata calculations. Respect "
+        "the API limits (access/call limits; at most 50,000 records per call).",
+        "https://quickstats.nass.usda.gov/api",
+        "All services which utilize or access the API should display the following notice prominently within "
+        "the application: \"This product uses the NASS API but is not endorsed or certified by NASS.\" You "
+        "may use the NASS name in order to identify the source of API content, subject to these rules. You "
+        "may not use the NASS name to imply endorsement of any product, service, or entity (not-for-profit, "
+        "commercial or otherwise). ... You may not modify or falsely represent content accessed through the "
+        "NASS API and still claim the source is NASS.", "high"),
     "fda": _usg("U.S. Food and Drug Administration (openFDA)", "business_contact",
                 "openFDA dedicates its data CC0 1.0 (private-party copyrighted submissions excluded).",
                 **_cite("https://open.fda.gov/license",
@@ -219,9 +356,39 @@ SOURCE_RIGHTS: Dict[str, SourceRights] = {
                             "You may not use the Entity Management FOUO API to build out a public view of the "
                             "data ... You are not allowed to display or disseminate outside the U.S. Government "
                             "any values received in a sensitive API response.", "medium-high")),
-    "osha": _usg("U.S. Department of Labor, OSHA", **_FEDERAL),
-    "census": _usg("U.S. Census Bureau", attribution=f"Source: U.S. Census Bureau. {_CENSUS_NOTICE}", **_CENSUS),
-    "epa_echo": _usg("U.S. EPA ECHO", **_FEDERAL),
+    # Rights review batch 2 (osha, census, epa_echo): every dataset in each family approved.
+    "osha": _b2(
+        "US Government work (17 U.S.C. §105), public domain per DOL copyright policy", "attribution", "none",
+        "Source: U.S. Department of Labor, Occupational Safety and Health Administration (https://www.dol.gov). "
+        "Not endorsed by DOL. If data is pulled via the DOL Data API: \"This product uses the DOL Data API but "
+        "is not endorsed or certified by the DOL\".",
+        "DOL asks for credit to the U.S. Department of Labor and/or dol.gov and forbids implying affiliation or "
+        "endorsement. The DOL Data API notice is from a search snippet (unverified on the live page); it applies "
+        "only if ingest moves to that API. Keep accident/injury tables (worker-level data) out. Enforcement "
+        "records are not final findings: never present them as adjudicated violations. Confidence medium-high "
+        "in substance.",
+        "https://www.dol.gov/general/aboutdol/copyright",
+        "Materials created by the federal government are generally part of the public domain and may be used, "
+        "reproduced and distributed without permission.", "medium"),
+    "census": _b2(_CENSUS_LICENSE, "attribution", "none", f"Source: U.S. Census Bureau. {_CENSUS_NOTICE}",
+                  _CENSUS_TOS_NOTE, _CENSUS_TOS, _CENSUS_ATTRIBUTION_QUOTE, "high"),
+    "epa_echo": _b2(
+        "US Government work (17 U.S.C. §105), public domain; data.gov catalog record for ECHO Facilities lists "
+        "CC0 1.0 (creativecommons.org/publicdomain/zero/1.0/)",
+        "attribution", "none",
+        "Source: U.S. EPA Enforcement and Compliance History Online (ECHO). Made available by EPA for "
+        "informational purposes only; EPA makes no warranty regarding the accuracy, completeness, or currency "
+        "of this information and does not endorse this product.",
+        "The quote is EPA's no-warranty disclaimer; the rights basis is the catalog.data.gov ECHO Facilities "
+        "record (CC0 1.0) plus 17 U.S.C. §105. Attribution is good practice, not legally required under CC0. "
+        "ECHO is 'not designed for large scale data transfers or robotic queries' and EPA may disable "
+        "automated users: keep REST request rates low or use the ECHO bulk downloads for full refreshes. "
+        "Confidence medium-high in substance.",
+        "https://echo.epa.gov/resources/echo-data/about-the-data",
+        "The information contained in ECHO is made available to the public by the U.S. Environmental "
+        "Protection Agency (EPA) for informational purposes only. No warranty, express or implied, is made by "
+        "EPA or any other agency of the U.S. Government regarding the accuracy, completeness, or currency of "
+        "this information.", "medium"),
     # ── open licence, attribution required ──────────────────────────────
     "uspto": SourceRights(CC_BY_4, "attribution", "personal", "official",
                           attribution="Source: USPTO PatentsView",
@@ -634,6 +801,104 @@ DATASET_RIGHTS: Dict[str, SourceRights] = {
     "sec_companyfacts": _usg("U.S. Securities and Exchange Commission (EDGAR)", "none", _SEC_MARKS_NOTE,
                              **_ALLOWED_TERMS, **_SEC),
     "sec_company_financials": _usg("U.S. Securities and Exchange Commission (EDGAR)", "none", **_SEC),
+    # Rights review batch 2: dataset-level differences inside approved families (quote / licence /
+    # notes per the verified research), and the two approved bts datasets (bts_vmt held).
+    "bea_nipa": replace(
+        SOURCE_RIGHTS["bea"],
+        citation_quote=_BEA_QUOTE + " You may use the BEA name in order to identify the source of API content "
+                                    "subject to these rules. You may not use the BEA name, or the like to imply "
+                                    "endorsement of any product, service, or entity, not-for-profit, commercial "
+                                    "or otherwise."),
+    "us_trade_port_trade": replace(
+        SOURCE_RIGHTS["us_trade"],
+        citation_quote="You may use the Census Bureau API to develop a service or service to search, display, "
+                       "analyze, retrieve, view and otherwise 'get' information from Census Bureau data."),
+    "census_cbp": replace(
+        SOURCE_RIGHTS["census"],
+        notes=_CENSUS_TOS_NOTE + " CBP is establishment counts/payroll by geography x NAICS: never join CBP "
+                                 "small cells with Nexdata entity/company data (entity_master, "
+                                 "industrial_companies, rollup_intel) to infer a specific business's "
+                                 "employment or payroll. Aggregate use (market sizing, rollups) is fine.",
+        citation_quote="Users will not use these data, alone or in combination with any other Census or "
+                       "non-Census data, to identify any individual person, household, business or other "
+                       "entity; not link or combine these data with information in any other Census or "
+                       "non-Census dataset in a manner that identifies an individual person, household, "
+                       "business or other entity."),
+    "census_cbp_county_yearly": replace(
+        SOURCE_RIGHTS["census"],
+        notes=_CENSUS_TOS_NOTE + " County x NAICS cells can be small: never join them with company/entity "
+                                 "data to identify a specific business.",
+        citation_quote="You may use the Census Bureau name in order to identify the source of API content "
+                       "subject to these rules. You may not use the Census Bureau name, or the like to imply "
+                       "endorsement of any product, service, or entity, not-for-profit, commercial or "
+                       "otherwise."),
+    "census_acs_county_tract": replace(
+        SOURCE_RIGHTS["census"],
+        notes=_CENSUS_TOS_NOTE + " Tract-level ACS is small-area: never combine it with people/address data "
+                                 "to infer individual households."),
+    "eia_petroleum": replace(
+        SOURCE_RIGHTS["eia"],
+        license="US Government work (17 U.S.C. §105), public domain; access via EIA API v2 is also subject to "
+                "the EIA API Terms of Service (https://www.eia.gov/opendata/terms-of-service.php)"),
+    # EIA STEO: the ingest pulls every STEO series, including Refinitiv spot prices and the S&P
+    # Global-model macro forecasts, so the whole dataset is restricted until they are excluded.
+    "eia_steo": _b2(
+        "US Government work (17 U.S.C. §105), public domain, EXCEPT third-party series: Refinitiv (an LSEG "
+        "company) spot prices in STEO history; macroeconomic forecasts based on the S&P Global model of the "
+        "U.S. Economy",
+        "restricted", "none",
+        "Source: U.S. Energy Information Administration, Short-Term Energy Outlook (<Month YYYY>)",
+        "STEO Table 2: WTI and Brent crude, Mt. Belvieu propane and Henry Hub spot prices are 'from "
+        "Refinitiv,an LSEG company, via EIA'; Table 9a: macro forecasts 'are based on the S&P Global model of "
+        "the U.S. Economy'. ingest_eia_steo_projections pulls every STEO series (no facet filter), so the "
+        "dataset is restricted (redistribution and commercial use) until those series are excluded or tagged "
+        "restricted by seriesId; EIA-own series could then be re-reviewed as attribution. Table 9a macro "
+        "forecasts stay restricted until a human decides (historical 9a values are BEA/Fed G17/FHWA/FAA "
+        "public domain). EIA API ToS: use must not infringe third-party IP. Same EIA dated-acknowledgment "
+        "and no-endorsement rules as the eia family.",
+        "https://www.eia.gov/about/copyrights_reuse.php",
+        "You may see on our website documents, illustrations, photographs, or other information resources "
+        "contributed or licensed by private individuals, companies, or organizations that may be protected by "
+        "U.S. and foreign copyright laws. Transmission or reproduction of protected items beyond that allowed "
+        "by fair use as defined in the copyright laws requires the written permission of the copyright owners.",
+        "medium", commercial_use="restricted"),
+    "fema_disaster_declarations": replace(
+        SOURCE_RIGHTS["fema"],
+        license="OpenFEMA API Terms and Conditions (US Government work, 17 U.S.C. §105; the terms do not use "
+                "the words 'public domain')",
+        citation_quote="Users must clearly state that \"This product uses the Federal Emergency Management "
+                       "Agency's OpenFEMA API, but is not endorsed by FEMA. The Federal Government or FEMA "
+                       "cannot vouch for the data or analyses derived from these data after the data have been "
+                       "retrieved from the Agency's website(s).\""),
+    "fema_hma_projects": replace(
+        SOURCE_RIGHTS["fema"],
+        citation_quote="You agree you will cease using the data and destroy any copy you may have if requested "
+                       "by FEMA."),
+    "bts_border_crossing": _b2(
+        "Public Domain (data.transportation.gov licenseId PUBLIC_DOMAIN). The underlying data is from U.S. DHS "
+        "Customs and Border Protection, published by BTS.",
+        "attribution", "none",
+        "Source: Bureau of Transportation Statistics, Border Crossing Entry Data (U.S. Department of Homeland "
+        "Security, Customs and Border Protection), data.transportation.gov",
+        "Dataset-level Socrata licence (keg4-3bc2), the id the client queries; the URL now redirects to "
+        "data.bts.gov/api/views/keg4-3bc2.json. Aggregate counts by port, month and measure; no PII.",
+        "https://data.transportation.gov/api/views/keg4-3bc2.json",
+        "\"name\" : \"Border Crossing Entry Data\" ... \"attribution\" : \"U.S. Department of Homeland "
+        "Security, Customs and Border Protection\" ... \"license\" : { \"name\" : \"Public Domain\" }, "
+        "\"licenseId\" : \"PUBLIC_DOMAIN\"", "high"),
+    "bts_faf_regional": _b2(
+        "US Government work (17 U.S.C. §101/§105), not protected by U.S. copyright, unrestricted public use. "
+        "Joint BTS/FHWA product with technical work by ORNL.",
+        "attribution", "none",
+        "Source: Freight Analysis Framework (FAF5), Bureau of Transportation Statistics and Federal Highway "
+        "Administration",
+        "The quote is the licenseInfo of the sibling ArcGIS item 'Freight Analysis Framework (FAF5) Regions'; "
+        "we ingest the FAF5.7.1 regional/state flow tables (bts.gov zips) of the same program. The item asks "
+        "for acknowledgment of FHWA, the US Census Bureau, OMB and BTS [distributor].",
+        "https://geodata.bts.gov/content/539fdab88ee74e38b28959494965ace2",
+        "This NTAD dataset is a work of the United States government as defined in 17 U.S.C. § 101 and as "
+        "such are not protected by any U.S. copyrights. This work is available for unrestricted public use.",
+        "high"),
     "entity_source_records": SourceRights(
         "Nexdata-derived from SEC EDGAR (public domain inputs)", "internal_only", "personal", "derived",
         notes="Feeds insider reporting owners (natural persons) with name, state and ZIP."),
