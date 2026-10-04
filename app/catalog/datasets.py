@@ -1305,7 +1305,9 @@ _DISPATCH: List[DatasetSpec] = [
               coverage_basis="fixed_vintage",
               coverage_from="2011-01-29",
               data_state="missing_tables", missing_tables=("m5_sales", "m5_prices"),
-              limitations=("m5_sales and m5_prices do not exist; coverage is the calendar horizon.",)),
+              limitations=("m5_sales and m5_prices do not exist; coverage is the calendar horizon.",
+                           "Dropped 2026-10-04 (owner: not useful; no further loads). Kaggle M5 rules are "
+                           "non-commercial; the stored calendar/items rows are flagged, not purged.")),
     # Foot traffic (location discovery)
     _dispatch("foot_traffic_locations", "foot_traffic", "Brand locations",
               "Retail and restaurant brand locations discovered from places APIs; the table "

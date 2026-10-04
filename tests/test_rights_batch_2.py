@@ -50,7 +50,7 @@ HELD = {"bts_vmt"}
 # Approved, then held at sign-off (2026-10-04): the OpenFEMA terms add a
 # "used solely for statistical research" clause the user had not seen. Their
 # blocks are the approved ones; only the sign-off waits for the user.
-SIGNOFF_HELD = {"fema_disaster_declarations", "fema_pa_projects", "fema_hma_projects"}
+SIGNOFF_HELD: set = set()  # FEMA x3 signed off 2026-10-04 after the user saw the clause
 MEDIUM = {"irs_soi", "eia_steo", "usaspending_awards", "osha", "epa_echo_facilities"}
 REDISTRIBUTION = {k: "attribution" for k in APPROVED} | {"irs_soi": "open", "eia_steo": "restricted"}
 
