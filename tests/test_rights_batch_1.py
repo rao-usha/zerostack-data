@@ -108,8 +108,9 @@ class TestApprovedBlocks:
         from app.catalog.rights_reviewed import REVIEWED
 
         cat = _catalog()
-        assert set(REVIEWED) == set(APPROVED)
-        assert {k for k, s in cat.items() if s.reviewed} == set(APPROVED)
+        # later batches add their own sign-offs (tests/test_rights_batch_2.py); batch 1's stay
+        assert set(APPROVED) <= set(REVIEWED)
+        assert set(APPROVED) <= {k for k, s in cat.items() if s.reviewed}
         assert not any(cat[k].reviewed for k in HELD_FDIC)
 
 

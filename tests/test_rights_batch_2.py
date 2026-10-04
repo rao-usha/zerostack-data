@@ -47,6 +47,10 @@ APPROVED = {
     "epa_echo_facilities": "https://echo.epa.gov/resources/echo-data/about-the-data",
 }
 HELD = {"bts_vmt"}
+# Approved, then held at sign-off (2026-10-04): the OpenFEMA terms add a
+# "used solely for statistical research" clause the user had not seen. Their
+# blocks are the approved ones; only the sign-off waits for the user.
+SIGNOFF_HELD = {"fema_disaster_declarations", "fema_pa_projects", "fema_hma_projects"}
 MEDIUM = {"irs_soi", "eia_steo", "usaspending_awards", "osha", "epa_echo_facilities"}
 REDISTRIBUTION = {k: "attribution" for k in APPROVED} | {"irs_soi": "open", "eia_steo": "restricted"}
 
@@ -121,14 +125,19 @@ class TestApprovedBlocks:
         assert s.status_public not in ("ga", "beta"), key
 
     @pytest.mark.parametrize("key", sorted(APPROVED))
-    def test_new_hash_recorded_and_not_yet_reviewed(self, key):
-        """Never reviewed by hand: the sign-off is a later committed hash."""
+    def test_signed_off_by_committed_hash(self, key):
+        """Reviewed only through the committed hash of exactly this block (27 signed off
+        2026-10-04); the three FEMA blocks are approved but their sign-off is held."""
         from app.catalog.rights_reviewed import REVIEWED
 
         s = _catalog()[key]
         assert s.rights_hash == NEW_HASHES[key], key
-        assert key not in REVIEWED, key
-        assert s.reviewed is False and s.effective_redistribution == "internal_only", key
+        if key in SIGNOFF_HELD:
+            assert key not in REVIEWED, key
+            assert s.reviewed is False and s.effective_redistribution == "internal_only", key
+        else:
+            assert REVIEWED[key][0] == s.rights_hash, key
+            assert s.reviewed is True and s.effective_redistribution == s.redistribution, key
 
     def test_required_notices_verbatim(self):
         cat = _catalog()
@@ -210,8 +219,7 @@ class TestNothingElseChanged:
         for key in APPROVED:
             b, n = before[key], _now(cat[key])
             assert b["storage"] is None and b["commercial_use"] is None, key  # were not assessed
-            for f in ("license_url", "share_alike", "storage_max_age_days", "proposed", "reviewed",
-                      "effective_redistribution", "gate"):
+            for f in ("license_url", "share_alike", "storage_max_age_days", "proposed", "gate"):
                 assert n[f] == b[f], (key, f)
             assert n["rights_hash"] != b["rights_hash"], key
             assert cat[key].pii_class == base[key]["pii_class"], key
@@ -228,8 +236,9 @@ class TestNothingElseChanged:
         from app.catalog.rights_reviewed import REVIEWED
 
         before, cat = _before(), _catalog()
-        assert set(REVIEWED) == BATCH_1
-        assert {k for k, s in cat.items() if s.reviewed} == BATCH_1
+        signed = BATCH_1 | (set(APPROVED) - SIGNOFF_HELD)
+        assert set(REVIEWED) == signed
+        assert {k for k, s in cat.items() if s.reviewed} == signed
         for key in BATCH_1:
             assert _now(cat[key]) == before[key], key
             assert REVIEWED[key][0] == cat[key].rights_hash, key
