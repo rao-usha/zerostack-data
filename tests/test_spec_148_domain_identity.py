@@ -129,16 +129,16 @@ class TestFeeds:
                          "generic": 2, "generic:social": 1, "generic:shortener": 1}
 
     def test_attach_feed_names(self):
-        """T6b: the seven attach-only sources and their families"""
+        """T6b: the attach-only sources and their families (SPEC_155 added atsboard)"""
         from app.entities import feeds
         from app.entities.resolve_core import ATTACH_ONLY_SOURCES, family_of
 
         assert {f.name for f in feeds.ATTACH_FEEDS} == set(ATTACH_ONLY_SOURCES) == {
-            "pefirm", "industrial", "peportco", "portco", "threepl", "famoffice", "lpfund"}
+            "pefirm", "industrial", "peportco", "portco", "threepl", "famoffice", "lpfund", "atsboard"}
         assert family_of("adv") == family_of("iapd") == "form_adv"
         assert family_of("edgar") == "edgar"
         assert family_of("pefirm") == "pe_firm_web"
-        assert len({family_of(s) for s in ATTACH_ONLY_SOURCES}) == 7
+        assert len({family_of(s) for s in ATTACH_ONLY_SOURCES}) == 8
 
 
 # ---------------------------------------------------------------------------

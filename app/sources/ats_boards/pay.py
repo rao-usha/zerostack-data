@@ -18,6 +18,14 @@ Precision over recall. A money amount in text counts only when
 - the value is plausible for that interval.
 Anything else returns None: no pay is better than wrong pay. Every result keeps
 the raw snippet it came from and a confidence (``high`` | ``medium``).
+
+pay_v2 (SPEC_156, the 2026-10-06 review sample): "+ Bonus" / "plus commission" / "(including a
+bonus)" after a salary range no longer disqualifies it, and a disqualifier before the amount is
+overridden by a salary cue after it ("Monthly Stipend The salary for this role is $X-$Y"); an
+add-on amount ("+ $11,500 Variable") is not pay; a range whose top is > 4x its bottom is not one
+role's band ("$100k - $500k for all engineers"); two-decimal amounts in the hourly band are hourly;
+Greenhouse "cents" in a zero-decimal currency (JPY, KRW, ...) are whole units; plausibility is
+judged in rough US-dollar terms for every currency.
 """
 
 from __future__ import annotations
@@ -27,7 +35,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-PARSER_VERSION = "pay_v1"
+PARSER_VERSION = "pay_v2"
 
 PLAUSIBLE = {
     "year": (10_000, 2_000_000),
@@ -36,6 +44,16 @@ PLAUSIBLE = {
     "day": (50, 5_000),
     "hour": (7, 500),
 }
+
+
+# currencies without minor units: Greenhouse "min_cents" is already whole units (pay_v1 divided by 100)
+ZERO_DECIMAL = frozenset({"JPY", "KRW", "VND", "CLP", "ISK", "PYG", "UGX"})
+# ROUGH US dollars per unit, used ONLY to judge plausibility (never stored, never converted)
+USD_PER_UNIT = {"USD": 1.0, "CAD": 0.73, "AUD": 0.66, "NZD": 0.6, "SGD": 0.74, "HKD": 0.128, "GBP": 1.27,
+                "EUR": 1.08, "CHF": 1.1, "SEK": 0.095, "NOK": 0.093, "DKK": 0.145, "PLN": 0.25, "ILS": 0.27,
+                "INR": 0.012, "MXN": 0.055, "BRL": 0.18, "ZAR": 0.055, "JPY": 0.0067, "KRW": 0.00072,
+                "VND": 0.00004, "CLP": 0.00105, "ISK": 0.0072, "PYG": 0.00013, "UGX": 0.00027}
+MAX_RANGE_RATIO = 4             # a band wider than 4x is a company-wide statement, not one role's pay
 
 
 @dataclass(frozen=True)
@@ -69,17 +87,22 @@ def _num(v: Any) -> Optional[float]:
     return int(f) if f == int(f) else f
 
 
-def _plausible(interval: Optional[str], lo: Optional[float], hi: Optional[float]) -> bool:
+def _usd(v: Optional[float], currency: Optional[str]) -> Optional[float]:
+    return None if v is None else v * USD_PER_UNIT.get((currency or "USD").upper(), 1.0)
+
+
+def _plausible(interval: Optional[str], lo: Optional[float], hi: Optional[float], currency: str = "USD") -> bool:
     if interval not in PLAUSIBLE or lo is None:
         return False
     a, b = PLAUSIBLE[interval]
-    return all(v is None or a <= v <= b for v in (lo, hi)) and (hi is None or hi >= lo)
+    return (all(v is None or a <= v <= b for v in (_usd(lo, currency), _usd(hi, currency)))
+            and (hi is None or hi >= lo))
 
 
-def _interval_by_magnitude(v: Optional[float]) -> Optional[str]:
+def _interval_by_magnitude(v: Optional[float], currency: str = "USD") -> Optional[str]:
     if v is None:
         return None
-    return "year" if v >= 10_000 else None
+    return "year" if _usd(v, currency) >= 10_000 else None
 
 
 # ---------------------------------------------------------------------------
@@ -98,16 +121,17 @@ def from_structured(ats: str, raw: Dict[str, Any]) -> Optional[Pay]:
     raw = raw or {}
     if ats == "greenhouse":
         ranges = [r for r in (raw.get("pay_input_ranges") or []) if isinstance(r, dict)]
+        cur = ((ranges[0].get("currency_type") if ranges else None) or "USD").upper()
+        unit = 1 if cur in ZERO_DECIMAL else 100
         lows = [_num(r.get("min_cents")) for r in ranges]
         highs = [_num(r.get("max_cents")) for r in ranges]
-        lows = [v / 100 for v in lows if v]
-        highs = [v / 100 for v in highs if v]
+        lows = [v / unit for v in lows if v]
+        highs = [v / unit for v in highs if v]
         if not lows:
             return None
         lo, hi = _num(min(lows)), _num(max(highs)) if highs else None
-        cur = (ranges[0].get("currency_type") or "USD").upper()
-        interval = _interval_by_magnitude(lo)
-        if not _plausible(interval, lo, hi):
+        interval = _interval_by_magnitude(lo, cur)
+        if not _plausible(interval, lo, hi, cur):
             return None
         snippet = "; ".join(f"{r.get('title') or ''} {r.get('min_cents')}-{r.get('max_cents')} cents "
                             f"{r.get('currency_type') or ''}".strip() for r in ranges)[:300]
@@ -119,9 +143,10 @@ def from_structured(ats: str, raw: Dict[str, Any]) -> Optional[Pay]:
             return None
         lo, hi = _num(sr.get("min")), _num(sr.get("max"))
         interval = _LEVER_INTERVAL.get(sr.get("interval") or "")
-        if not lo or not _plausible(interval, lo, hi):
+        cur = (sr.get("currency") or "USD").upper()
+        if not lo or not _plausible(interval, lo, hi, cur):
             return None
-        return Pay(lo, hi, (sr.get("currency") or "USD").upper(), interval, "unspecified", "structured",
+        return Pay(lo, hi, cur, interval, "unspecified", "structured",
                    f"salaryRange: {sr}"[:300], "high")
     if ats == "ashby":
         comp = raw.get("compensation") or {}
@@ -134,7 +159,7 @@ def from_structured(ats: str, raw: Dict[str, Any]) -> Optional[Pay]:
                 continue
             lo, hi = _num(c.get("minValue")), _num(c.get("maxValue"))
             interval = _ASHBY_INTERVAL.get(str(c.get("interval") or "").upper())
-            if not lo or not _plausible(interval, lo, hi):
+            if not lo or not _plausible(interval, lo, hi, (c.get("currencyCode") or "USD").upper()):
                 continue
             return Pay(lo, hi, (c.get("currencyCode") or "USD").upper(), interval, "base", "structured",
                        f"summaryComponents: {c}"[:300], "high")
@@ -190,7 +215,15 @@ _BASE = re.compile(r"\bbase\b", re.I)
 # disqualifiers right before the amount (<= ~45 chars, same clause)
 _NEG_BEFORE = re.compile(
     r"\b(reimburse\w*|stipend|budgets?|revenue|funding|raised|valuation|series [a-h]|bonus|"
-    r"allowance|discount|tuition|P&L|GMV|ARR|saved|savings|grant|donat\w*)\b[^.;:!?$,()]*$", re.I)
+    r"allowance|discount|tuition|P&L|GMV|ARR|saved|savings|grant|donat\w*|equity)\b[^.;:!?$,()]*$", re.I)
+# pay_v2: a salary cue AFTER the disqualifier, still before the amount, wins
+# ("Monthly Stipend The salary for this role is $50,000-$80,000")
+_SALARY_AFTER_NEG = re.compile(r"\b(salary|base|pay range|pay rate|compensation|wages?|hourly rate)\b", re.I)
+# pay_v2: what follows the amount is an ADD-ON to it, not what it is ("+ Bonus", "plus commission")
+_ADDON_AFTER = re.compile(r"^\s*(?:\(\s*)?(?:\+|plus\b|and\b|including\b|incl\b|with\b)", re.I)
+# pay_v2: the amount itself is variable / commission / incentive ("+ $11,500 Variable")
+_VARIABLE_AFTER = re.compile(r"^\s*(?:USD\s*)?(?:in\s+)?(?:annual\s+|target\s+)?(variable(?!\s+based)|commissions?|incentive)",
+                             re.I)
 # disqualifiers right after the amount (<= 3 words; "plus bonus" / "and equity" do not count)
 _NEG_AFTER = re.compile(
     r"^[^.;!?]{0,6}?(?:(?!plus\b|and\b|\+)\w+\s+){0,2}(?:sign[- ]?on |signing |relocation |referral )?"
@@ -280,10 +313,17 @@ def _judge(text: str, m: "re.Match", chained: bool = False) -> Optional[Dict[str
             return None
         if g.get("c2") is None and not (0.5 * lo <= hi <= 5 * lo):
             return None                              # "$90,000 and 2 years" is not a range
+    if g.get("n2") and hi is not None and hi > MAX_RANGE_RATIO * lo:
+        return None                                  # "$100k - $500k for all engineers"
     before = text[max(0, m.start() - 160):m.start()]
     after = text[m.end():m.end() + 40]
     near_before = before[-45:]
-    if _NEG_BEFORE.search(near_before) or _NEG_AFTER.search(after):
+    if re.search(r"\+\s*$", before[-4:]) or _VARIABLE_AFTER.search(after):
+        return None                                  # an add-on amount ("+ $11,500 Variable")
+    neg = _NEG_BEFORE.search(near_before)
+    if neg and not _SALARY_AFTER_NEG.search(near_before[neg.end(1):]):
+        return None
+    if not _ADDON_AFTER.search(after) and _NEG_AFTER.search(after):
         return None
     # the amount's own sentence names variable / commission / incentive pay and no salary or base:
     # it is not base pay ("Target Variable range for this role is: $X - $Y")
@@ -301,8 +341,12 @@ def _judge(text: str, m: "re.Match", chained: bool = False) -> Optional[Dict[str
         explicit = "hour"
     elif _ANNUAL_CUE.search(cue_window):
         explicit = "year"
-    interval = explicit or _interval_by_magnitude(lo)
-    if not _plausible(interval, lo, hi):
+    currency = _currency(m, sentence)
+    interval = explicit or _interval_by_magnitude(lo, currency)
+    if interval is None and "." in g["n1"] and (not g.get("n2") or "." in g["n2"]) and \
+            _plausible("hour", lo, hi, currency):
+        interval = "hour"                            # "$33.17 - $44.39 USD": cents in the hourly band
+    if not _plausible(interval, lo, hi, currency):
         return None
     # a floor ("starts at $25") only for a single amount; "ranges from $X to $Y" is a range
     starts_at = g.get("n2") is None and (
@@ -314,7 +358,7 @@ def _judge(text: str, m: "re.Match", chained: bool = False) -> Optional[Dict[str
         "base" if _BASE.search(before[-120:]) else "unspecified")
     start = max(0, m.start() - 80)
     snippet = text[start:min(len(text), m.end() + 30)].strip()
-    return {"min": lo, "max": hi, "currency": _currency(m, sentence), "interval": interval, "kind": kind,
+    return {"min": lo, "max": hi, "currency": currency, "interval": interval, "kind": kind,
             "explicit": explicit is not None, "range": g.get("n2") is not None, "starts_at": starts_at,
             "snippet": snippet, "pos": m.start()}
 

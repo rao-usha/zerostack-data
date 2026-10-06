@@ -180,6 +180,15 @@
     ]
    }
   ],
+  "ats_board": [
+   {
+    "kind": "entity",
+    "path": "app/entities/feeds.py",
+    "via": [
+     "sql"
+    ]
+   }
+  ],
   "batch_source_tier_overrides": [
    {
     "kind": "api_router",

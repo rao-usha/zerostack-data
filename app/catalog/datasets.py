@@ -458,7 +458,9 @@ _DERIVED: List[DatasetSpec] = [
                 "gleif_lei_records", "usaspending_awards",
                 # SPEC_148 attach-only website feeds (collection jobs, not bulk: no input gate)
                 "pe_collection", "people_org_charts", "lp_collection", "family_offices",
-                "agentic_portfolios", "si_3pl_companies"),
+                "agentic_portfolios", "si_3pl_companies",
+                # SPEC_155: a verified job board's careers domain (attach-only, family ats_board)
+                "ats_boards"),
         coverage_sql="SELECT max(observed_at)::date FROM core.source_record",
         coverage_basis="as_of",
         limitations=("Form 5500 sponsors (source dol5500, SPEC_147) are read from "
@@ -1417,14 +1419,19 @@ _DISPATCH: List[DatasetSpec] = [
               "timeseries", "one row per posting per board; one fetch row per board per run",
               "dispatch:ats_boards", "weekly",
               # SPEC_153: scheduled weekly through ingestion_schedules (SCHEDULE_DISPATCH)
-              tables=("ats_board", "ats_posting", "ats_board_fetch"),
+              tables=("ats_board", "ats_posting", "ats_board_fetch", "ats_discovery_run",
+                      "ats_discovery_attempt"),     # SPEC_155: target discovery run + ledger
               primary_key=("board_id", "external_id"),
               coverage_sql="SELECT max(fetched_at)::date FROM ats_board_fetch WHERE outcome = 'fetched'",
               coverage_basis="as_of",
               data_state="ok", verified_at="2026-10-02",
-              limitations=("Discovery is pilot scope: new boards are found for at most 25 named companies "
-                           "per run. The weekly refresh (SPEC_153) re-fetches only boards already "
-                           "verified (status active), in chunks of 25, Tuesday 03:00 UTC.",
+              limitations=("Boards of PE targets are found by name-derived tokens and linked to a firm only "
+                           "when rule R7 verifies them (full name, or canonical name plus the firm's city / "
+                           "state in a posting; SPEC_155). Boards that name a firm weakly are status "
+                           "'candidate' with no firm link; rejected pairs are in ats_discovery_attempt. "
+                           "Name variants miss some real boards (recall was not measured).",
+                           "The weekly refresh (SPEC_153) re-fetches only boards already verified (status "
+                           "active), in chunks of 25, Tuesday 03:00 UTC.",
                            "Ashby boards are not fetched: api.ashbyhq.com/robots.txt answers 401 and the "
                            "open_web gate treats that as disallow-all.",
                            "Pay from text is parsed (pay_source = 'text'); read pay_snippet and "

@@ -1074,7 +1074,8 @@ def source_metrics(records, rec_keys, comps, weak, new_components=(), source="do
 # Sources whose records ATTACH a domain claim to an identity through their keys
 # but never resolve: their CIKs are self-reported by a research pipeline, and
 # letting them into the union-find would turn a scraped CIK into merge evidence.
-ATTACH_ONLY_SOURCES = ("pefirm", "industrial", "peportco", "portco", "threepl", "famoffice", "lpfund")
+ATTACH_ONLY_SOURCES = ("pefirm", "industrial", "peportco", "portco", "threepl", "famoffice", "lpfund",
+                       "atsboard")
 
 # Independence: two records of ONE family are one source. ADV roster and IAPD
 # are both Form ADV (Item 1.I, the adviser's own filing), so they never confirm
@@ -1085,7 +1086,7 @@ SOURCE_FAMILY = {
     "formd": "form_d", "dol5500": "form_5500",
     "pefirm": "pe_firm_web", "industrial": "industrial_seed", "peportco": "pe_portfolio",
     "portco": "portfolio_agentic", "threepl": "three_pl", "famoffice": "family_office",
-    "lpfund": "lp_fund",
+    "lpfund": "lp_fund", "atsboard": "ats_board",      # SPEC_155: a verified job board's careers domain
 }
 OWN_SITE_FAMILY = "own_site"
 

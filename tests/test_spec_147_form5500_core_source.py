@@ -395,7 +395,8 @@ def test_feeds_without_workbench_table_pg(pg_engine):
     assert "dol5500" in counts["skipped"]
     assert set(counts["skipped"]) - {"dol5500"} <= {"pefirm", "industrial", "peportco", "portco", "threepl",
                                                     "famoffice", "lpfund",
-                                                    "gleif", "usasp"}  # SPEC_154 feeds
+                                                    "gleif", "usasp",  # SPEC_154 feeds
+                                                    "atsboard"}  # SPEC_155
     with pg_engine.connect() as conn:
         keys = {r[0] for r in conn.execute(text("SELECT record_key FROM core.source_record"))}
     assert "edgar:0000000042" in keys and "edgar:0000000777" not in keys

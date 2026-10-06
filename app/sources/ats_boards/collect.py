@@ -40,7 +40,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 from sqlalchemy import text
 
 from app.core import open_web
-from app.sources.ats_boards import adapters, discover
+from app.sources.ats_boards import adapters, discover, pay
 
 MAX_BYTES = 16_000_000          # Tecovas' Greenhouse board is ~1 MB with content=true
 TRANSIENT = ("retry_after", "host_backed_off", "error", "dns_error", "too_many_redirects")
@@ -155,7 +155,11 @@ def try_board(bf: BoardFetcher, company: Company, ats: str, token: str, basis: s
                            sha256=info.get("sha256"), terms_citation=info.get("terms_citation"),
                            error=info.get("error"))
 
-    if meta_url:
+    # SPEC_155: a weekly refresh re-reads a board the lane ALREADY verified (status 'active'); it is
+    # never re-verified -- an R7-verified board (name + location) would fail the board-name rule
+    # here and be dropped to 'unverified'. No board-name request either.
+    refresh = basis == "refresh"
+    if meta_url and not refresh:
         outcome, meta, info = bf.fetch_json(meta_url)
         if outcome != "fetched":
             return result(outcome, info)
@@ -167,7 +171,7 @@ def try_board(bf: BoardFetcher, company: Company, ats: str, token: str, basis: s
     if outcome != "fetched":
         return result(outcome, info)
     raw_jobs = adapters.jobs_from_payload(ats, payload)
-    if not meta_url:
+    if not meta_url and not refresh:
         ok, ev = discover.verify(ats, names, None, raw_jobs)
         if not ok:
             return result("unverified", info, ev=ev)
@@ -278,14 +282,46 @@ _FETCH_INSERT = text("""
 """)
 
 
+# SPEC_155: a refresh touches only the fetch bookkeeping of the board row it re-read -- never its
+# basis, evidence or firm link ('refresh' is not a discovery basis: ck_ats_board_basis refuses it).
+# SPEC_156: one 404 is not enough to drop a board the weekly refresh would never read again -- the
+# first keeps it active (last_outcome 'not_found'), a second consecutive one sets 'not_found'.
+_BOARD_REFRESH = text("""
+    UPDATE ats_board SET
+        status = CASE WHEN :status = 'error' THEN status
+                      WHEN :status = 'not_found' AND COALESCE(last_outcome, '') <> 'not_found' THEN status
+                      ELSE :status END,
+        terms_citation = COALESCE(:citation, terms_citation),
+        last_fetched_at = :fetched_at,
+        last_outcome = :outcome,
+        updated_at = NOW()
+    WHERE id = :id
+    RETURNING id
+""")
+
+
 def store(db, br: BoardResult) -> Dict[str, Optional[int]]:
     """Write one board result. Returns new / seen / closed / reopened / open counts."""
     co = br.company
-    board_id = db.execute(_BOARD_UPSERT, {
-        "ats": br.ats, "token": br.token, "name": co.name, "eid": co.core_entity_id, "cik": co.cik,
-        "iid": co.industrial_company_id, "basis": br.basis, "evidence": json.dumps(br.evidence, default=str),
-        "status": br.status, "citation": br.terms_citation, "fetched_at": br.fetched_at, "outcome": br.outcome,
-    }).scalar()
+    refresh_id = (br.evidence or {}).get("ats_board.id") if br.basis == "refresh" else None
+    if refresh_id is not None:
+        board_id = db.execute(_BOARD_REFRESH, {
+            "id": int(refresh_id), "status": br.status, "citation": br.terms_citation,
+            "fetched_at": br.fetched_at, "outcome": br.outcome}).scalar()
+        if board_id is None:
+            raise ValueError(f"refresh of a board that does not exist: ats_board.id {refresh_id}")
+    else:
+        board_id = db.execute(_BOARD_UPSERT, {
+            "ats": br.ats, "token": br.token, "name": co.name, "eid": co.core_entity_id, "cik": co.cik,
+            "iid": co.industrial_company_id, "basis": br.basis, "evidence": json.dumps(br.evidence, default=str),
+            "status": br.status, "citation": br.terms_citation, "fetched_at": br.fetched_at, "outcome": br.outcome,
+        }).scalar()
+    return {**store_postings(db, board_id, br), "board_id": board_id}
+
+
+def store_postings(db, board_id: int, br: BoardResult) -> Dict[str, Optional[int]]:
+    """Merge one fetch's postings into ``ats_posting`` and append its ``ats_board_fetch`` row.
+    ``br.postings is None`` (a failed fetch) closes nothing."""
     counts: Dict[str, Optional[int]] = {"new": None, "seen": None, "closed": None, "reopened": None, "open": None}
     pay_n = None
     if br.postings is not None:
@@ -323,7 +359,55 @@ def store(db, br: BoardResult) -> Dict[str, Optional[int]]:
         "new": counts["new"], "closed": counts["closed"], "reopened": counts["reopened"], "pay": pay_n,
         "ua": open_web.USER_AGENT, "citation": br.terms_citation, "error": br.error,
     })
-    return {**counts, "board_id": board_id}
+    return counts
+
+
+# SPEC_156: re-parse stored pay under the current parser. Text pay is re-derived from the stored
+# description; structured pay cannot be (the raw payload is not kept) except the pay_v1 zero-decimal bug
+# (Greenhouse JPY / KRW "cents" divided by 100), which is multiplied back.
+_PAY_ROWS = text("""
+    SELECT id, description_text, pay_min, pay_max, pay_currency, pay_interval, pay_source, pay_kind,
+           pay_snippet, pay_confidence
+    FROM ats_posting
+    WHERE status IN ('open', 'closed') AND COALESCE(pay_parser, '') <> :v
+      AND (pay_source IS NULL OR pay_source = 'text'
+           OR (pay_source = 'structured' AND pay_currency = ANY(:zero)))
+""")
+_PAY_UPDATE = text(
+    "UPDATE ats_posting SET " + ", ".join(f"{c} = :{c}" for c in pay.EMPTY_COLUMNS) + " WHERE id = :id")
+
+
+def _f(v: Any) -> Optional[float]:
+    return float(v) if v is not None else None
+
+
+def reparse_pay(db, apply: bool = False) -> Dict[str, Any]:
+    """Re-parse stored pay under the current parser (dry run by default): counts, with examples."""
+    changed, examples, updates = 0, [], []
+    rows = db.execute(_PAY_ROWS, {"v": pay.PARSER_VERSION, "zero": sorted(pay.ZERO_DECIMAL)}).fetchall()
+    for pid, desc, lo, hi, cur, iv, src, kind, snip, conf in rows:
+        if src == "structured":                 # pay_v1 divided zero-decimal "cents" by 100
+            cols = {"pay_min": pay._num(_f(lo) * 100) if lo is not None else None,
+                    "pay_max": pay._num(_f(hi) * 100) if hi is not None else None,
+                    "pay_currency": cur, "pay_interval": iv, "pay_kind": kind, "pay_source": src,
+                    "pay_snippet": snip, "pay_confidence": conf, "pay_parser": pay.PARSER_VERSION}
+        else:
+            p = pay.parse_text(desc)
+            cols = p.as_columns() if p else dict(pay.EMPTY_COLUMNS)
+        if (_f(cols["pay_min"]), _f(cols["pay_max"]), cols["pay_currency"], cols["pay_interval"]) != (
+                _f(lo), _f(hi), cur, iv):
+            changed += 1
+            if len(examples) < 25:
+                examples.append({"id": pid, "old": [_f(lo), _f(hi), cur, iv],
+                                 "new": [_f(cols["pay_min"]), _f(cols["pay_max"]), cols["pay_currency"],
+                                         cols["pay_interval"]], "snippet": (cols.get("pay_snippet") or "")[:160]})
+        updates.append({**cols, "id": pid})
+    if apply:
+        for u in updates:
+            db.execute(_PAY_UPDATE, u)
+        db.commit()
+    return {"apply": apply, "rows": len(rows), "changed": changed, "examples": examples,
+            "parser": pay.PARSER_VERSION}
 
 
 # ---------------------------------------------------------------------------

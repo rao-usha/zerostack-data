@@ -30,7 +30,7 @@ workbench never loaded) the feed is skipped and reported, never an error.
 Web domains (SPEC_148): every feed stores `domains.domain(website)` -- the
 registrable domain, with social / builder / ATS / webmail / parking hosts
 dropped -- and reports per feed how many raw values were kept, empty, invalid
-or generic. Seven ATTACH-ONLY feeds read company tables that carry a website
+or generic. Eight ATTACH-ONLY feeds read company tables that carry a website
 but no trustworthy identifier (`ATTACH_FEEDS`): a row is fed only when its
 domain survives, and the resolver uses its keys solely to attach the domain
 claim, never to resolve (`resolve_core.ATTACH_ONLY_SOURCES`). The pe_firms rows
@@ -90,6 +90,8 @@ class Feed:
     attach_only: bool = False
     # SPEC_154: native_id IS this identifier ('lei' | 'uei'): canonicalized, rows without one dropped
     native_key: Optional[str] = None
+    # SPEC_155: a column the `requires` relation must carry (a table predating its migration is skipped)
+    requires_column: Optional[str] = None
 
 
 # The CIK universe we care about: everything referenced by an adviser-side or
@@ -433,6 +435,13 @@ def _relation_exists(conn, name: str) -> bool:
     return bool(conn.execute(text("SELECT to_regclass(:n) IS NOT NULL"), {"n": name}).scalar())
 
 
+def _column_exists(conn, relation: str, column: str) -> bool:
+    schema, _, table = relation.rpartition(".")
+    return bool(conn.execute(text(
+        "SELECT 1 FROM information_schema.columns WHERE table_schema = :s AND table_name = :t AND column_name = :c"),
+        {"s": schema or "public", "t": table, "c": column}).scalar())
+
+
 def feeds_for(conn) -> Tuple[List[Feed], List[str]]:
     """(feeds to run, names skipped) for this database.
 
@@ -443,6 +452,9 @@ def feeds_for(conn) -> Tuple[List[Feed], List[str]]:
     for feed in FEEDS + [DOL5500, GLEIF, USASP] + ATTACH_FEEDS:
         if feed.requires and not _relation_exists(conn, feed.requires):
             logger.warning(f"[entities:feeds] {feed.requires} not found: {feed.name} feed skipped")
+            skipped.append(feed.name)
+        elif feed.requires_column and not _column_exists(conn, feed.requires, feed.requires_column):
+            logger.warning(f"[entities:feeds] {feed.requires}.{feed.requires_column} not found: {feed.name} feed skipped")
             skipped.append(feed.name)
         else:
             run.append(feed)
@@ -489,8 +501,8 @@ def run_feeds(conn, feeds: Optional[Sequence[Feed]] = None,
 # SPEC_148: attach-only company tables (a website, no trustworthy identifier)
 # ---------------------------------------------------------------------------
 
-def _attach_feed(name: str, table: str, sql: str) -> Feed:
-    return Feed(name, sql, name, requires=table, attach_only=True)
+def _attach_feed(name: str, table: str, sql: str, requires_column: Optional[str] = None) -> Feed:
+    return Feed(name, sql, name, requires=table, attach_only=True, requires_column=requires_column)
 
 
 ATTACH_FEEDS: List[Feed] = [
@@ -532,6 +544,17 @@ ATTACH_FEEDS: List[Feed] = [
                website AS domain, updated_at::TIMESTAMP AS observed_at
         FROM family_offices WHERE website IS NOT NULL
     """),
+    # SPEC_155: the careers domain a VERIFIED job board shows (posting URLs on the firm's own site,
+    # or a domain in the postings that matches the firm's name). Board URLs and posting text are
+    # written by one company in one system: ONE family (ats_board), so alone it is a weak link.
+    # SPEC_156: the linked target's EIN rides along (EIN-only firms attach by EIN, not by name).
+    _attach_feed("atsboard", "public.ats_board", """
+        SELECT id::TEXT AS native_id, company_name AS legal_name,
+               NULL::TEXT AS crd, cik, ein AS ein, NULL::TEXT AS state,
+               careers_domain AS domain, COALESCE(verified_at, updated_at)::TIMESTAMP AS observed_at
+        FROM ats_board
+        WHERE status = 'active' AND verification = 'verified' AND careers_domain IS NOT NULL
+    """, requires_column="careers_domain"),
     _attach_feed("lpfund", "public.lp_fund", """
         SELECT id::TEXT AS native_id, COALESCE(formal_name, name) AS legal_name,
                sec_crd_number AS crd, NULL::TEXT AS cik, NULL::TEXT AS ein, NULL::TEXT AS state,

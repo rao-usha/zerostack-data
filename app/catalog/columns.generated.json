@@ -1,5 +1,5 @@
 {
- "dictionary_hash": "0149fcaebf63bf92",
+ "dictionary_hash": "aa0d9733846b7aa7",
  "format_version": 1,
  "package_columns": {
   "cms": {
@@ -1696,6 +1696,243 @@
     "ats_boards"
    ],
    "origin": "ddl",
+   "packages": [
+    "ats_boards"
+   ]
+  },
+  "ats_discovery_attempt": {
+   "columns": [
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "ats_type",
+     "nullable": false,
+     "pg_type": "varchar(16)",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "attempted_at",
+     "nullable": false,
+     "pg_type": "timestamp",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "board_id",
+     "nullable": true,
+     "pg_type": "integer",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "board_token",
+     "nullable": false,
+     "pg_type": "text",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "core_entity_id",
+     "nullable": true,
+     "pg_type": "bigint",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "error",
+     "nullable": true,
+     "pg_type": "text",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "evidence",
+     "nullable": true,
+     "pg_type": "jsonb",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "http_status",
+     "nullable": true,
+     "pg_type": "integer",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": "low",
+     "description": "Surrogate row id assigned by the database; not stable across reloads.",
+     "example": null,
+     "name": "id",
+     "nullable": false,
+     "pg_type": "bigserial",
+     "pii": "none",
+     "semantic_type": null,
+     "source": "glossary",
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "outcome",
+     "nullable": false,
+     "pg_type": "varchar(40)",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "postings",
+     "nullable": true,
+     "pg_type": "integer",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "reason",
+     "nullable": true,
+     "pg_type": "varchar(40)",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "requests",
+     "nullable": false,
+     "pg_type": "smallint",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "run_id",
+     "nullable": true,
+     "pg_type": "integer",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "score",
+     "nullable": true,
+     "pg_type": "numeric(4, 3)",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "target_id",
+     "nullable": false,
+     "pg_type": "bigint",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "variant",
+     "nullable": true,
+     "pg_type": "varchar(16)",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    },
+    {
+     "confidence": null,
+     "description": null,
+     "example": null,
+     "name": "verdict",
+     "nullable": true,
+     "pg_type": "varchar(16)",
+     "pii": "none",
+     "semantic_type": null,
+     "source": null,
+     "unit": null
+    }
+   ],
+   "datasets": [
+    "ats_boards"
+   ],
+   "origin": "ddl",
+   "packages": [
+    "ats_boards"
+   ]
+  },
+  "ats_discovery_run": {
+   "columns": [],
+   "datasets": [
+    "ats_boards"
+   ],
+   "origin": "none",
    "packages": [
     "ats_boards"
    ]
