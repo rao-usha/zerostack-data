@@ -74,6 +74,8 @@ demo_output/
 backup/
 *.sql
 *.sql.gz
+# SPEC_162: the ontology gold set (probes, gold SQL, fixtures) is source, not a dump
+!app/ontology/gold/**/*.sql
 
 # Docker
 docker-compose.override.yml

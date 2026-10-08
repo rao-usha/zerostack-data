@@ -30,7 +30,8 @@ LOOSENED_WITH_REVIEW: set = set()
 # datasets added after the baseline snapshot (each split out of a baseline dataset; the
 # fix-round tests pin their rights)
 ADDED_AFTER_BASELINE = {"zip_medspa_scores", "ats_boards",  # ats_boards: SPEC_151, a new source
-                        "gleif_lei_records"}                   # SPEC_154: GLEIF LEI records
+                        "gleif_lei_records",                   # SPEC_154: GLEIF LEI records
+                        "cms_hospitals"}                       # SPEC_162: table existed, now catalogued
 
 STORAGE_FLAGGED = {"yelp_businesses", "fred_series", "kaggle_m5", "prediction_markets", "si_zoning_districts",
                    "si_internet_exchanges", "si_warehouse_listings", "medspa_prospects"}

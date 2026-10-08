@@ -1,0 +1,94 @@
+{
+ "note": "Hand-computed expected answers of cq_gold.sql on seed.sql (SPEC_162). Dates are ISO strings; numerics compare as floats to 1e-6; row order matters (every gold query orders its rows).",
+ "cases": {
+  "CQ01": [
+   {"params": {"npi": "1000000010"},
+    "rows": [{"npi": "1000000010", "entity_kind": "organization", "status": "A", "active": true,
+              "enumeration_date": "2009-09-09", "last_updated": "2024-06-06", "dba_name": "TEST CLINIC"}]},
+   {"params": {"npi": "9999999999"}, "rows": []}
+  ],
+  "CQ02": [
+   {"params": {"npi": "1000000001"},
+    "rows": [{"npi": "1000000001", "credential": "MD", "taxonomy_code": "207Q00000X",
+              "taxonomy_description": "Family Medicine", "taxonomy_license": "IL-0001", "license_state": "IL"}]},
+   {"params": {"npi": "1000000010"}, "rows": []}
+  ],
+  "CQ04": [
+   {"params": {"npi": "1000000003"},
+    "rows": [{"npi": "1000000003", "taxonomy_code": "363L00000X",
+              "grouping": "Physician Assistants & Advanced Practice Nursing Providers",
+              "classification": "Nurse Practitioner", "specialization": null}]},
+   {"params": {"npi": "1000000004"}, "rows": []}
+  ],
+  "CQ05": [
+   {"params": {"org_npi": "1000000010"},
+    "rows": [{"org_npi": "1000000010", "individual_npi": "1000000001", "shared_on": "address+phone"},
+             {"org_npi": "1000000010", "individual_npi": "1000000003", "shared_on": "address"},
+             {"org_npi": "1000000010", "individual_npi": "1000000004", "shared_on": "phone"}]}
+  ],
+  "CQ08": [
+   {"params": {"npi": "1000000011"},
+    "rows": [{"npi": "1000000011", "organization_subpart": "YES", "is_subpart": true}]},
+   {"params": {"npi": "1000000010"},
+    "rows": [{"npi": "1000000010", "organization_subpart": "NO", "is_subpart": false}]}
+  ],
+  "CQ11": [
+   {"params": {"npi": "1000000001"},
+    "rows": [{"npi": "1000000001", "practice_address_line1": "100 MAIN ST", "practice_city": "SPRINGFIELD",
+              "practice_state": "IL", "zip5": "62701", "state_fips": "17", "ruca": "1"}]},
+   {"params": {"npi": "1000000012"},
+    "rows": [{"npi": "1000000012", "practice_address_line1": "1 COMMERCE ST", "practice_city": "DALLAS",
+              "practice_state": "TX", "zip5": "75201", "state_fips": null, "ruca": null}]}
+  ],
+  "CQ12": [
+   {"params": {"taxonomy_code": "207Q00000X"},
+    "rows": [{"taxonomy_code": "207Q00000X", "zip5": "62701", "providers": 1},
+             {"taxonomy_code": "207Q00000X", "zip5": "62702", "providers": 1}]},
+   {"params": {"taxonomy_code": "207N00000X"},
+    "rows": [{"taxonomy_code": "207N00000X", "zip5": "75201", "providers": 1},
+             {"taxonomy_code": "207N00000X", "zip5": "77002", "providers": 1}]}
+  ],
+  "CQ14": [
+   {"params": {"ccn": "140001"},
+    "rows": [{"ccn": "140001", "hospital_type": "Acute Care Hospitals", "emergency_services": true, "county": "SANGAMON"}]},
+   {"params": {"ccn": "14001F"},
+    "rows": [{"ccn": "14001F", "hospital_type": "Acute Care - Veterans Administration", "emergency_services": false, "county": null}]}
+  ],
+  "CQ15": [
+   {"params": {"npi": "1000000001"},
+    "rows": [{"npi": "1000000001", "data_year": 2023, "accepts_assignment": true},
+             {"npi": "1000000001", "data_year": 2024, "accepts_assignment": true}]},
+   {"params": {"npi": "1000000005"},
+    "rows": [{"npi": "1000000005", "data_year": 2024, "accepts_assignment": false}]}
+  ],
+  "CQ18": [
+   {"params": {"npi": "1000000001"},
+    "rows": [{"data_year": 2023, "hcpcs_cd": "G0438", "place_of_srvc": "O", "tot_srvcs": 20, "tot_benes": 20,
+              "avg_mdcr_alowd_amt": 170.5, "avg_mdcr_pymt_amt": 133.2},
+             {"data_year": 2024, "hcpcs_cd": "G0438", "place_of_srvc": "O", "tot_srvcs": 25, "tot_benes": 25,
+              "avg_mdcr_alowd_amt": 175.0, "avg_mdcr_pymt_amt": 137.0},
+             {"data_year": 2024, "hcpcs_cd": "G0439", "place_of_srvc": "O", "tot_srvcs": 30, "tot_benes": 30,
+              "avg_mdcr_alowd_amt": 120.0, "avg_mdcr_pymt_amt": 94.0}]}
+  ],
+  "CQ19": [
+   {"params": {"provider_type": "Family Practice", "state": "IL", "data_year": 2024},
+    "rows": [{"hcpcs_cd": "G0439", "place_of_srvc": "O", "services": 81, "providers": 3},
+             {"hcpcs_cd": "G0438", "place_of_srvc": "O", "services": 25, "providers": 1},
+             {"hcpcs_cd": "G0438", "place_of_srvc": "F", "services": 5, "providers": 1}]}
+  ],
+  "CQ23": [
+   {"params": {"pe_owner": "Test Capital Partners"},
+    "rows": [{"portfolio_company_id": 1, "company_name": "Acme Dermatology Partners", "npi": "1000000012",
+              "practice_state": "TX", "zip5": "75201"},
+             {"portfolio_company_id": 1, "company_name": "Acme Dermatology Partners", "npi": "1000000013",
+              "practice_state": "TX", "zip5": "77002"}]}
+  ],
+  "CQ25": [
+   {"params": {"ccn": "140001"},
+    "rows": [{"ccn": "140001", "overall_rating": 4, "mortality_rating": "Same as the national average",
+              "readmission_rating": "Below the national average", "patient_experience_rating": "Above the national average",
+              "effectiveness_rating": "Same as the national average", "timeliness_rating": "Same as the national average",
+              "imaging_rating": "Not Available"}]}
+  ]
+ }
+}

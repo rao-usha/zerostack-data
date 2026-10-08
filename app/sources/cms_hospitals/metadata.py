@@ -83,7 +83,7 @@ def generate_create_table_sql() -> str:
         CREATE TABLE SQL statement
     """
     return f"""
-    CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
+    CREATE TABLE IF NOT EXISTS cms_hospitals (
         id SERIAL PRIMARY KEY,
         facility_id TEXT NOT NULL UNIQUE,
         facility_name TEXT,

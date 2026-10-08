@@ -885,16 +885,29 @@ _DISPATCH: List[DatasetSpec] = [
                            "BUG-FDIC-COLNAMES: mangled column names (uninession, dession, ...).")),
     # CMS
     _dispatch("cms_medicare_utilization", "cms", "Medicare provider utilization",
-              "A sample (about 21k rows, 1,008 NPIs) of Medicare physician and supplier "
-              "utilization and payment by rendering provider, HCPCS code and place of service.",
-              "timeseries", "one row per rendering NPI per HCPCS code per place of service (one "
-              "data year)", "dispatch:cms", "annual",
+              "CMS Medicare Physician & Other Practitioners by Provider and Service: Part B "
+              "services, beneficiaries, submitted charges and allowed / paid amounts per rendering "
+              "NPI, HCPCS code and place of service, per calendar year. Two partial years are "
+              "loaded: 2023 for the first ~1,006 NPIs of the national file (all states) and 2024 "
+              "for every Wyoming provider.",
+              "timeseries", "one row per data year per rendering NPI per HCPCS code per place of "
+              "service", "dispatch:cms", "annual",
               tables=("cms_medicare_utilization",),
-              primary_key=("rndrng_npi", "hcpcs_cd", "place_of_srvc"),
+              primary_key=("data_year", "rndrng_npi", "hcpcs_cd", "place_of_srvc"),
+              coverage_sql="SELECT make_date(max(data_year),12,31) FROM cms_medicare_utilization",
+              coverage_basis="period",
+              coverage_from="2023-01-01",
+              verified_at="2026-10-08",
+              data_state="ok",
               limitations=(
-                  "BUG-CMS-IDEMPOTENT: no data_year column and no unique constraint; overlapping "
-                  "loads left about 2x duplicate rows.",
-                  "A sample of a ~9.7M-row dataset; no period column, so no coverage_sql.",
+                  "A sample of a ~9.8M-rows-per-year dataset (after alembic 0022, 2026-10-08): data "
+                  "year 2023 = 10,373 rows, the first ~1,006 NPIs of the national file in NPI order; "
+                  "data year 2024 = 18,816 rows, all of Wyoming. 3,216 NPIs in total.",
+                  "SPEC_162 fixed BUG-CMS-IDEMPOTENT: the ingest fetched the DKAN series id (always "
+                  "the latest release) and stored no year, so data_year was backfilled by load date "
+                  "(before 2026-05-21 = 2023) and 10,865 in-year duplicate rows were removed; new "
+                  "loads read a pinned per-year release and upsert on the unique key.",
+                  "hcpcs_desc carries AMA CPT descriptors (see rights).",
               )),
     _dispatch("cms_hospital_cost_reports", "cms", "Hospital cost reports",
               "Medicare hospital cost report financials published by CMS; the 10 loaded rows have "
@@ -2268,6 +2281,30 @@ _API: List[DatasetSpec] = [
         # index, over the status page's 1.5 s combined-coverage budget (SPEC_141)
         limitations=("last_inspection_date has junk values (min 1016-04-22).",
                      "Single load 2026-03-07/08; updated_at is unindexed, so no coverage clock.")),
+    # SPEC_162: the table existed (5,426 rows) with no DatasetSpec; rights = cms family default
+    # until SPEC_163 reviews it.
+    _ds("cms_hospitals", "cms", "CMS hospital general information",
+        "Medicare-certified hospitals from the CMS Care Compare Hospital General Information "
+        "file: CMS Certification Number, name, address, state, ZIP, hospital type, ownership, "
+        "emergency services and the overall star rating (the domain comparisons are not "
+        "loaded). One load, March 2026; no NPI.",
+        "reference", "one row per hospital (CMS Certification Number)", "api:cms_hospitals",
+        "ad_hoc", tables=("cms_hospitals",), status="archival",
+        primary_key=("facility_id",),
+        coverage_sql="SELECT max(ingested_at)::date FROM cms_hospitals",
+        coverage_basis="as_of",
+        spatial_coverage="US:state",
+        upstream_url="https://data.cms.gov/provider-data/dataset/xubh-q36u",
+        verified_at="2026-10-08",
+        data_state="ok",
+        limitations=("BUG-CMS-HOSP-GEO: city and county are NULL on all 5,426 rows (the parser "
+                     "reads field names the API does not send); address, state and ZIP are set.",
+                     "overall_rating is NULL on 2,560 rows where CMS publishes 'Not Available'. "
+                     "The six domain comparison columns (mortality ... imaging) are NULL on every "
+                     "row (same parser bug).",
+                     "facility_id is the CCN: 6 characters, 164 VA/DoD ids end in a letter "
+                     "('12001F'). There is no NPI column, so hospitals do not join to NPPES.",
+                     "Single load 2026-03-31; no snapshot history.")),
     _ds("synthetic_job_postings", "synthetic", "Synthetic job postings",
         "Generated, sector-aware job postings used to seed hiring-velocity analysis. Not real "
         "data; none are present today.",

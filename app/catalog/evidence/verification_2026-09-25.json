@@ -1539,7 +1539,7 @@
     ]
    },
    "disposition": {
-    "primary_key": "applied",
+    "primary_key": "amended:SPEC_162 adds data_year to the key, as this evidence recommends (alembic 0022 unique key)",
     "description": "applied",
     "grain": "applied",
     "pii": "applied"

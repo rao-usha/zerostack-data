@@ -647,14 +647,15 @@ UNRESOLVED_2026_09_26 = [
 # change, not an alias), a manual test row, rows naming a shared table, and the
 # one multi-dataset producer.
 EXPECTED_UNRESOLVED = {
-    "census_bfs", "epa_ghg", "dot_grants", "cms_hospitals", "ffiec_banks", "ferc_energy",
+    "census_bfs", "epa_ghg", "dot_grants", "ffiec_banks", "ferc_energy",
     "google_trends", "test_manual", "job:pe_mart_build", "freight_index", "pe_collection",
     "pe_fund_data", "pe_people", "news_collection",
     # fix round: maintenance over job_postings, not a producer run
     "job_postings_skills",
 }
 # 280 before the fix round dropped the 7 job_postings_skills rows
-EXPECTED_RESOLVED = 273
+# SPEC_162: +4 cms_hospitals jobs now that the dataset is catalogued
+EXPECTED_RESOLVED = 277
 
 
 def _load_fixture(engine):

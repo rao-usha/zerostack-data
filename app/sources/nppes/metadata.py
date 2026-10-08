@@ -99,7 +99,7 @@ UPDATE_COLUMNS = [c for c in COLUMN_NAMES if c != "npi"]
 # ---------------------------------------------------------------------------
 
 CREATE_TABLE_SQL = f"""
-CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
+CREATE TABLE IF NOT EXISTS nppes_providers (
     npi TEXT PRIMARY KEY,
     entity_type TEXT,
     legal_name TEXT,
@@ -255,12 +255,14 @@ def parse_provider_record(result: Dict[str, Any]) -> Dict[str, Any]:
         "first_name": first_name or None,
         "last_name": last_name or None,
         "credential": basic.get("credential") or None,
+        # SPEC_162: the Registry API sends DBA names in other_names (code 3), not in basic
         "dba_name": (
-            basic.get("name")  # NPI-1 uses "name" for DBA
+            _extract_dba_name(result.get("other_names") or [])
+            or basic.get("name")
             or basic.get("authorized_official_organization_name")
             or None
         ),
-        "gender": basic.get("gender") or None,
+        "gender": basic.get("sex") or basic.get("gender") or None,  # API v2.1 sends "sex"
         # Practice address
         "practice_address_line1": practice_addr.get("address_1"),
         "practice_address_line2": practice_addr.get("address_2"),
@@ -286,10 +288,27 @@ def parse_provider_record(result: Dict[str, Any]) -> Dict[str, Any]:
         # Status
         "status": basic.get("status", "A"),
         "sole_proprietor": basic.get("sole_proprietor") or None,
-        "organization_subpart": basic.get("organization_subpart") or None,
+        # SPEC_162: the API key is "organizational_subpart" (YES / NO)
+        "organization_subpart": (
+            basic.get("organizational_subpart") or basic.get("organization_subpart") or None
+        ),
     }
 
     return row
+
+
+def _extract_dba_name(other_names: List[Dict[str, Any]]) -> Optional[str]:
+    """First 'Doing Business As' name (other_names code 3) of an NPPES record."""
+    for name in other_names:
+        if not isinstance(name, dict):
+            continue
+        code = str(name.get("code") or "")
+        kind = str(name.get("type") or "").lower()
+        if code == "3" or "doing business as" in kind:
+            value = (name.get("organization_name") or "").strip()
+            if value:
+                return value
+    return None
 
 
 def _extract_address(
