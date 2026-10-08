@@ -3,3 +3,6 @@
 deploy/** text eol=lf
 Dockerfile text eol=lf
 docker-compose*.yml text eol=lf
+# Vendored reference standards are pinned by sha256 in manifest.json (SPEC_163): never convert line endings.
+app/ontology/standards/*.json -text
+app/ontology/standards/*.csv -text

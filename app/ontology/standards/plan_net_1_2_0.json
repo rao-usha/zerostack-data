@@ -1,0 +1,3123 @@
+{
+ "fhirVersions": [
+  "4.0.1"
+ ],
+ "license": "CC0-1.0",
+ "package": "hl7.fhir.us.davinci-pdex-plan-net",
+ "profiles": {
+  "plannet-Endpoint": {
+   "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Endpoint",
+   "mustSupport": [
+    {
+     "id": "Endpoint.extension:endpoint-usecase",
+     "max": "*",
+     "min": 0,
+     "path": "Endpoint.extension",
+     "type": [
+      {
+       "code": "Extension",
+       "profile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/endpoint-usecase"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Endpoint.status",
+     "max": "1",
+     "min": 1,
+     "path": "Endpoint.status",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "Endpoint.connectionType",
+     "max": "1",
+     "min": 1,
+     "path": "Endpoint.connectionType",
+     "type": [
+      {
+       "code": "Coding"
+      }
+     ]
+    },
+    {
+     "id": "Endpoint.name",
+     "max": "1",
+     "min": 0,
+     "path": "Endpoint.name",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Endpoint.managingOrganization",
+     "max": "1",
+     "min": 0,
+     "path": "Endpoint.managingOrganization",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Organization"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Endpoint.contact",
+     "max": "*",
+     "min": 0,
+     "path": "Endpoint.contact",
+     "type": [
+      {
+       "code": "ContactPoint"
+      }
+     ]
+    },
+    {
+     "id": "Endpoint.contact.system",
+     "max": "1",
+     "min": 0,
+     "path": "Endpoint.contact.system",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "Endpoint.contact.value",
+     "max": "1",
+     "min": 0,
+     "path": "Endpoint.contact.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Endpoint.payloadType",
+     "max": "1",
+     "min": 1,
+     "path": "Endpoint.payloadType",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "Endpoint.payloadMimeType",
+     "max": "*",
+     "min": 0,
+     "path": "Endpoint.payloadMimeType",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "Endpoint.address",
+     "max": "1",
+     "min": 1,
+     "path": "Endpoint.address",
+     "type": [
+      {
+       "code": "url"
+      }
+     ]
+    }
+   ],
+   "references": [
+    {
+     "id": "Endpoint.managingOrganization",
+     "mustSupport": true,
+     "path": "Endpoint.managingOrganization",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Organization"
+     ]
+    }
+   ],
+   "title": "Plan-Net Endpoint",
+   "type": "Endpoint",
+   "url": "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Endpoint"
+  },
+  "plannet-HealthcareService": {
+   "baseDefinition": "http://hl7.org/fhir/StructureDefinition/HealthcareService",
+   "mustSupport": [
+    {
+     "id": "HealthcareService.extension:newpatients",
+     "max": "*",
+     "min": 0,
+     "path": "HealthcareService.extension",
+     "type": [
+      {
+       "code": "Extension",
+       "profile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/newpatients"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.extension:deliverymethod",
+     "max": "*",
+     "min": 0,
+     "path": "HealthcareService.extension",
+     "type": [
+      {
+       "code": "Extension",
+       "profile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/delivery-method"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.identifier.type",
+     "max": "1",
+     "min": 0,
+     "path": "HealthcareService.identifier.type",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.identifier.value",
+     "max": "1",
+     "min": 0,
+     "path": "HealthcareService.identifier.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.active",
+     "max": "1",
+     "min": 1,
+     "path": "HealthcareService.active",
+     "type": [
+      {
+       "code": "boolean"
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.providedBy",
+     "max": "1",
+     "min": 0,
+     "path": "HealthcareService.providedBy",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Organization"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.category",
+     "max": "*",
+     "min": 1,
+     "path": "HealthcareService.category",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.category:plan-net-category",
+     "max": "1",
+     "min": 0,
+     "path": "HealthcareService.category",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.type",
+     "max": "*",
+     "min": 0,
+     "path": "HealthcareService.type",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.specialty",
+     "max": "*",
+     "min": 0,
+     "path": "HealthcareService.specialty",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.location",
+     "max": "*",
+     "min": 0,
+     "path": "HealthcareService.location",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Location"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.name",
+     "max": "1",
+     "min": 0,
+     "path": "HealthcareService.name",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.comment",
+     "max": "1",
+     "min": 0,
+     "path": "HealthcareService.comment",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.telecom",
+     "max": "*",
+     "min": 0,
+     "path": "HealthcareService.telecom",
+     "type": [
+      {
+       "code": "ContactPoint"
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.telecom.extension:contactpoint-availabletime",
+     "max": "*",
+     "min": 0,
+     "path": "HealthcareService.telecom.extension",
+     "type": [
+      {
+       "code": "Extension",
+       "profile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/contactpoint-availabletime"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.telecom.extension:via-intermediary",
+     "max": "*",
+     "min": 0,
+     "path": "HealthcareService.telecom.extension",
+     "type": [
+      {
+       "code": "Extension",
+       "profile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/via-intermediary"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.telecom.system",
+     "max": "1",
+     "min": 0,
+     "path": "HealthcareService.telecom.system",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.telecom.value",
+     "max": "1",
+     "min": 0,
+     "path": "HealthcareService.telecom.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.coverageArea",
+     "max": "*",
+     "min": 0,
+     "path": "HealthcareService.coverageArea",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Location"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.appointmentRequired",
+     "max": "1",
+     "min": 0,
+     "path": "HealthcareService.appointmentRequired",
+     "type": [
+      {
+       "code": "boolean"
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.availableTime",
+     "max": "*",
+     "min": 0,
+     "path": "HealthcareService.availableTime",
+     "type": [
+      {
+       "code": "BackboneElement"
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.availableTime.daysOfWeek",
+     "max": "*",
+     "min": 0,
+     "path": "HealthcareService.availableTime.daysOfWeek",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.availableTime.allDay",
+     "max": "1",
+     "min": 0,
+     "path": "HealthcareService.availableTime.allDay",
+     "type": [
+      {
+       "code": "boolean"
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.availableTime.availableStartTime",
+     "max": "1",
+     "min": 0,
+     "path": "HealthcareService.availableTime.availableStartTime",
+     "type": [
+      {
+       "code": "time"
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.availableTime.availableEndTime",
+     "max": "1",
+     "min": 0,
+     "path": "HealthcareService.availableTime.availableEndTime",
+     "type": [
+      {
+       "code": "time"
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.notAvailable",
+     "max": "*",
+     "min": 0,
+     "path": "HealthcareService.notAvailable",
+     "type": [
+      {
+       "code": "BackboneElement"
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.notAvailable.description",
+     "max": "1",
+     "min": 1,
+     "path": "HealthcareService.notAvailable.description",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.notAvailable.during",
+     "max": "1",
+     "min": 0,
+     "path": "HealthcareService.notAvailable.during",
+     "type": [
+      {
+       "code": "Period"
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.availabilityExceptions",
+     "max": "1",
+     "min": 0,
+     "path": "HealthcareService.availabilityExceptions",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "HealthcareService.endpoint",
+     "max": "*",
+     "min": 0,
+     "path": "HealthcareService.endpoint",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Endpoint"
+       ]
+      }
+     ]
+    }
+   ],
+   "references": [
+    {
+     "id": "HealthcareService.identifier.assigner",
+     "mustSupport": false,
+     "path": "HealthcareService.identifier.assigner",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Organization"
+     ]
+    },
+    {
+     "id": "HealthcareService.providedBy",
+     "mustSupport": true,
+     "path": "HealthcareService.providedBy",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Organization"
+     ]
+    },
+    {
+     "id": "HealthcareService.location",
+     "mustSupport": true,
+     "path": "HealthcareService.location",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Location"
+     ]
+    },
+    {
+     "id": "HealthcareService.coverageArea",
+     "mustSupport": true,
+     "path": "HealthcareService.coverageArea",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Location"
+     ]
+    },
+    {
+     "id": "HealthcareService.endpoint",
+     "mustSupport": true,
+     "path": "HealthcareService.endpoint",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Endpoint"
+     ]
+    }
+   ],
+   "title": "Plan-Net HealthcareService",
+   "type": "HealthcareService",
+   "url": "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-HealthcareService"
+  },
+  "plannet-InsurancePlan": {
+   "baseDefinition": "http://hl7.org/fhir/StructureDefinition/InsurancePlan",
+   "mustSupport": [
+    {
+     "id": "InsurancePlan.identifier.type",
+     "max": "1",
+     "min": 0,
+     "path": "InsurancePlan.identifier.type",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "InsurancePlan.identifier.value",
+     "max": "1",
+     "min": 0,
+     "path": "InsurancePlan.identifier.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "InsurancePlan.identifier.assigner",
+     "max": "1",
+     "min": 0,
+     "path": "InsurancePlan.identifier.assigner",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/StructureDefinition/Organization"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "InsurancePlan.status",
+     "max": "1",
+     "min": 1,
+     "path": "InsurancePlan.status",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "InsurancePlan.type",
+     "max": "1",
+     "min": 1,
+     "path": "InsurancePlan.type",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "InsurancePlan.name",
+     "max": "1",
+     "min": 0,
+     "path": "InsurancePlan.name",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "InsurancePlan.alias",
+     "max": "*",
+     "min": 0,
+     "path": "InsurancePlan.alias",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "InsurancePlan.period",
+     "max": "1",
+     "min": 0,
+     "path": "InsurancePlan.period",
+     "type": [
+      {
+       "code": "Period"
+      }
+     ]
+    },
+    {
+     "id": "InsurancePlan.ownedBy",
+     "max": "1",
+     "min": 1,
+     "path": "InsurancePlan.ownedBy",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Organization"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "InsurancePlan.administeredBy",
+     "max": "1",
+     "min": 1,
+     "path": "InsurancePlan.administeredBy",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Organization"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "InsurancePlan.coverageArea",
+     "max": "*",
+     "min": 0,
+     "path": "InsurancePlan.coverageArea",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Location"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "InsurancePlan.contact",
+     "max": "*",
+     "min": 0,
+     "path": "InsurancePlan.contact",
+     "type": [
+      {
+       "code": "BackboneElement"
+      }
+     ]
+    },
+    {
+     "id": "InsurancePlan.contact.name",
+     "max": "1",
+     "min": 0,
+     "path": "InsurancePlan.contact.name",
+     "type": [
+      {
+       "code": "HumanName"
+      }
+     ]
+    },
+    {
+     "id": "InsurancePlan.contact.name.text",
+     "max": "1",
+     "min": 0,
+     "path": "InsurancePlan.contact.name.text",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "InsurancePlan.contact.telecom",
+     "max": "*",
+     "min": 0,
+     "path": "InsurancePlan.contact.telecom",
+     "type": [
+      {
+       "code": "ContactPoint"
+      }
+     ]
+    },
+    {
+     "id": "InsurancePlan.contact.telecom.system",
+     "max": "1",
+     "min": 0,
+     "path": "InsurancePlan.contact.telecom.system",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "InsurancePlan.contact.telecom.value",
+     "max": "1",
+     "min": 0,
+     "path": "InsurancePlan.contact.telecom.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "InsurancePlan.endpoint",
+     "max": "*",
+     "min": 0,
+     "path": "InsurancePlan.endpoint",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Endpoint"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "InsurancePlan.network",
+     "max": "*",
+     "min": 0,
+     "path": "InsurancePlan.network",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Network"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "InsurancePlan.plan.type",
+     "max": "1",
+     "min": 0,
+     "path": "InsurancePlan.plan.type",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "InsurancePlan.plan.coverageArea",
+     "max": "*",
+     "min": 0,
+     "path": "InsurancePlan.plan.coverageArea",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Location"
+       ]
+      }
+     ]
+    }
+   ],
+   "references": [
+    {
+     "id": "InsurancePlan.identifier.assigner",
+     "mustSupport": true,
+     "path": "InsurancePlan.identifier.assigner",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Organization"
+     ]
+    },
+    {
+     "id": "InsurancePlan.ownedBy",
+     "mustSupport": true,
+     "path": "InsurancePlan.ownedBy",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Organization"
+     ]
+    },
+    {
+     "id": "InsurancePlan.administeredBy",
+     "mustSupport": true,
+     "path": "InsurancePlan.administeredBy",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Organization"
+     ]
+    },
+    {
+     "id": "InsurancePlan.coverageArea",
+     "mustSupport": true,
+     "path": "InsurancePlan.coverageArea",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Location"
+     ]
+    },
+    {
+     "id": "InsurancePlan.endpoint",
+     "mustSupport": true,
+     "path": "InsurancePlan.endpoint",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Endpoint"
+     ]
+    },
+    {
+     "id": "InsurancePlan.network",
+     "mustSupport": true,
+     "path": "InsurancePlan.network",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Network"
+     ]
+    },
+    {
+     "id": "InsurancePlan.coverage.network",
+     "mustSupport": false,
+     "path": "InsurancePlan.coverage.network",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Organization"
+     ]
+    },
+    {
+     "id": "InsurancePlan.plan.coverageArea",
+     "mustSupport": true,
+     "path": "InsurancePlan.plan.coverageArea",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Location"
+     ]
+    },
+    {
+     "id": "InsurancePlan.plan.network",
+     "mustSupport": false,
+     "path": "InsurancePlan.plan.network",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Network"
+     ]
+    }
+   ],
+   "title": "Plan-Net InsurancePlan",
+   "type": "InsurancePlan",
+   "url": "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-InsurancePlan"
+  },
+  "plannet-Location": {
+   "baseDefinition": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location",
+   "mustSupport": [
+    {
+     "id": "Location.extension:newpatients",
+     "max": "*",
+     "min": 0,
+     "path": "Location.extension",
+     "type": [
+      {
+       "code": "Extension",
+       "profile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/newpatients"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Location.extension:accessibility",
+     "max": "*",
+     "min": 0,
+     "path": "Location.extension",
+     "type": [
+      {
+       "code": "Extension",
+       "profile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/accessibility"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Location.extension:region",
+     "max": "1",
+     "min": 0,
+     "path": "Location.extension",
+     "type": [
+      {
+       "code": "Extension",
+       "profile": [
+        "http://hl7.org/fhir/StructureDefinition/location-boundary-geojson"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Location.identifier",
+     "max": "*",
+     "min": 0,
+     "path": "Location.identifier",
+     "type": [
+      {
+       "code": "Identifier"
+      }
+     ]
+    },
+    {
+     "id": "Location.identifier.type",
+     "max": "1",
+     "min": 0,
+     "path": "Location.identifier.type",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "Location.identifier.value",
+     "max": "1",
+     "min": 0,
+     "path": "Location.identifier.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Location.status",
+     "max": "1",
+     "min": 1,
+     "path": "Location.status",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "Location.name",
+     "max": "1",
+     "min": 1,
+     "path": "Location.name",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Location.alias",
+     "max": "*",
+     "min": 0,
+     "path": "Location.alias",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Location.description",
+     "max": "1",
+     "min": 0,
+     "path": "Location.description",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Location.type",
+     "max": "*",
+     "min": 0,
+     "path": "Location.type",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "Location.telecom",
+     "max": "*",
+     "min": 0,
+     "path": "Location.telecom",
+     "type": [
+      {
+       "code": "ContactPoint"
+      }
+     ]
+    },
+    {
+     "id": "Location.telecom.extension:contactpoint-availabletime",
+     "max": "*",
+     "min": 0,
+     "path": "Location.telecom.extension",
+     "type": [
+      {
+       "code": "Extension",
+       "profile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/contactpoint-availabletime"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Location.telecom.extension:via-intermediary",
+     "max": "*",
+     "min": 0,
+     "path": "Location.telecom.extension",
+     "type": [
+      {
+       "code": "Extension",
+       "profile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/via-intermediary"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Location.telecom.system",
+     "max": "1",
+     "min": 0,
+     "path": "Location.telecom.system",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "Location.telecom.value",
+     "max": "1",
+     "min": 0,
+     "path": "Location.telecom.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Location.address",
+     "max": "1",
+     "min": 0,
+     "path": "Location.address",
+     "type": [
+      {
+       "code": "Address"
+      }
+     ]
+    },
+    {
+     "id": "Location.address.line",
+     "max": "*",
+     "min": 0,
+     "path": "Location.address.line",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Location.address.city",
+     "max": "1",
+     "min": 0,
+     "path": "Location.address.city",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Location.address.state",
+     "max": "1",
+     "min": 0,
+     "path": "Location.address.state",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Location.address.postalCode",
+     "max": "1",
+     "min": 0,
+     "path": "Location.address.postalCode",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Location.position",
+     "max": "1",
+     "min": 0,
+     "path": "Location.position",
+     "type": [
+      {
+       "code": "BackboneElement"
+      }
+     ]
+    },
+    {
+     "id": "Location.managingOrganization",
+     "max": "1",
+     "min": 0,
+     "path": "Location.managingOrganization",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Organization"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Location.partOf",
+     "max": "1",
+     "min": 0,
+     "path": "Location.partOf",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Location"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Location.hoursOfOperation",
+     "max": "*",
+     "min": 0,
+     "path": "Location.hoursOfOperation",
+     "type": [
+      {
+       "code": "BackboneElement"
+      }
+     ]
+    },
+    {
+     "id": "Location.hoursOfOperation.daysOfWeek",
+     "max": "*",
+     "min": 0,
+     "path": "Location.hoursOfOperation.daysOfWeek",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "Location.hoursOfOperation.allDay",
+     "max": "1",
+     "min": 0,
+     "path": "Location.hoursOfOperation.allDay",
+     "type": [
+      {
+       "code": "boolean"
+      }
+     ]
+    },
+    {
+     "id": "Location.hoursOfOperation.openingTime",
+     "max": "1",
+     "min": 0,
+     "path": "Location.hoursOfOperation.openingTime",
+     "type": [
+      {
+       "code": "time"
+      }
+     ]
+    },
+    {
+     "id": "Location.hoursOfOperation.closingTime",
+     "max": "1",
+     "min": 0,
+     "path": "Location.hoursOfOperation.closingTime",
+     "type": [
+      {
+       "code": "time"
+      }
+     ]
+    },
+    {
+     "id": "Location.availabilityExceptions",
+     "max": "1",
+     "min": 0,
+     "path": "Location.availabilityExceptions",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Location.endpoint",
+     "max": "*",
+     "min": 0,
+     "path": "Location.endpoint",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Endpoint"
+       ]
+      }
+     ]
+    }
+   ],
+   "references": [
+    {
+     "id": "Location.identifier.assigner",
+     "mustSupport": false,
+     "path": "Location.identifier.assigner",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Organization"
+     ]
+    },
+    {
+     "id": "Location.managingOrganization",
+     "mustSupport": true,
+     "path": "Location.managingOrganization",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Organization"
+     ]
+    },
+    {
+     "id": "Location.partOf",
+     "mustSupport": true,
+     "path": "Location.partOf",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Location"
+     ]
+    },
+    {
+     "id": "Location.endpoint",
+     "mustSupport": true,
+     "path": "Location.endpoint",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Endpoint"
+     ]
+    }
+   ],
+   "title": "Plan-Net Location",
+   "type": "Location",
+   "url": "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Location"
+  },
+  "plannet-Network": {
+   "baseDefinition": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization",
+   "mustSupport": [
+    {
+     "id": "Organization.extension:location-reference",
+     "max": "*",
+     "min": 0,
+     "path": "Organization.extension",
+     "type": [
+      {
+       "code": "Extension",
+       "profile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/location-reference"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Organization.identifier",
+     "max": "*",
+     "min": 0,
+     "path": "Organization.identifier",
+     "type": [
+      {
+       "code": "Identifier"
+      }
+     ]
+    },
+    {
+     "id": "Organization.identifier.type",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.identifier.type",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "Organization.identifier.system",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.identifier.system",
+     "type": [
+      {
+       "code": "uri"
+      }
+     ]
+    },
+    {
+     "id": "Organization.identifier.value",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.identifier.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.identifier:NPI",
+     "max": "*",
+     "min": 0,
+     "path": "Organization.identifier",
+     "type": [
+      {
+       "code": "Identifier"
+      }
+     ]
+    },
+    {
+     "id": "Organization.active",
+     "max": "1",
+     "min": 1,
+     "path": "Organization.active",
+     "type": [
+      {
+       "code": "boolean"
+      }
+     ]
+    },
+    {
+     "id": "Organization.type",
+     "max": "1",
+     "min": 1,
+     "path": "Organization.type",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "Organization.name",
+     "max": "1",
+     "min": 1,
+     "path": "Organization.name",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.telecom",
+     "max": "0",
+     "min": 0,
+     "path": "Organization.telecom",
+     "type": [
+      {
+       "code": "ContactPoint"
+      }
+     ]
+    },
+    {
+     "id": "Organization.telecom.system",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.telecom.system",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "Organization.telecom.value",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.telecom.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.address",
+     "max": "*",
+     "min": 0,
+     "path": "Organization.address",
+     "type": [
+      {
+       "code": "Address"
+      }
+     ]
+    },
+    {
+     "id": "Organization.address.line",
+     "max": "4",
+     "min": 0,
+     "path": "Organization.address.line",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.address.city",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.address.city",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.address.state",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.address.state",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.address.postalCode",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.address.postalCode",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.address.country",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.address.country",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.partOf",
+     "max": "1",
+     "min": 1,
+     "path": "Organization.partOf",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Organization"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Organization.contact",
+     "max": "*",
+     "min": 0,
+     "path": "Organization.contact",
+     "type": [
+      {
+       "code": "BackboneElement"
+      }
+     ]
+    },
+    {
+     "id": "Organization.contact.name",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.contact.name",
+     "type": [
+      {
+       "code": "HumanName"
+      }
+     ]
+    },
+    {
+     "id": "Organization.contact.telecom",
+     "max": "*",
+     "min": 0,
+     "path": "Organization.contact.telecom",
+     "type": [
+      {
+       "code": "ContactPoint"
+      }
+     ]
+    },
+    {
+     "id": "Organization.contact.telecom.system",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.contact.telecom.system",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "Organization.contact.telecom.value",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.contact.telecom.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.endpoint",
+     "max": "*",
+     "min": 0,
+     "path": "Organization.endpoint",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Endpoint"
+       ]
+      }
+     ]
+    }
+   ],
+   "references": [
+    {
+     "id": "Organization.identifier.assigner",
+     "mustSupport": false,
+     "path": "Organization.identifier.assigner",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Organization"
+     ]
+    },
+    {
+     "id": "Organization.partOf",
+     "mustSupport": true,
+     "path": "Organization.partOf",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Organization"
+     ]
+    },
+    {
+     "id": "Organization.endpoint",
+     "mustSupport": true,
+     "path": "Organization.endpoint",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Endpoint"
+     ]
+    }
+   ],
+   "title": "Plan-Net Network",
+   "type": "Organization",
+   "url": "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Network"
+  },
+  "plannet-Organization": {
+   "baseDefinition": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization",
+   "mustSupport": [
+    {
+     "id": "Organization.extension:qualification",
+     "max": "*",
+     "min": 0,
+     "path": "Organization.extension",
+     "type": [
+      {
+       "code": "Extension",
+       "profile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/qualification"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Organization.extension:org-description",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.extension",
+     "type": [
+      {
+       "code": "Extension",
+       "profile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/org-description"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Organization.extension:org-period",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.extension",
+     "type": [
+      {
+       "code": "Extension",
+       "profile": [
+        "http://hl7.org/fhir/StructureDefinition/organization-period"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Organization.identifier",
+     "max": "*",
+     "min": 0,
+     "path": "Organization.identifier",
+     "type": [
+      {
+       "code": "Identifier"
+      }
+     ]
+    },
+    {
+     "id": "Organization.identifier.type",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.identifier.type",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "Organization.identifier.system",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.identifier.system",
+     "type": [
+      {
+       "code": "uri"
+      }
+     ]
+    },
+    {
+     "id": "Organization.identifier.value",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.identifier.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.identifier:NPI",
+     "max": "*",
+     "min": 0,
+     "path": "Organization.identifier",
+     "type": [
+      {
+       "code": "Identifier"
+      }
+     ]
+    },
+    {
+     "id": "Organization.active",
+     "max": "1",
+     "min": 1,
+     "path": "Organization.active",
+     "type": [
+      {
+       "code": "boolean"
+      }
+     ]
+    },
+    {
+     "id": "Organization.type",
+     "max": "*",
+     "min": 1,
+     "path": "Organization.type",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "Organization.name",
+     "max": "1",
+     "min": 1,
+     "path": "Organization.name",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.telecom",
+     "max": "*",
+     "min": 0,
+     "path": "Organization.telecom",
+     "type": [
+      {
+       "code": "ContactPoint"
+      }
+     ]
+    },
+    {
+     "id": "Organization.telecom.extension:contactpoint-availabletime",
+     "max": "*",
+     "min": 0,
+     "path": "Organization.telecom.extension",
+     "type": [
+      {
+       "code": "Extension",
+       "profile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/contactpoint-availabletime"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Organization.telecom.extension:via-intermediary",
+     "max": "*",
+     "min": 0,
+     "path": "Organization.telecom.extension",
+     "type": [
+      {
+       "code": "Extension",
+       "profile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/via-intermediary"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Organization.telecom.system",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.telecom.system",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "Organization.telecom.value",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.telecom.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.telecom.rank",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.telecom.rank",
+     "type": [
+      {
+       "code": "positiveInt"
+      }
+     ]
+    },
+    {
+     "id": "Organization.address",
+     "max": "*",
+     "min": 1,
+     "path": "Organization.address",
+     "type": [
+      {
+       "code": "Address"
+      }
+     ]
+    },
+    {
+     "id": "Organization.address.extension:geolocation",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.address.extension",
+     "type": [
+      {
+       "code": "Extension",
+       "profile": [
+        "http://hl7.org/fhir/StructureDefinition/geolocation"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Organization.address.type",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.address.type",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "Organization.address.text",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.address.text",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.address.line",
+     "max": "4",
+     "min": 0,
+     "path": "Organization.address.line",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.address.city",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.address.city",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.address.state",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.address.state",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.address.postalCode",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.address.postalCode",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.address.country",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.address.country",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.partOf",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.partOf",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Organization"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Organization.contact",
+     "max": "*",
+     "min": 0,
+     "path": "Organization.contact",
+     "type": [
+      {
+       "code": "BackboneElement"
+      }
+     ]
+    },
+    {
+     "id": "Organization.contact.telecom",
+     "max": "*",
+     "min": 0,
+     "path": "Organization.contact.telecom",
+     "type": [
+      {
+       "code": "ContactPoint"
+      }
+     ]
+    },
+    {
+     "id": "Organization.contact.telecom.system",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.contact.telecom.system",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "Organization.contact.telecom.value",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.contact.telecom.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.contact.telecom.use",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.contact.telecom.use",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "Organization.endpoint",
+     "max": "*",
+     "min": 0,
+     "path": "Organization.endpoint",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/StructureDefinition/Endpoint"
+       ]
+      }
+     ]
+    }
+   ],
+   "references": [
+    {
+     "id": "Organization.identifier.assigner",
+     "mustSupport": false,
+     "path": "Organization.identifier.assigner",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Organization"
+     ]
+    },
+    {
+     "id": "Organization.partOf",
+     "mustSupport": true,
+     "path": "Organization.partOf",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Organization"
+     ]
+    },
+    {
+     "id": "Organization.endpoint",
+     "mustSupport": true,
+     "path": "Organization.endpoint",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Endpoint"
+     ]
+    }
+   ],
+   "title": "Plan-Net Organization",
+   "type": "Organization",
+   "url": "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Organization"
+  },
+  "plannet-OrganizationAffiliation": {
+   "baseDefinition": "http://hl7.org/fhir/StructureDefinition/OrganizationAffiliation",
+   "mustSupport": [
+    {
+     "id": "OrganizationAffiliation.identifier.type",
+     "max": "1",
+     "min": 0,
+     "path": "OrganizationAffiliation.identifier.type",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "OrganizationAffiliation.identifier.value",
+     "max": "1",
+     "min": 0,
+     "path": "OrganizationAffiliation.identifier.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "OrganizationAffiliation.active",
+     "max": "1",
+     "min": 1,
+     "path": "OrganizationAffiliation.active",
+     "type": [
+      {
+       "code": "boolean"
+      }
+     ]
+    },
+    {
+     "id": "OrganizationAffiliation.period",
+     "max": "1",
+     "min": 0,
+     "path": "OrganizationAffiliation.period",
+     "type": [
+      {
+       "code": "Period"
+      }
+     ]
+    },
+    {
+     "id": "OrganizationAffiliation.organization",
+     "max": "1",
+     "min": 0,
+     "path": "OrganizationAffiliation.organization",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Organization"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "OrganizationAffiliation.participatingOrganization",
+     "max": "1",
+     "min": 0,
+     "path": "OrganizationAffiliation.participatingOrganization",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Organization"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "OrganizationAffiliation.network",
+     "max": "*",
+     "min": 0,
+     "path": "OrganizationAffiliation.network",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Network"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "OrganizationAffiliation.code",
+     "max": "*",
+     "min": 0,
+     "path": "OrganizationAffiliation.code",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "OrganizationAffiliation.specialty",
+     "max": "*",
+     "min": 0,
+     "path": "OrganizationAffiliation.specialty",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "OrganizationAffiliation.location",
+     "max": "*",
+     "min": 0,
+     "path": "OrganizationAffiliation.location",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Location"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "OrganizationAffiliation.healthcareService",
+     "max": "*",
+     "min": 0,
+     "path": "OrganizationAffiliation.healthcareService",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-HealthcareService"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "OrganizationAffiliation.telecom",
+     "max": "*",
+     "min": 0,
+     "path": "OrganizationAffiliation.telecom",
+     "type": [
+      {
+       "code": "ContactPoint"
+      }
+     ]
+    },
+    {
+     "id": "OrganizationAffiliation.telecom.system",
+     "max": "1",
+     "min": 0,
+     "path": "OrganizationAffiliation.telecom.system",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "OrganizationAffiliation.telecom.value",
+     "max": "1",
+     "min": 0,
+     "path": "OrganizationAffiliation.telecom.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "OrganizationAffiliation.telecom.rank",
+     "max": "1",
+     "min": 0,
+     "path": "OrganizationAffiliation.telecom.rank",
+     "type": [
+      {
+       "code": "positiveInt"
+      }
+     ]
+    },
+    {
+     "id": "OrganizationAffiliation.endpoint",
+     "max": "*",
+     "min": 0,
+     "path": "OrganizationAffiliation.endpoint",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Endpoint"
+       ]
+      }
+     ]
+    }
+   ],
+   "references": [
+    {
+     "id": "OrganizationAffiliation.identifier.assigner",
+     "mustSupport": false,
+     "path": "OrganizationAffiliation.identifier.assigner",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Organization"
+     ]
+    },
+    {
+     "id": "OrganizationAffiliation.organization",
+     "mustSupport": true,
+     "path": "OrganizationAffiliation.organization",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Organization"
+     ]
+    },
+    {
+     "id": "OrganizationAffiliation.participatingOrganization",
+     "mustSupport": true,
+     "path": "OrganizationAffiliation.participatingOrganization",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Organization"
+     ]
+    },
+    {
+     "id": "OrganizationAffiliation.network",
+     "mustSupport": true,
+     "path": "OrganizationAffiliation.network",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Network"
+     ]
+    },
+    {
+     "id": "OrganizationAffiliation.location",
+     "mustSupport": true,
+     "path": "OrganizationAffiliation.location",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Location"
+     ]
+    },
+    {
+     "id": "OrganizationAffiliation.healthcareService",
+     "mustSupport": true,
+     "path": "OrganizationAffiliation.healthcareService",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-HealthcareService"
+     ]
+    },
+    {
+     "id": "OrganizationAffiliation.endpoint",
+     "mustSupport": true,
+     "path": "OrganizationAffiliation.endpoint",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Endpoint"
+     ]
+    }
+   ],
+   "title": "Plan-Net OrganizationAffiliation",
+   "type": "OrganizationAffiliation",
+   "url": "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-OrganizationAffiliation"
+  },
+  "plannet-Practitioner": {
+   "baseDefinition": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-practitioner",
+   "mustSupport": [
+    {
+     "id": "Practitioner.identifier",
+     "max": "*",
+     "min": 1,
+     "path": "Practitioner.identifier",
+     "type": [
+      {
+       "code": "Identifier"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.identifier.type",
+     "max": "1",
+     "min": 0,
+     "path": "Practitioner.identifier.type",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.identifier.system",
+     "max": "1",
+     "min": 1,
+     "path": "Practitioner.identifier.system",
+     "type": [
+      {
+       "code": "uri"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.identifier.value",
+     "max": "1",
+     "min": 1,
+     "path": "Practitioner.identifier.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.identifier:NPI",
+     "max": "*",
+     "min": 0,
+     "path": "Practitioner.identifier",
+     "type": [
+      {
+       "code": "Identifier"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.active",
+     "max": "1",
+     "min": 1,
+     "path": "Practitioner.active",
+     "type": [
+      {
+       "code": "boolean"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.name",
+     "max": "*",
+     "min": 1,
+     "path": "Practitioner.name",
+     "type": [
+      {
+       "code": "HumanName"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.name.text",
+     "max": "1",
+     "min": 0,
+     "path": "Practitioner.name.text",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.name.family",
+     "max": "1",
+     "min": 1,
+     "path": "Practitioner.name.family",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.name.given",
+     "max": "*",
+     "min": 0,
+     "path": "Practitioner.name.given",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.telecom",
+     "max": "*",
+     "min": 0,
+     "path": "Practitioner.telecom",
+     "type": [
+      {
+       "code": "ContactPoint"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.telecom.system",
+     "max": "1",
+     "min": 0,
+     "path": "Practitioner.telecom.system",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.telecom.value",
+     "max": "1",
+     "min": 0,
+     "path": "Practitioner.telecom.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.address",
+     "max": "*",
+     "min": 0,
+     "path": "Practitioner.address",
+     "type": [
+      {
+       "code": "Address"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.address.extension:geolocation",
+     "max": "1",
+     "min": 0,
+     "path": "Practitioner.address.extension",
+     "type": [
+      {
+       "code": "Extension",
+       "profile": [
+        "http://hl7.org/fhir/StructureDefinition/geolocation"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.address.line",
+     "max": "4",
+     "min": 0,
+     "path": "Practitioner.address.line",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.address.city",
+     "max": "1",
+     "min": 0,
+     "path": "Practitioner.address.city",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.address.state",
+     "max": "1",
+     "min": 0,
+     "path": "Practitioner.address.state",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.address.postalCode",
+     "max": "1",
+     "min": 0,
+     "path": "Practitioner.address.postalCode",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.address.country",
+     "max": "1",
+     "min": 0,
+     "path": "Practitioner.address.country",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.qualification",
+     "max": "*",
+     "min": 0,
+     "path": "Practitioner.qualification",
+     "type": [
+      {
+       "code": "BackboneElement"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.qualification.extension:practitioner-qualification",
+     "max": "1",
+     "min": 0,
+     "path": "Practitioner.qualification.extension",
+     "type": [
+      {
+       "code": "Extension",
+       "profile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/practitioner-qualification"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.qualification.identifier",
+     "max": "*",
+     "min": 0,
+     "path": "Practitioner.qualification.identifier",
+     "type": [
+      {
+       "code": "Identifier"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.qualification.code",
+     "max": "1",
+     "min": 1,
+     "path": "Practitioner.qualification.code",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.qualification.period",
+     "max": "1",
+     "min": 0,
+     "path": "Practitioner.qualification.period",
+     "type": [
+      {
+       "code": "Period"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.qualification.issuer",
+     "max": "1",
+     "min": 0,
+     "path": "Practitioner.qualification.issuer",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/StructureDefinition/Organization"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.communication",
+     "max": "*",
+     "min": 0,
+     "path": "Practitioner.communication",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.communication.extension:communication-proficiency",
+     "max": "1",
+     "min": 0,
+     "path": "Practitioner.communication.extension",
+     "type": [
+      {
+       "code": "Extension",
+       "profile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/communication-proficiency"
+       ]
+      }
+     ]
+    }
+   ],
+   "references": [
+    {
+     "id": "Practitioner.identifier.assigner",
+     "mustSupport": false,
+     "path": "Practitioner.identifier.assigner",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Organization"
+     ]
+    },
+    {
+     "id": "Practitioner.qualification.issuer",
+     "mustSupport": true,
+     "path": "Practitioner.qualification.issuer",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Organization"
+     ]
+    }
+   ],
+   "title": "Plan-Net Practitioner",
+   "type": "Practitioner",
+   "url": "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Practitioner"
+  },
+  "plannet-PractitionerRole": {
+   "baseDefinition": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-practitionerrole",
+   "mustSupport": [
+    {
+     "id": "PractitionerRole.extension:newpatients",
+     "max": "*",
+     "min": 0,
+     "path": "PractitionerRole.extension",
+     "type": [
+      {
+       "code": "Extension",
+       "profile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/newpatients"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.extension:network-reference",
+     "max": "1",
+     "min": 0,
+     "path": "PractitionerRole.extension",
+     "type": [
+      {
+       "code": "Extension",
+       "profile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/network-reference"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.extension:qualification",
+     "max": "*",
+     "min": 0,
+     "path": "PractitionerRole.extension",
+     "type": [
+      {
+       "code": "Extension",
+       "profile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/qualification"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.extension:qualification.extension:identifier",
+     "max": "*",
+     "min": 0,
+     "path": "PractitionerRole.extension.extension",
+     "type": [
+      {
+       "code": "Extension"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.extension:qualification.extension:code",
+     "max": "1",
+     "min": 1,
+     "path": "PractitionerRole.extension.extension",
+     "type": [
+      {
+       "code": "Extension"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.extension:qualification.extension:issuer",
+     "max": "1",
+     "min": 0,
+     "path": "PractitionerRole.extension.extension",
+     "type": [
+      {
+       "code": "Extension"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.extension:qualification.extension:status",
+     "max": "1",
+     "min": 1,
+     "path": "PractitionerRole.extension.extension",
+     "type": [
+      {
+       "code": "Extension"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.extension:qualification.extension:period",
+     "max": "1",
+     "min": 0,
+     "path": "PractitionerRole.extension.extension",
+     "type": [
+      {
+       "code": "Extension"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.extension:qualification.extension:whereValid",
+     "max": "*",
+     "min": 0,
+     "path": "PractitionerRole.extension.extension",
+     "type": [
+      {
+       "code": "Extension"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.identifier.type",
+     "max": "1",
+     "min": 0,
+     "path": "PractitionerRole.identifier.type",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.identifier.value",
+     "max": "1",
+     "min": 0,
+     "path": "PractitionerRole.identifier.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.active",
+     "max": "1",
+     "min": 1,
+     "path": "PractitionerRole.active",
+     "type": [
+      {
+       "code": "boolean"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.period",
+     "max": "1",
+     "min": 0,
+     "path": "PractitionerRole.period",
+     "type": [
+      {
+       "code": "Period"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.practitioner",
+     "max": "1",
+     "min": 0,
+     "path": "PractitionerRole.practitioner",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Practitioner"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.organization",
+     "max": "1",
+     "min": 0,
+     "path": "PractitionerRole.organization",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Organization"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.code",
+     "max": "*",
+     "min": 0,
+     "path": "PractitionerRole.code",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.specialty",
+     "max": "*",
+     "min": 0,
+     "path": "PractitionerRole.specialty",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.location",
+     "max": "*",
+     "min": 0,
+     "path": "PractitionerRole.location",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Location"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.healthcareService",
+     "max": "*",
+     "min": 0,
+     "path": "PractitionerRole.healthcareService",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-HealthcareService"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.telecom",
+     "max": "*",
+     "min": 0,
+     "path": "PractitionerRole.telecom",
+     "type": [
+      {
+       "code": "ContactPoint"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.telecom.extension:contactpoint-availabletime",
+     "max": "*",
+     "min": 0,
+     "path": "PractitionerRole.telecom.extension",
+     "type": [
+      {
+       "code": "Extension",
+       "profile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/contactpoint-availabletime"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.telecom.extension:via-intermediary",
+     "max": "*",
+     "min": 0,
+     "path": "PractitionerRole.telecom.extension",
+     "type": [
+      {
+       "code": "Extension",
+       "profile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/via-intermediary"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.telecom.system",
+     "max": "1",
+     "min": 1,
+     "path": "PractitionerRole.telecom.system",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.telecom.value",
+     "max": "1",
+     "min": 1,
+     "path": "PractitionerRole.telecom.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.telecom.rank",
+     "max": "1",
+     "min": 0,
+     "path": "PractitionerRole.telecom.rank",
+     "type": [
+      {
+       "code": "positiveInt"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.availableTime",
+     "max": "*",
+     "min": 0,
+     "path": "PractitionerRole.availableTime",
+     "type": [
+      {
+       "code": "BackboneElement"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.availableTime.daysOfWeek",
+     "max": "*",
+     "min": 0,
+     "path": "PractitionerRole.availableTime.daysOfWeek",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.availableTime.allDay",
+     "max": "1",
+     "min": 0,
+     "path": "PractitionerRole.availableTime.allDay",
+     "type": [
+      {
+       "code": "boolean"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.availableTime.availableStartTime",
+     "max": "1",
+     "min": 0,
+     "path": "PractitionerRole.availableTime.availableStartTime",
+     "type": [
+      {
+       "code": "time"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.availableTime.availableEndTime",
+     "max": "1",
+     "min": 0,
+     "path": "PractitionerRole.availableTime.availableEndTime",
+     "type": [
+      {
+       "code": "time"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.notAvailable",
+     "max": "*",
+     "min": 0,
+     "path": "PractitionerRole.notAvailable",
+     "type": [
+      {
+       "code": "BackboneElement"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.notAvailable.description",
+     "max": "1",
+     "min": 1,
+     "path": "PractitionerRole.notAvailable.description",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.notAvailable.during",
+     "max": "1",
+     "min": 0,
+     "path": "PractitionerRole.notAvailable.during",
+     "type": [
+      {
+       "code": "Period"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.endpoint",
+     "max": "*",
+     "min": 0,
+     "path": "PractitionerRole.endpoint",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Endpoint"
+       ]
+      }
+     ]
+    }
+   ],
+   "references": [
+    {
+     "id": "PractitionerRole.extension:qualification.extension:issuer.value[x]",
+     "mustSupport": false,
+     "path": "PractitionerRole.extension.extension.value[x]",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Organization"
+     ]
+    },
+    {
+     "id": "PractitionerRole.extension:qualification.extension:whereValid.value[x]",
+     "mustSupport": false,
+     "path": "PractitionerRole.extension.extension.value[x]",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Location"
+     ]
+    },
+    {
+     "id": "PractitionerRole.identifier.assigner",
+     "mustSupport": false,
+     "path": "PractitionerRole.identifier.assigner",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Organization"
+     ]
+    },
+    {
+     "id": "PractitionerRole.practitioner",
+     "mustSupport": true,
+     "path": "PractitionerRole.practitioner",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Practitioner"
+     ]
+    },
+    {
+     "id": "PractitionerRole.organization",
+     "mustSupport": true,
+     "path": "PractitionerRole.organization",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Organization"
+     ]
+    },
+    {
+     "id": "PractitionerRole.location",
+     "mustSupport": true,
+     "path": "PractitionerRole.location",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Location"
+     ]
+    },
+    {
+     "id": "PractitionerRole.healthcareService",
+     "mustSupport": true,
+     "path": "PractitionerRole.healthcareService",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-HealthcareService"
+     ]
+    },
+    {
+     "id": "PractitionerRole.endpoint",
+     "mustSupport": true,
+     "path": "PractitionerRole.endpoint",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-Endpoint"
+     ]
+    }
+   ],
+   "title": "Plan-Net PractitionerRole",
+   "type": "PractitionerRole",
+   "url": "http://hl7.org/fhir/us/davinci-pdex-plan-net/StructureDefinition/plannet-PractitionerRole"
+  }
+ },
+ "version": "1.2.0"
+}

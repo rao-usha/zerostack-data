@@ -47,6 +47,11 @@ APPROVED = {
     "epa_echo_facilities": "https://echo.epa.gov/resources/echo-data/about-the-data",
 }
 HELD = {"bts_vmt"}
+# Later specs that changed only the (unhashed) notes of a block outside the 30: pinned below.
+NOTES_ONLY_AFTER = {
+    "nppes_providers": "SPEC_163: NUCC taxonomy terms (AMA copyright, D9 internal-only) recorded",
+    "cms_medicare_utilization": "SPEC_163: CPT/AMA note points at the licence guard",
+}
 # Approved, then held at sign-off (2026-10-04): the OpenFEMA terms add a
 # "used solely for statistical research" clause the user had not seen. Their
 # blocks are the approved ones; only the sign-off waits for the user.
@@ -202,7 +207,17 @@ class TestNothingElseChanged:
         before, cat = _before(), _catalog()
         assert set(cat) == set(before)
         changed = {k for k, s in cat.items() if _now(s) != before[k]}
-        assert changed == set(APPROVED), sorted(changed ^ set(APPROVED))
+        expected = set(APPROVED) | set(NOTES_ONLY_AFTER)
+        assert changed == expected, sorted(changed ^ expected)
+
+    def test_later_notes_only(self):
+        """SPEC_163: only ``notes`` (not a hashed field) differs on these blocks."""
+        before, cat = _before(), _catalog()
+        for key in NOTES_ONLY_AFTER:
+            b, n = before[key], _now(cat[key])
+            diff = {f for f in set(b) | set(n) if b.get(f) != n.get(f)}
+            assert diff == {"notes"}, (key, diff)
+            assert n["notes"].startswith(b["notes"]), key  # appended, nothing removed
 
     def test_held_bts_vmt_untouched(self):
         before, cat = _before(), _catalog()
