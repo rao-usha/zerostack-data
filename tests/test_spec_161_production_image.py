@@ -52,7 +52,13 @@ IMPORT_TO_DIST = {
 # Imported directly but installed by a declared parent (not pinned on their own).
 PROVIDED_BY = {"numpy": "pandas", "starlette": "fastapi", "httpcore": "httpx"}
 # Optional at runtime: every use is behind an availability check.
-OPTIONAL_IMPORTS = {"shap": {"app/ml/probability_model.py"}}
+OPTIONAL_IMPORTS = {
+    "shap": {"app/ml/probability_model.py"},
+    # SPEC_164: guarded; ontology falls back to a subset validator / ±30% token estimate
+    "jsonschema": {"app/ontology/jsonschema_lite.py"},
+    "tiktoken": {"app/ontology/tokens.py"},
+    "tokenizers": {"app/ontology/tokens.py"},
+}
 
 
 # ---------------------------------------------------------------------------

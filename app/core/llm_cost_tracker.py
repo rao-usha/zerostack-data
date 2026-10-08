@@ -45,9 +45,21 @@ def _detect_provider(model: str) -> str:
     return "openai"
 
 
+# Models already warned about, so an unknown model logs once per process (D12)
+_WARNED_UNKNOWN_MODELS: set = set()
+
+
 def _calculate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
     """Calculate cost in USD for token usage."""
-    pricing = MODEL_PRICING.get(model, {"input": 0.0, "output": 0.0})
+    pricing = MODEL_PRICING.get(model)
+    if pricing is None:
+        if model not in _WARNED_UNKNOWN_MODELS:
+            _WARNED_UNKNOWN_MODELS.add(model)
+            logger.warning(
+                f"[LLMCostTracker] no price for model {model!r}; recording $0 cost. "
+                "Add it to MODEL_PRICING or pass cost_usd= to record()."
+            )
+        pricing = {"input": 0.0, "output": 0.0}
     input_cost = (input_tokens / 1_000_000) * pricing["input"]
     output_cost = (output_tokens / 1_000_000) * pricing["output"]
     return input_cost + output_cost
