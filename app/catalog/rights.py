@@ -284,8 +284,17 @@ SOURCE_RIGHTS: Dict[str, SourceRights] = {
     "cms": _usg("Centers for Medicare & Medicaid Services",
                 **_cite("https://www.cms.gov/Research-Statistics-Data-and-Systems/Downloadable-Public-Use-Files/Cost-Reports",
                         None, "medium")),
+    # SPEC_163: the taxonomy columns carry NUCC Health Care Provider Taxonomy content (AMA
+    # copyright). Notes only: notes are not a hashed rights field, and nppes is not in REVIEWED.
     "nppes": _usg("CMS NPPES NPI Registry", "personal",
-                  "Individual providers are natural persons (name, practice address).",
+                  "Individual providers are natural persons (name, practice address). The taxonomy "
+                  "columns (taxonomy_code / taxonomy_description) carry the NUCC Health Care Provider "
+                  "Taxonomy code set, 'Copyright 2026 American Medical Association'; NUCC: 'For commercial "
+                  "use, including sales or licensing, a license must be obtained from this web site.' "
+                  "Owner decision D9 (PLAN_100, 2026-10-08): NUCC content is used INTERNALLY only; the NUCC "
+                  "commercial licence is requested before any external release of taxonomy codes or "
+                  "descriptions (customer export, published ontology, public API). See "
+                  "REFERENCE_STANDARD_RIGHTS['nucc_taxonomy'].",
                   **_cite("https://www.cms.gov/medicare/regulations-guidance/administrative-simplification/data-dissemination",
                           "The information disclosed on the NPI Registry and in the downloadable files are "
                           "FOIA-disclosable ... There is no charge to download the NPPES file", "high")),
@@ -915,7 +924,10 @@ DATASET_RIGHTS: Dict[str, SourceRights] = {
         commercial_use="agreement_required",
         notes="Rendering providers are individual physicians (name, gender, NPI). All rows carry CPT "
               "descriptors (hcpcs_desc): redistribution needs an AMA distribution licence, or strip Level I "
-              "codes and descriptors from any external surface.",
+              "codes and descriptors from any external surface. SPEC_163 (PLAN_100 §3, §5.4): hcpcs_desc "
+              "(AMA CPT descriptors) never reaches an LLM prompt or output; Level I codes are join values "
+              "only. app.ontology.standards.licence_guard detects CPT codes/descriptors and SNOMED IDs "
+              "to block them.",
         **_cite("https://data.cms.gov/provider-summary-by-type-of-service/medicare-physician-other-practitioners/medicare-physician-other-practitioners-by-provider-and-service",
                 "CPT codes, descriptions and other data are copyright American Medical Association ... The "
                 "complete CMS AMA CPT License agreement is presented to users when accessing the data.", "high")),
@@ -975,6 +987,87 @@ DATASET_RIGHTS: Dict[str, SourceRights] = {
                                  "terms are not reviewed and are not covered by this block."),
 }
 
+
+# ── SPEC_163: vendored reference standards (app/ontology/standards/manifest.json) ─────────
+# Not datasets (no DatasetSpec, no table): the ontology scorer's answer keys. One block per
+# standard; redistribution here must agree with the manifest ``use`` (tested). Verified live
+# 2026-10-08; quotes verbatim from the cited page (or file).
+_HL7_LICENSE = "https://hl7.org/fhir/R4/license.html"
+_NUCC_CSV_PAGE = "https://www.nucc.org/index.php/code-sets-mainmenu-41/provider-taxonomy-mainmenu-40/csv-mainmenu-57"
+_WHO_ICD_FAQ = ("https://cdn.who.int/media/docs/default-source/publishing-policies/copyright/"
+                "who-faq-licensing-icd-10.pdf")
+REFERENCE_STANDARD_RIGHTS: Dict[str, SourceRights] = {
+    "fhir_r4": SourceRights(
+        "CC0 1.0 (HL7 FHIR R4 licence); third-party terminologies inside the spec are not covered",
+        "open", "none", "official", storage="allowed", commercial_use="allowed", license_url=CC0_URL,
+        attribution="HL7® and FHIR® are trademarks of Health Level Seven International",
+        notes="Never imply HL7 endorsement; do not call a derivative 'FHIR'. SNOMED CT, LOINC, CPT and ICD "
+              "content referenced by the spec is Third Party IP and is not vendored (bindings keep only "
+              "value-set URLs).",
+        **_cite(_HL7_LICENSE,
+                "This document is licensed under Creative Commons \"No Rights Reserved\" ( CC0 ). ... "
+                "Acceptance of these License Terms does not grant any rights with respect to Third Party IP.",
+                "high")),
+    "us_core": SourceRights(
+        "CC0 1.0 (HL7 US Core 9.0.0 package licence)", "open", "none", "official",
+        storage="allowed", commercial_use="allowed", license_url=CC0_URL,
+        notes="package.json and the ImplementationGuide resource both declare CC0-1.0.",
+        **_cite("https://hl7.org/fhir/us/core/STU9/", "\"license\": \"CC0-1.0\"", "high")),
+    "plan_net": SourceRights(
+        "CC0 1.0 (HL7 Da Vinci PDex Plan-Net 1.2.0 package licence)", "open", "none", "official",
+        storage="allowed", commercial_use="allowed", license_url=CC0_URL,
+        notes="package.json and the ImplementationGuide resource both declare CC0-1.0.",
+        **_cite("http://hl7.org/fhir/us/davinci-pdex-plan-net/STU1.2/", "\"license\": \"CC0-1.0\"", "high")),
+    "omop_cdm": SourceRights(
+        "Apache License 2.0 (OHDSI/CommonDataModel repository files, tag v5.4.3)", "attribution", "none",
+        "official", storage="allowed", commercial_use="allowed",
+        license_url="https://www.apache.org/licenses/LICENSE-2.0",
+        attribution="OMOP Common Data Model v5.4, OHDSI (Apache License 2.0)",
+        notes="Owner decision D3: CDM 5.4. Only the structural CSV columns are vendored; the OHDSI docs "
+              "site prose is CC BY-SA 4.0 and is never copied. Athena vocabularies are separate (some "
+              "carry EULAs) and are not vendored.",
+        **_cite("https://raw.githubusercontent.com/OHDSI/CommonDataModel/"
+                "746a15e0fb36a95ba6cc0993737f1273bbad92f2/DESCRIPTION",
+                "License: Apache License 2.0", "high")),
+    "nucc_taxonomy": SourceRights(
+        "NUCC Health Care Provider Taxonomy Code Set, Copyright 2026 American Medical Association; "
+        "commercial use needs a NUCC licence",
+        "internal_only", "none", "official", storage="allowed", commercial_use="agreement_required",
+        license_url=_NUCC_CSV_PAGE,
+        attribution="Health Care Provider Taxonomy code set, National Uniform Claim Committee (NUCC). "
+                    "Copyright 2026 American Medical Association.",
+        notes="Owner decision D9 (2026-10-08): vendored for INTERNAL use now; the NUCC commercial licence "
+              "is requested BEFORE any external release (customer export, published ontology release, "
+              "public API) of taxonomy codes or descriptions. The further conditions an earlier draft "
+              "listed (royalty-free, no modification, keep notices) are not on the CSV page and stay "
+              "unverified. The vendored extract drops the Definition and Notes columns.",
+        **_cite(_NUCC_CSV_PAGE,
+                "For commercial use, including sales or licensing, a license must be obtained from this web "
+                "site. Form to request license Copyright 2026 American Medical Association", "high")),
+    "icd10cm": SourceRights(
+        "ICD-10-CM FY2027 (NCHS clinical modification of WHO ICD-10); not verified as public domain",
+        "internal_only", "none", "official", storage="allowed", license_url=_WHO_ICD_FAQ,
+        notes="WHO holds the ICD-10 copyright; NCHS develops ICD-10-CM under WHO authorisation ('The World "
+              "Health Organization (WHO), which owns and publishes ICD-10, authorized NCHS to develop "
+              "ICD-10-CM', cdc.gov/nchs/icd/icd-10-cm). No public-domain statement found on the CDC or CMS "
+              "pages. Vendored: chapters, blocks and 3-character category codes only. Confirm "
+              "redistribution terms with NCHS before any external release (D10).",
+        **_cite(_WHO_ICD_FAQ,
+                "WHO is the copyright holder of ICD-10, and can grant licences for the use of ICD-10 "
+                "worldwide for commercial and non-commercial uses.", "medium")),
+    "hcpcs_l2": _usg("Centers for Medicare & Medicaid Services (HCPCS Level II)",
+                     license_url="https://www.cms.gov/medicare/coding-billing/healthcare-common-procedure-system",
+                     notes="Level II only. Level I (CPT, AMA) is never vendored; the HCPCS D-series is CDT "
+                           "(American Dental Association copyright) and is excluded from the vendored file.",
+                     **_cite("https://www.cms.gov/medicare/coding-billing/healthcare-common-procedure-system",
+                             "CMS maintains HCPCS Level II codes, including decisions about additions, revisions, "
+                             "and deletions to the codes.", "medium-high")),
+    "cms_pos": _usg("Centers for Medicare & Medicaid Services (Place of Service code set)",
+                    license_url="https://www.cms.gov/medicare/coding-billing/place-of-service-codes/code-sets",
+                    notes="The page carries no licence statement; public domain rests on 17 U.S.C. §105.",
+                    **_cite("https://www.cms.gov/medicare/coding-billing/place-of-service-codes/code-sets",
+                            None, "medium")),
+}
 
 def rights_for(dataset_key: str, source: str, collector: Optional[str] = None) -> SourceRights:
     """Most specific rights entry: dataset, then collector, then source family."""

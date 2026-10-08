@@ -1,0 +1,4468 @@
+{
+ "chapters": [
+  {
+   "blocks": [
+    {
+     "categories": [
+      "A00",
+      "A01",
+      "A02",
+      "A03",
+      "A04",
+      "A05",
+      "A06",
+      "A07",
+      "A08",
+      "A09"
+     ],
+     "first": "A00",
+     "id": "A00-A09",
+     "last": "A09",
+     "title": "Intestinal infectious diseases"
+    },
+    {
+     "categories": [
+      "A15",
+      "A17",
+      "A18",
+      "A19"
+     ],
+     "first": "A15",
+     "id": "A15-A19",
+     "last": "A19",
+     "title": "Tuberculosis"
+    },
+    {
+     "categories": [
+      "A20",
+      "A21",
+      "A22",
+      "A23",
+      "A24",
+      "A25",
+      "A26",
+      "A27",
+      "A28"
+     ],
+     "first": "A20",
+     "id": "A20-A28",
+     "last": "A28",
+     "title": "Certain zoonotic bacterial diseases"
+    },
+    {
+     "categories": [
+      "A30",
+      "A31",
+      "A32",
+      "A33",
+      "A34",
+      "A35",
+      "A36",
+      "A37",
+      "A38",
+      "A39",
+      "A40",
+      "A41",
+      "A42",
+      "A43",
+      "A44",
+      "A46",
+      "A48",
+      "A49"
+     ],
+     "first": "A30",
+     "id": "A30-A49",
+     "last": "A49",
+     "title": "Other bacterial diseases"
+    },
+    {
+     "categories": [
+      "A50",
+      "A51",
+      "A52",
+      "A53",
+      "A54",
+      "A55",
+      "A56",
+      "A57",
+      "A58",
+      "A59",
+      "A60",
+      "A63",
+      "A64"
+     ],
+     "first": "A50",
+     "id": "A50-A64",
+     "last": "A64",
+     "title": "Infections with a predominantly sexual mode of transmission"
+    },
+    {
+     "categories": [
+      "A65",
+      "A66",
+      "A67",
+      "A68",
+      "A69"
+     ],
+     "first": "A65",
+     "id": "A65-A69",
+     "last": "A69",
+     "title": "Other spirochetal diseases"
+    },
+    {
+     "categories": [
+      "A70",
+      "A71",
+      "A74"
+     ],
+     "first": "A70",
+     "id": "A70-A74",
+     "last": "A74",
+     "title": "Other diseases caused by chlamydiae"
+    },
+    {
+     "categories": [
+      "A75",
+      "A77",
+      "A78",
+      "A79"
+     ],
+     "first": "A75",
+     "id": "A75-A79",
+     "last": "A79",
+     "title": "Rickettsioses"
+    },
+    {
+     "categories": [
+      "A80",
+      "A81",
+      "A82",
+      "A83",
+      "A84",
+      "A85",
+      "A86",
+      "A87",
+      "A88",
+      "A89"
+     ],
+     "first": "A80",
+     "id": "A80-A89",
+     "last": "A89",
+     "title": "Viral and prion infections of the central nervous system"
+    },
+    {
+     "categories": [
+      "A90",
+      "A91",
+      "A92",
+      "A93",
+      "A94",
+      "A95",
+      "A96",
+      "A98",
+      "A99"
+     ],
+     "first": "A90",
+     "id": "A90-A99",
+     "last": "A99",
+     "title": "Arthropod-borne viral fevers and viral hemorrhagic fevers"
+    },
+    {
+     "categories": [
+      "B00",
+      "B01",
+      "B02",
+      "B03",
+      "B04",
+      "B05",
+      "B06",
+      "B07",
+      "B08",
+      "B09"
+     ],
+     "first": "B00",
+     "id": "B00-B09",
+     "last": "B09",
+     "title": "Viral infections characterized by skin and mucous membrane lesions"
+    },
+    {
+     "categories": [
+      "B10"
+     ],
+     "first": "B10",
+     "id": "B10",
+     "last": "B10",
+     "title": "Other human herpesviruses"
+    },
+    {
+     "categories": [
+      "B15",
+      "B16",
+      "B17",
+      "B18",
+      "B19"
+     ],
+     "first": "B15",
+     "id": "B15-B19",
+     "last": "B19",
+     "title": "Viral hepatitis"
+    },
+    {
+     "categories": [
+      "B20"
+     ],
+     "first": "B20",
+     "id": "B20",
+     "last": "B20",
+     "title": "Human immunodeficiency virus [HIV] disease"
+    },
+    {
+     "categories": [
+      "B25",
+      "B26",
+      "B27",
+      "B30",
+      "B33",
+      "B34"
+     ],
+     "first": "B25",
+     "id": "B25-B34",
+     "last": "B34",
+     "title": "Other viral diseases"
+    },
+    {
+     "categories": [
+      "B35",
+      "B36",
+      "B37",
+      "B38",
+      "B39",
+      "B40",
+      "B41",
+      "B42",
+      "B43",
+      "B44",
+      "B45",
+      "B46",
+      "B47",
+      "B48",
+      "B49"
+     ],
+     "first": "B35",
+     "id": "B35-B49",
+     "last": "B49",
+     "title": "Mycoses"
+    },
+    {
+     "categories": [
+      "B50",
+      "B51",
+      "B52",
+      "B53",
+      "B54",
+      "B55",
+      "B56",
+      "B57",
+      "B58",
+      "B59",
+      "B60",
+      "B64"
+     ],
+     "first": "B50",
+     "id": "B50-B64",
+     "last": "B64",
+     "title": "Protozoal diseases"
+    },
+    {
+     "categories": [
+      "B65",
+      "B66",
+      "B67",
+      "B68",
+      "B69",
+      "B70",
+      "B71",
+      "B72",
+      "B73",
+      "B74",
+      "B75",
+      "B76",
+      "B77",
+      "B78",
+      "B79",
+      "B80",
+      "B81",
+      "B82",
+      "B83"
+     ],
+     "first": "B65",
+     "id": "B65-B83",
+     "last": "B83",
+     "title": "Helminthiases"
+    },
+    {
+     "categories": [
+      "B85",
+      "B86",
+      "B87",
+      "B88",
+      "B89"
+     ],
+     "first": "B85",
+     "id": "B85-B89",
+     "last": "B89",
+     "title": "Pediculosis, acariasis and other infestations"
+    },
+    {
+     "categories": [
+      "B90",
+      "B91",
+      "B92",
+      "B94"
+     ],
+     "first": "B90",
+     "id": "B90-B94",
+     "last": "B94",
+     "title": "Sequelae of infectious and parasitic diseases"
+    },
+    {
+     "categories": [
+      "B95",
+      "B96",
+      "B97"
+     ],
+     "first": "B95",
+     "id": "B95-B97",
+     "last": "B97",
+     "title": "Bacterial and viral infectious agents"
+    },
+    {
+     "categories": [
+      "B99"
+     ],
+     "first": "B99",
+     "id": "B99",
+     "last": "B99",
+     "title": "Other infectious diseases"
+    }
+   ],
+   "chapter": 1,
+   "first": "A00",
+   "last": "B99",
+   "title": "Certain infectious and parasitic diseases"
+  },
+  {
+   "blocks": [
+    {
+     "categories": [],
+     "first": "C00",
+     "id": "C00-C96",
+     "last": "C96",
+     "title": "Malignant neoplasms"
+    },
+    {
+     "categories": [],
+     "first": "C00",
+     "id": "C00-C75",
+     "last": "C75",
+     "title": "Malignant neoplasms, stated or presumed to be primary (of specified sites), and certain specified histologies, except neuroendocrine, and of lymphoid, hematopoietic and related tissue"
+    },
+    {
+     "categories": [
+      "C00",
+      "C01",
+      "C02",
+      "C03",
+      "C04",
+      "C05",
+      "C06",
+      "C07",
+      "C08",
+      "C09",
+      "C10",
+      "C11",
+      "C12",
+      "C13",
+      "C14"
+     ],
+     "first": "C00",
+     "id": "C00-C14",
+     "last": "C14",
+     "title": "Malignant neoplasms of lip, oral cavity and pharynx"
+    },
+    {
+     "categories": [
+      "C15",
+      "C16",
+      "C17",
+      "C18",
+      "C19",
+      "C20",
+      "C21",
+      "C22",
+      "C23",
+      "C24",
+      "C25",
+      "C26"
+     ],
+     "first": "C15",
+     "id": "C15-C26",
+     "last": "C26",
+     "title": "Malignant neoplasms of digestive organs"
+    },
+    {
+     "categories": [
+      "C30",
+      "C31",
+      "C32",
+      "C33",
+      "C34",
+      "C37",
+      "C38",
+      "C39"
+     ],
+     "first": "C30",
+     "id": "C30-C39",
+     "last": "C39",
+     "title": "Malignant neoplasms of respiratory and intrathoracic organs"
+    },
+    {
+     "categories": [
+      "C40",
+      "C41"
+     ],
+     "first": "C40",
+     "id": "C40-C41",
+     "last": "C41",
+     "title": "Malignant neoplasms of bone and articular cartilage"
+    },
+    {
+     "categories": [
+      "C43",
+      "C44",
+      "C4A"
+     ],
+     "first": "C43",
+     "id": "C43-C44",
+     "last": "C44",
+     "title": "Melanoma and other malignant neoplasms of skin"
+    },
+    {
+     "categories": [
+      "C45",
+      "C46",
+      "C47",
+      "C48",
+      "C49"
+     ],
+     "first": "C45",
+     "id": "C45-C49",
+     "last": "C49",
+     "title": "Malignant neoplasms of mesothelial and soft tissue"
+    },
+    {
+     "categories": [
+      "C50"
+     ],
+     "first": "C50",
+     "id": "C50",
+     "last": "C50",
+     "title": "Malignant neoplasms of breast"
+    },
+    {
+     "categories": [
+      "C51",
+      "C52",
+      "C53",
+      "C54",
+      "C55",
+      "C56",
+      "C57",
+      "C58"
+     ],
+     "first": "C51",
+     "id": "C51-C58",
+     "last": "C58",
+     "title": "Malignant neoplasms of female genital organs"
+    },
+    {
+     "categories": [
+      "C60",
+      "C61",
+      "C62",
+      "C63"
+     ],
+     "first": "C60",
+     "id": "C60-C63",
+     "last": "C63",
+     "title": "Malignant neoplasms of male genital organs"
+    },
+    {
+     "categories": [
+      "C64",
+      "C65",
+      "C66",
+      "C67",
+      "C68"
+     ],
+     "first": "C64",
+     "id": "C64-C68",
+     "last": "C68",
+     "title": "Malignant neoplasms of urinary tract"
+    },
+    {
+     "categories": [
+      "C69",
+      "C70",
+      "C71",
+      "C72"
+     ],
+     "first": "C69",
+     "id": "C69-C72",
+     "last": "C72",
+     "title": "Malignant neoplasms of eye, brain and other parts of central nervous system"
+    },
+    {
+     "categories": [
+      "C73",
+      "C74",
+      "C75"
+     ],
+     "first": "C73",
+     "id": "C73-C75",
+     "last": "C75",
+     "title": "Malignant neoplasms of thyroid and other endocrine glands"
+    },
+    {
+     "categories": [
+      "C7A"
+     ],
+     "first": "C7A",
+     "id": "C7A",
+     "last": "C7A",
+     "title": "Malignant neuroendocrine tumors"
+    },
+    {
+     "categories": [
+      "C7B"
+     ],
+     "first": "C7B",
+     "id": "C7B",
+     "last": "C7B",
+     "title": "Secondary neuroendocrine tumors"
+    },
+    {
+     "categories": [
+      "C76",
+      "C77",
+      "C78",
+      "C79",
+      "C80"
+     ],
+     "first": "C76",
+     "id": "C76-C80",
+     "last": "C80",
+     "title": "Malignant neoplasms of ill-defined, other secondary and unspecified sites"
+    },
+    {
+     "categories": [
+      "C81",
+      "C82",
+      "C83",
+      "C84",
+      "C85",
+      "C86",
+      "C88",
+      "C90",
+      "C91",
+      "C92",
+      "C93",
+      "C94",
+      "C95",
+      "C96"
+     ],
+     "first": "C81",
+     "id": "C81-C96",
+     "last": "C96",
+     "title": "Malignant neoplasms of lymphoid, hematopoietic and related tissue"
+    },
+    {
+     "categories": [
+      "D00",
+      "D01",
+      "D02",
+      "D03",
+      "D04",
+      "D05",
+      "D06",
+      "D07",
+      "D09"
+     ],
+     "first": "D00",
+     "id": "D00-D09",
+     "last": "D09",
+     "title": "In situ neoplasms"
+    },
+    {
+     "categories": [
+      "D10",
+      "D11",
+      "D12",
+      "D13",
+      "D14",
+      "D15",
+      "D16",
+      "D17",
+      "D18",
+      "D19",
+      "D20",
+      "D21",
+      "D22",
+      "D23",
+      "D24",
+      "D25",
+      "D26",
+      "D27",
+      "D28",
+      "D29",
+      "D30",
+      "D31",
+      "D32",
+      "D33",
+      "D34",
+      "D35",
+      "D36"
+     ],
+     "first": "D10",
+     "id": "D10-D36",
+     "last": "D36",
+     "title": "Benign neoplasms, except benign neuroendocrine tumors"
+    },
+    {
+     "categories": [
+      "D3A"
+     ],
+     "first": "D3A",
+     "id": "D3A",
+     "last": "D3A",
+     "title": "Benign neuroendocrine tumors"
+    },
+    {
+     "categories": [
+      "D37",
+      "D38",
+      "D39",
+      "D40",
+      "D41",
+      "D42",
+      "D43",
+      "D44",
+      "D45",
+      "D46",
+      "D47",
+      "D48"
+     ],
+     "first": "D37",
+     "id": "D37-D48",
+     "last": "D48",
+     "title": "Neoplasms of uncertain behavior, polycythemia vera and myelodysplastic syndromes"
+    },
+    {
+     "categories": [
+      "D49"
+     ],
+     "first": "D49",
+     "id": "D49",
+     "last": "D49",
+     "title": "Neoplasms of unspecified behavior"
+    }
+   ],
+   "chapter": 2,
+   "first": "C00",
+   "last": "D49",
+   "title": "Neoplasms"
+  },
+  {
+   "blocks": [
+    {
+     "categories": [
+      "D50",
+      "D51",
+      "D52",
+      "D53"
+     ],
+     "first": "D50",
+     "id": "D50-D53",
+     "last": "D53",
+     "title": "Nutritional anemias"
+    },
+    {
+     "categories": [
+      "D55",
+      "D56",
+      "D57",
+      "D58",
+      "D59"
+     ],
+     "first": "D55",
+     "id": "D55-D59",
+     "last": "D59",
+     "title": "Hemolytic anemias"
+    },
+    {
+     "categories": [
+      "D60",
+      "D61",
+      "D62",
+      "D63",
+      "D64"
+     ],
+     "first": "D60",
+     "id": "D60-D64",
+     "last": "D64",
+     "title": "Aplastic and other anemias and other bone marrow failure syndromes"
+    },
+    {
+     "categories": [
+      "D65",
+      "D66",
+      "D67",
+      "D68",
+      "D69"
+     ],
+     "first": "D65",
+     "id": "D65-D69",
+     "last": "D69",
+     "title": "Coagulation defects, purpura and other hemorrhagic conditions"
+    },
+    {
+     "categories": [
+      "D70",
+      "D71",
+      "D72",
+      "D73",
+      "D74",
+      "D75",
+      "D76",
+      "D77"
+     ],
+     "first": "D70",
+     "id": "D70-D77",
+     "last": "D77",
+     "title": "Other disorders of blood and blood-forming organs"
+    },
+    {
+     "categories": [
+      "D78"
+     ],
+     "first": "D78",
+     "id": "D78",
+     "last": "D78",
+     "title": "Intraoperative and postprocedural complications of the spleen"
+    },
+    {
+     "categories": [
+      "D80",
+      "D81",
+      "D82",
+      "D83",
+      "D84",
+      "D86",
+      "D89"
+     ],
+     "first": "D80",
+     "id": "D80-D89",
+     "last": "D89",
+     "title": "Certain disorders involving the immune mechanism"
+    }
+   ],
+   "chapter": 3,
+   "first": "D50",
+   "last": "D89",
+   "title": "Diseases of the blood and blood-forming organs and certain disorders involving the immune mechanism"
+  },
+  {
+   "blocks": [
+    {
+     "categories": [
+      "E00",
+      "E01",
+      "E02",
+      "E03",
+      "E04",
+      "E05",
+      "E06",
+      "E07"
+     ],
+     "first": "E00",
+     "id": "E00-E07",
+     "last": "E07",
+     "title": "Disorders of thyroid gland"
+    },
+    {
+     "categories": [
+      "E08",
+      "E09",
+      "E10",
+      "E11",
+      "E13"
+     ],
+     "first": "E08",
+     "id": "E08-E13",
+     "last": "E13",
+     "title": "Diabetes mellitus"
+    },
+    {
+     "categories": [
+      "E15",
+      "E16"
+     ],
+     "first": "E15",
+     "id": "E15-E16",
+     "last": "E16",
+     "title": "Other disorders of glucose regulation and pancreatic internal secretion"
+    },
+    {
+     "categories": [
+      "E20",
+      "E21",
+      "E22",
+      "E23",
+      "E24",
+      "E25",
+      "E26",
+      "E27",
+      "E28",
+      "E29",
+      "E30",
+      "E31",
+      "E32",
+      "E34",
+      "E35"
+     ],
+     "first": "E20",
+     "id": "E20-E35",
+     "last": "E35",
+     "title": "Disorders of other endocrine glands"
+    },
+    {
+     "categories": [
+      "E36"
+     ],
+     "first": "E36",
+     "id": "E36",
+     "last": "E36",
+     "title": "Intraoperative complications of endocrine system"
+    },
+    {
+     "categories": [
+      "E40",
+      "E41",
+      "E42",
+      "E43",
+      "E44",
+      "E45",
+      "E46"
+     ],
+     "first": "E40",
+     "id": "E40-E46",
+     "last": "E46",
+     "title": "Malnutrition"
+    },
+    {
+     "categories": [
+      "E50",
+      "E51",
+      "E52",
+      "E53",
+      "E54",
+      "E55",
+      "E56",
+      "E58",
+      "E59",
+      "E60",
+      "E61",
+      "E63",
+      "E64"
+     ],
+     "first": "E50",
+     "id": "E50-E64",
+     "last": "E64",
+     "title": "Other nutritional deficiencies"
+    },
+    {
+     "categories": [
+      "E65",
+      "E66",
+      "E67",
+      "E68"
+     ],
+     "first": "E65",
+     "id": "E65-E68",
+     "last": "E68",
+     "title": "Overweight, obesity and other hyperalimentation"
+    },
+    {
+     "categories": [
+      "E70",
+      "E71",
+      "E72",
+      "E73",
+      "E74",
+      "E75",
+      "E76",
+      "E77",
+      "E78",
+      "E79",
+      "E80",
+      "E83",
+      "E84",
+      "E85",
+      "E86",
+      "E87",
+      "E88"
+     ],
+     "first": "E70",
+     "id": "E70-E88",
+     "last": "E88",
+     "title": "Metabolic disorders"
+    },
+    {
+     "categories": [
+      "E89"
+     ],
+     "first": "E89",
+     "id": "E89",
+     "last": "E89",
+     "title": "Postprocedural endocrine and metabolic complications and disorders, not elsewhere classified"
+    }
+   ],
+   "chapter": 4,
+   "first": "E00",
+   "last": "E89",
+   "title": "Endocrine, nutritional and metabolic diseases"
+  },
+  {
+   "blocks": [
+    {
+     "categories": [
+      "F01",
+      "F02",
+      "F03",
+      "F04",
+      "F05",
+      "F06",
+      "F07",
+      "F09"
+     ],
+     "first": "F01",
+     "id": "F01-F09",
+     "last": "F09",
+     "title": "Mental disorders due to known physiological conditions"
+    },
+    {
+     "categories": [
+      "F10",
+      "F11",
+      "F12",
+      "F13",
+      "F14",
+      "F15",
+      "F16",
+      "F17",
+      "F18",
+      "F19"
+     ],
+     "first": "F10",
+     "id": "F10-F19",
+     "last": "F19",
+     "title": "Mental and behavioral disorders due to psychoactive substance use"
+    },
+    {
+     "categories": [
+      "F20",
+      "F21",
+      "F22",
+      "F23",
+      "F24",
+      "F25",
+      "F28",
+      "F29"
+     ],
+     "first": "F20",
+     "id": "F20-F29",
+     "last": "F29",
+     "title": "Schizophrenia, schizotypal, delusional, and other non-mood psychotic disorders"
+    },
+    {
+     "categories": [
+      "F30",
+      "F31",
+      "F32",
+      "F33",
+      "F34",
+      "F39"
+     ],
+     "first": "F30",
+     "id": "F30-F39",
+     "last": "F39",
+     "title": "Mood [affective] disorders"
+    },
+    {
+     "categories": [
+      "F40",
+      "F41",
+      "F42",
+      "F43",
+      "F44",
+      "F45",
+      "F48"
+     ],
+     "first": "F40",
+     "id": "F40-F48",
+     "last": "F48",
+     "title": "Anxiety, dissociative, stress-related, somatoform and other nonpsychotic mental disorders"
+    },
+    {
+     "categories": [
+      "F50",
+      "F51",
+      "F52",
+      "F53",
+      "F54",
+      "F55",
+      "F59"
+     ],
+     "first": "F50",
+     "id": "F50-F59",
+     "last": "F59",
+     "title": "Behavioral syndromes associated with physiological disturbances and physical factors"
+    },
+    {
+     "categories": [
+      "F60",
+      "F63",
+      "F64",
+      "F65",
+      "F66",
+      "F68",
+      "F69"
+     ],
+     "first": "F60",
+     "id": "F60-F69",
+     "last": "F69",
+     "title": "Disorders of adult personality and behavior"
+    },
+    {
+     "categories": [
+      "F70",
+      "F71",
+      "F72",
+      "F73",
+      "F78",
+      "F79"
+     ],
+     "first": "F70",
+     "id": "F70-F79",
+     "last": "F79",
+     "title": "Intellectual Disabilities"
+    },
+    {
+     "categories": [
+      "F80",
+      "F81",
+      "F82",
+      "F84",
+      "F88",
+      "F89"
+     ],
+     "first": "F80",
+     "id": "F80-F89",
+     "last": "F89",
+     "title": "Pervasive and specific developmental disorders"
+    },
+    {
+     "categories": [
+      "F90",
+      "F91",
+      "F93",
+      "F94",
+      "F95",
+      "F98"
+     ],
+     "first": "F90",
+     "id": "F90-F98",
+     "last": "F98",
+     "title": "Behavioral and emotional disorders with onset usually occurring in childhood and adolescence"
+    },
+    {
+     "categories": [
+      "F99"
+     ],
+     "first": "F99",
+     "id": "F99",
+     "last": "F99",
+     "title": "Unspecified mental disorder"
+    }
+   ],
+   "chapter": 5,
+   "first": "F01",
+   "last": "F99",
+   "title": "Mental, Behavioral and Neurodevelopmental disorders"
+  },
+  {
+   "blocks": [
+    {
+     "categories": [
+      "G00",
+      "G01",
+      "G02",
+      "G03",
+      "G04",
+      "G05",
+      "G06",
+      "G07",
+      "G08",
+      "G09"
+     ],
+     "first": "G00",
+     "id": "G00-G09",
+     "last": "G09",
+     "title": "Inflammatory diseases of the central nervous system"
+    },
+    {
+     "categories": [
+      "G10",
+      "G11",
+      "G12",
+      "G13",
+      "G14"
+     ],
+     "first": "G10",
+     "id": "G10-G14",
+     "last": "G14",
+     "title": "Systemic atrophies primarily affecting the central nervous system"
+    },
+    {
+     "categories": [
+      "G20",
+      "G21",
+      "G23",
+      "G24",
+      "G25",
+      "G26"
+     ],
+     "first": "G20",
+     "id": "G20-G26",
+     "last": "G26",
+     "title": "Extrapyramidal and movement disorders"
+    },
+    {
+     "categories": [
+      "G30",
+      "G31",
+      "G32"
+     ],
+     "first": "G30",
+     "id": "G30-G32",
+     "last": "G32",
+     "title": "Other degenerative diseases of the nervous system"
+    },
+    {
+     "categories": [
+      "G35",
+      "G36",
+      "G37"
+     ],
+     "first": "G35",
+     "id": "G35-G37",
+     "last": "G37",
+     "title": "Demyelinating diseases of the central nervous system"
+    },
+    {
+     "categories": [
+      "G40",
+      "G43",
+      "G44",
+      "G45",
+      "G46",
+      "G47"
+     ],
+     "first": "G40",
+     "id": "G40-G47",
+     "last": "G47",
+     "title": "Episodic and paroxysmal disorders"
+    },
+    {
+     "categories": [
+      "G50",
+      "G51",
+      "G52",
+      "G53",
+      "G54",
+      "G55",
+      "G56",
+      "G57",
+      "G58",
+      "G59"
+     ],
+     "first": "G50",
+     "id": "G50-G59",
+     "last": "G59",
+     "title": "Nerve, nerve root and plexus disorders"
+    },
+    {
+     "categories": [
+      "G60",
+      "G61",
+      "G62",
+      "G63",
+      "G64",
+      "G65"
+     ],
+     "first": "G60",
+     "id": "G60-G65",
+     "last": "G65",
+     "title": "Polyneuropathies and other disorders of the peripheral nervous system"
+    },
+    {
+     "categories": [
+      "G70",
+      "G71",
+      "G72",
+      "G73"
+     ],
+     "first": "G70",
+     "id": "G70-G73",
+     "last": "G73",
+     "title": "Diseases of myoneural junction and muscle"
+    },
+    {
+     "categories": [
+      "G80",
+      "G81",
+      "G82",
+      "G83"
+     ],
+     "first": "G80",
+     "id": "G80-G83",
+     "last": "G83",
+     "title": "Cerebral palsy and other paralytic syndromes"
+    },
+    {
+     "categories": [
+      "G89",
+      "G90",
+      "G91",
+      "G92",
+      "G93",
+      "G94",
+      "G95",
+      "G96",
+      "G97",
+      "G98",
+      "G99"
+     ],
+     "first": "G89",
+     "id": "G89-G99",
+     "last": "G99",
+     "title": "Other disorders of the nervous system"
+    }
+   ],
+   "chapter": 6,
+   "first": "G00",
+   "last": "G99",
+   "title": "Diseases of the nervous system"
+  },
+  {
+   "blocks": [
+    {
+     "categories": [
+      "H00",
+      "H01",
+      "H02",
+      "H04",
+      "H05"
+     ],
+     "first": "H00",
+     "id": "H00-H05",
+     "last": "H05",
+     "title": "Disorders of eyelid, lacrimal system and orbit"
+    },
+    {
+     "categories": [
+      "H10",
+      "H11"
+     ],
+     "first": "H10",
+     "id": "H10-H11",
+     "last": "H11",
+     "title": "Disorders of conjunctiva"
+    },
+    {
+     "categories": [
+      "H15",
+      "H16",
+      "H17",
+      "H18",
+      "H20",
+      "H21",
+      "H22"
+     ],
+     "first": "H15",
+     "id": "H15-H22",
+     "last": "H22",
+     "title": "Disorders of sclera, cornea, iris and ciliary body"
+    },
+    {
+     "categories": [
+      "H25",
+      "H26",
+      "H27",
+      "H28"
+     ],
+     "first": "H25",
+     "id": "H25-H28",
+     "last": "H28",
+     "title": "Disorders of lens"
+    },
+    {
+     "categories": [
+      "H30",
+      "H31",
+      "H32",
+      "H33",
+      "H34",
+      "H35",
+      "H36"
+     ],
+     "first": "H30",
+     "id": "H30-H36",
+     "last": "H36",
+     "title": "Disorders of choroid and retina"
+    },
+    {
+     "categories": [
+      "H40",
+      "H42"
+     ],
+     "first": "H40",
+     "id": "H40-H42",
+     "last": "H42",
+     "title": "Glaucoma"
+    },
+    {
+     "categories": [
+      "H43",
+      "H44"
+     ],
+     "first": "H43",
+     "id": "H43-H44",
+     "last": "H44",
+     "title": "Disorders of vitreous body and globe"
+    },
+    {
+     "categories": [
+      "H46",
+      "H47"
+     ],
+     "first": "H46",
+     "id": "H46-H47",
+     "last": "H47",
+     "title": "Disorders of optic nerve and visual pathways"
+    },
+    {
+     "categories": [
+      "H49",
+      "H50",
+      "H51",
+      "H52"
+     ],
+     "first": "H49",
+     "id": "H49-H52",
+     "last": "H52",
+     "title": "Disorders of ocular muscles, binocular movement, accommodation and refraction"
+    },
+    {
+     "categories": [
+      "H53",
+      "H54"
+     ],
+     "first": "H53",
+     "id": "H53-H54",
+     "last": "H54",
+     "title": "Visual disturbances and blindness"
+    },
+    {
+     "categories": [
+      "H55",
+      "H57"
+     ],
+     "first": "H55",
+     "id": "H55-H57",
+     "last": "H57",
+     "title": "Other disorders of eye and adnexa"
+    },
+    {
+     "categories": [
+      "H59"
+     ],
+     "first": "H59",
+     "id": "H59",
+     "last": "H59",
+     "title": "Intraoperative and postprocedural complications and disorders of eye and adnexa, not elsewhere classified"
+    }
+   ],
+   "chapter": 7,
+   "first": "H00",
+   "last": "H59",
+   "title": "Diseases of the eye and adnexa"
+  },
+  {
+   "blocks": [
+    {
+     "categories": [
+      "H60",
+      "H61",
+      "H62"
+     ],
+     "first": "H60",
+     "id": "H60-H62",
+     "last": "H62",
+     "title": "Diseases of external ear"
+    },
+    {
+     "categories": [
+      "H65",
+      "H66",
+      "H67",
+      "H68",
+      "H69",
+      "H70",
+      "H71",
+      "H72",
+      "H73",
+      "H74",
+      "H75"
+     ],
+     "first": "H65",
+     "id": "H65-H75",
+     "last": "H75",
+     "title": "Diseases of middle ear and mastoid"
+    },
+    {
+     "categories": [
+      "H80",
+      "H81",
+      "H82",
+      "H83"
+     ],
+     "first": "H80",
+     "id": "H80-H83",
+     "last": "H83",
+     "title": "Diseases of inner ear"
+    },
+    {
+     "categories": [
+      "H90",
+      "H91",
+      "H92",
+      "H93",
+      "H94"
+     ],
+     "first": "H90",
+     "id": "H90-H94",
+     "last": "H94",
+     "title": "Other disorders of ear"
+    },
+    {
+     "categories": [
+      "H95"
+     ],
+     "first": "H95",
+     "id": "H95",
+     "last": "H95",
+     "title": "Intraoperative and postprocedural complications and disorders of ear and mastoid process, not elsewhere classified"
+    }
+   ],
+   "chapter": 8,
+   "first": "H60",
+   "last": "H95",
+   "title": "Diseases of the ear and mastoid process"
+  },
+  {
+   "blocks": [
+    {
+     "categories": [
+      "I00",
+      "I01",
+      "I02"
+     ],
+     "first": "I00",
+     "id": "I00-I02",
+     "last": "I02",
+     "title": "Acute rheumatic fever"
+    },
+    {
+     "categories": [
+      "I05",
+      "I06",
+      "I07",
+      "I08",
+      "I09"
+     ],
+     "first": "I05",
+     "id": "I05-I09",
+     "last": "I09",
+     "title": "Chronic rheumatic heart diseases"
+    },
+    {
+     "categories": [
+      "I10",
+      "I11",
+      "I12",
+      "I13",
+      "I15",
+      "I16",
+      "I1A"
+     ],
+     "first": "I10",
+     "id": "I10-I1A",
+     "last": "I1A",
+     "title": "Hypertensive diseases"
+    },
+    {
+     "categories": [
+      "I20",
+      "I21",
+      "I22",
+      "I23",
+      "I24",
+      "I25"
+     ],
+     "first": "I20",
+     "id": "I20-I25",
+     "last": "I25",
+     "title": "Ischemic heart diseases"
+    },
+    {
+     "categories": [
+      "I26",
+      "I27",
+      "I28"
+     ],
+     "first": "I26",
+     "id": "I26-I28",
+     "last": "I28",
+     "title": "Pulmonary heart disease and diseases of pulmonary circulation"
+    },
+    {
+     "categories": [
+      "I30",
+      "I31",
+      "I32",
+      "I33",
+      "I34",
+      "I35",
+      "I36",
+      "I37",
+      "I38",
+      "I39",
+      "I40",
+      "I41",
+      "I42",
+      "I43",
+      "I44",
+      "I45",
+      "I46",
+      "I47",
+      "I48",
+      "I49",
+      "I50",
+      "I51",
+      "I52",
+      "I5A"
+     ],
+     "first": "I30",
+     "id": "I30-I5A",
+     "last": "I5A",
+     "title": "Other forms of heart disease"
+    },
+    {
+     "categories": [
+      "I60",
+      "I61",
+      "I62",
+      "I63",
+      "I65",
+      "I66",
+      "I67",
+      "I68",
+      "I69"
+     ],
+     "first": "I60",
+     "id": "I60-I69",
+     "last": "I69",
+     "title": "Cerebrovascular diseases"
+    },
+    {
+     "categories": [
+      "I70",
+      "I71",
+      "I72",
+      "I73",
+      "I74",
+      "I75",
+      "I76",
+      "I77",
+      "I78",
+      "I79"
+     ],
+     "first": "I70",
+     "id": "I70-I79",
+     "last": "I79",
+     "title": "Diseases of arteries, arterioles and capillaries"
+    },
+    {
+     "categories": [
+      "I80",
+      "I81",
+      "I82",
+      "I83",
+      "I85",
+      "I86",
+      "I87",
+      "I88",
+      "I89"
+     ],
+     "first": "I80",
+     "id": "I80-I89",
+     "last": "I89",
+     "title": "Diseases of veins, lymphatic vessels and lymph nodes, not elsewhere classified"
+    },
+    {
+     "categories": [
+      "I95",
+      "I96",
+      "I97",
+      "I99"
+     ],
+     "first": "I95",
+     "id": "I95-I99",
+     "last": "I99",
+     "title": "Other and unspecified disorders of the circulatory system"
+    }
+   ],
+   "chapter": 9,
+   "first": "I00",
+   "last": "I99",
+   "title": "Diseases of the circulatory system"
+  },
+  {
+   "blocks": [
+    {
+     "categories": [
+      "J00",
+      "J01",
+      "J02",
+      "J03",
+      "J04",
+      "J05",
+      "J06"
+     ],
+     "first": "J00",
+     "id": "J00-J06",
+     "last": "J06",
+     "title": "Acute upper respiratory infections"
+    },
+    {
+     "categories": [
+      "J09",
+      "J10",
+      "J11",
+      "J12",
+      "J13",
+      "J14",
+      "J15",
+      "J16",
+      "J17",
+      "J18"
+     ],
+     "first": "J09",
+     "id": "J09-J18",
+     "last": "J18",
+     "title": "Influenza and pneumonia"
+    },
+    {
+     "categories": [
+      "J20",
+      "J21",
+      "J22"
+     ],
+     "first": "J20",
+     "id": "J20-J22",
+     "last": "J22",
+     "title": "Other acute lower respiratory infections"
+    },
+    {
+     "categories": [
+      "J30",
+      "J31",
+      "J32",
+      "J33",
+      "J34",
+      "J35",
+      "J36",
+      "J37",
+      "J38",
+      "J39"
+     ],
+     "first": "J30",
+     "id": "J30-J39",
+     "last": "J39",
+     "title": "Other diseases of upper respiratory tract"
+    },
+    {
+     "categories": [
+      "J40",
+      "J41",
+      "J42",
+      "J43",
+      "J44",
+      "J45",
+      "J47",
+      "J4A",
+      "J4B"
+     ],
+     "first": "J40",
+     "id": "J40-J4B",
+     "last": "J4B",
+     "title": "Chronic lower respiratory diseases"
+    },
+    {
+     "categories": [
+      "J60",
+      "J61",
+      "J62",
+      "J63",
+      "J64",
+      "J65",
+      "J66",
+      "J67",
+      "J68",
+      "J69",
+      "J70"
+     ],
+     "first": "J60",
+     "id": "J60-J70",
+     "last": "J70",
+     "title": "Lung diseases due to external agents"
+    },
+    {
+     "categories": [
+      "J80",
+      "J81",
+      "J82",
+      "J84"
+     ],
+     "first": "J80",
+     "id": "J80-J84",
+     "last": "J84",
+     "title": "Other respiratory diseases principally affecting the interstitium"
+    },
+    {
+     "categories": [
+      "J85",
+      "J86"
+     ],
+     "first": "J85",
+     "id": "J85-J86",
+     "last": "J86",
+     "title": "Suppurative and necrotic conditions of the lower respiratory tract"
+    },
+    {
+     "categories": [
+      "J90",
+      "J91",
+      "J92",
+      "J93",
+      "J94"
+     ],
+     "first": "J90",
+     "id": "J90-J94",
+     "last": "J94",
+     "title": "Other diseases of the pleura"
+    },
+    {
+     "categories": [
+      "J95"
+     ],
+     "first": "J95",
+     "id": "J95",
+     "last": "J95",
+     "title": "Intraoperative and postprocedural complications and disorders of respiratory system, not elsewhere classified"
+    },
+    {
+     "categories": [
+      "J96",
+      "J98",
+      "J99"
+     ],
+     "first": "J96",
+     "id": "J96-J99",
+     "last": "J99",
+     "title": "Other diseases of the respiratory system"
+    }
+   ],
+   "chapter": 10,
+   "first": "J00",
+   "last": "J99",
+   "title": "Diseases of the respiratory system"
+  },
+  {
+   "blocks": [
+    {
+     "categories": [
+      "K00",
+      "K01",
+      "K02",
+      "K03",
+      "K04",
+      "K05",
+      "K06",
+      "K08",
+      "K09",
+      "K11",
+      "K12",
+      "K13",
+      "K14"
+     ],
+     "first": "K00",
+     "id": "K00-K14",
+     "last": "K14",
+     "title": "Diseases of oral cavity and salivary glands"
+    },
+    {
+     "categories": [
+      "K20",
+      "K21",
+      "K22",
+      "K23",
+      "K25",
+      "K26",
+      "K27",
+      "K28",
+      "K29",
+      "K30",
+      "K31"
+     ],
+     "first": "K20",
+     "id": "K20-K31",
+     "last": "K31",
+     "title": "Diseases of esophagus, stomach and duodenum"
+    },
+    {
+     "categories": [
+      "K35",
+      "K36",
+      "K37",
+      "K38"
+     ],
+     "first": "K35",
+     "id": "K35-K38",
+     "last": "K38",
+     "title": "Diseases of appendix"
+    },
+    {
+     "categories": [
+      "K40",
+      "K41",
+      "K42",
+      "K43",
+      "K44",
+      "K45",
+      "K46"
+     ],
+     "first": "K40",
+     "id": "K40-K46",
+     "last": "K46",
+     "title": "Hernia"
+    },
+    {
+     "categories": [
+      "K50",
+      "K51",
+      "K52"
+     ],
+     "first": "K50",
+     "id": "K50-K52",
+     "last": "K52",
+     "title": "Noninfective enteritis and colitis"
+    },
+    {
+     "categories": [
+      "K55",
+      "K56",
+      "K57",
+      "K58",
+      "K59",
+      "K60",
+      "K61",
+      "K62",
+      "K63",
+      "K64"
+     ],
+     "first": "K55",
+     "id": "K55-K64",
+     "last": "K64",
+     "title": "Other diseases of intestines"
+    },
+    {
+     "categories": [
+      "K65",
+      "K66",
+      "K67",
+      "K68",
+      "K6A"
+     ],
+     "first": "K65",
+     "id": "K65-K6A",
+     "last": "K6A",
+     "title": "Diseases of peritoneum, retroperitoneum and pelvis"
+    },
+    {
+     "categories": [
+      "K70",
+      "K71",
+      "K72",
+      "K73",
+      "K74",
+      "K75",
+      "K76",
+      "K77"
+     ],
+     "first": "K70",
+     "id": "K70-K77",
+     "last": "K77",
+     "title": "Diseases of liver"
+    },
+    {
+     "categories": [
+      "K80",
+      "K81",
+      "K82",
+      "K83",
+      "K85",
+      "K86",
+      "K87"
+     ],
+     "first": "K80",
+     "id": "K80-K87",
+     "last": "K87",
+     "title": "Disorders of gallbladder, biliary tract and pancreas"
+    },
+    {
+     "categories": [
+      "K90",
+      "K91",
+      "K92",
+      "K94",
+      "K95"
+     ],
+     "first": "K90",
+     "id": "K90-K95",
+     "last": "K95",
+     "title": "Other diseases of the digestive system"
+    }
+   ],
+   "chapter": 11,
+   "first": "K00",
+   "last": "K95",
+   "title": "Diseases of the digestive system"
+  },
+  {
+   "blocks": [
+    {
+     "categories": [
+      "L00",
+      "L01",
+      "L02",
+      "L03",
+      "L04",
+      "L05",
+      "L08"
+     ],
+     "first": "L00",
+     "id": "L00-L08",
+     "last": "L08",
+     "title": "Infections of the skin and subcutaneous tissue"
+    },
+    {
+     "categories": [
+      "L10",
+      "L11",
+      "L12",
+      "L13",
+      "L14"
+     ],
+     "first": "L10",
+     "id": "L10-L14",
+     "last": "L14",
+     "title": "Bullous disorders"
+    },
+    {
+     "categories": [
+      "L20",
+      "L21",
+      "L22",
+      "L23",
+      "L24",
+      "L25",
+      "L26",
+      "L27",
+      "L28",
+      "L29",
+      "L30"
+     ],
+     "first": "L20",
+     "id": "L20-L30",
+     "last": "L30",
+     "title": "Dermatitis and eczema"
+    },
+    {
+     "categories": [
+      "L40",
+      "L41",
+      "L42",
+      "L43",
+      "L44",
+      "L45"
+     ],
+     "first": "L40",
+     "id": "L40-L45",
+     "last": "L45",
+     "title": "Papulosquamous disorders"
+    },
+    {
+     "categories": [
+      "L49",
+      "L50",
+      "L51",
+      "L52",
+      "L53",
+      "L54"
+     ],
+     "first": "L49",
+     "id": "L49-L54",
+     "last": "L54",
+     "title": "Urticaria and erythema"
+    },
+    {
+     "categories": [
+      "L55",
+      "L56",
+      "L57",
+      "L58",
+      "L59"
+     ],
+     "first": "L55",
+     "id": "L55-L59",
+     "last": "L59",
+     "title": "Radiation-related disorders of the skin and subcutaneous tissue"
+    },
+    {
+     "categories": [
+      "L60",
+      "L62",
+      "L63",
+      "L64",
+      "L65",
+      "L66",
+      "L67",
+      "L68",
+      "L70",
+      "L71",
+      "L72",
+      "L73",
+      "L74",
+      "L75"
+     ],
+     "first": "L60",
+     "id": "L60-L75",
+     "last": "L75",
+     "title": "Disorders of skin appendages"
+    },
+    {
+     "categories": [
+      "L76"
+     ],
+     "first": "L76",
+     "id": "L76",
+     "last": "L76",
+     "title": "Intraoperative and postprocedural complications of skin and subcutaneous tissue"
+    },
+    {
+     "categories": [
+      "L80",
+      "L81",
+      "L82",
+      "L83",
+      "L84",
+      "L85",
+      "L86",
+      "L87",
+      "L88",
+      "L89",
+      "L90",
+      "L91",
+      "L92",
+      "L93",
+      "L94",
+      "L95",
+      "L97",
+      "L98",
+      "L99"
+     ],
+     "first": "L80",
+     "id": "L80-L99",
+     "last": "L99",
+     "title": "Other disorders of the skin and subcutaneous tissue"
+    }
+   ],
+   "chapter": 12,
+   "first": "L00",
+   "last": "L99",
+   "title": "Diseases of the skin and subcutaneous tissue"
+  },
+  {
+   "blocks": [
+    {
+     "categories": [],
+     "first": "M00",
+     "id": "M00-M25",
+     "last": "M25",
+     "title": "Arthropathies"
+    },
+    {
+     "categories": [
+      "M00",
+      "M01",
+      "M02"
+     ],
+     "first": "M00",
+     "id": "M00-M02",
+     "last": "M02",
+     "title": "Infectious arthropathies"
+    },
+    {
+     "categories": [
+      "M04"
+     ],
+     "first": "M04",
+     "id": "M04",
+     "last": "M04",
+     "title": "Autoinflammatory syndromes"
+    },
+    {
+     "categories": [
+      "M05",
+      "M06",
+      "M07",
+      "M08",
+      "M10",
+      "M11",
+      "M12",
+      "M13",
+      "M14",
+      "M1A"
+     ],
+     "first": "M05",
+     "id": "M05-M14",
+     "last": "M14",
+     "title": "Inflammatory polyarthropathies"
+    },
+    {
+     "categories": [
+      "M15",
+      "M16",
+      "M17",
+      "M18",
+      "M19"
+     ],
+     "first": "M15",
+     "id": "M15-M19",
+     "last": "M19",
+     "title": "Osteoarthritis"
+    },
+    {
+     "categories": [
+      "M20",
+      "M21",
+      "M22",
+      "M23",
+      "M24",
+      "M25"
+     ],
+     "first": "M20",
+     "id": "M20-M25",
+     "last": "M25",
+     "title": "Other joint disorders"
+    },
+    {
+     "categories": [
+      "M26",
+      "M27"
+     ],
+     "first": "M26",
+     "id": "M26-M27",
+     "last": "M27",
+     "title": "Dentofacial anomalies [including malocclusion] and other disorders of jaw"
+    },
+    {
+     "categories": [
+      "M30",
+      "M31",
+      "M32",
+      "M33",
+      "M34",
+      "M35",
+      "M36"
+     ],
+     "first": "M30",
+     "id": "M30-M36",
+     "last": "M36",
+     "title": "Systemic connective tissue disorders"
+    },
+    {
+     "categories": [],
+     "first": "M40",
+     "id": "M40-M54",
+     "last": "M54",
+     "title": "Dorsopathies"
+    },
+    {
+     "categories": [
+      "M40",
+      "M41",
+      "M42",
+      "M43"
+     ],
+     "first": "M40",
+     "id": "M40-M43",
+     "last": "M43",
+     "title": "Deforming dorsopathies"
+    },
+    {
+     "categories": [
+      "M45",
+      "M46",
+      "M47",
+      "M48",
+      "M49"
+     ],
+     "first": "M45",
+     "id": "M45-M49",
+     "last": "M49",
+     "title": "Spondylopathies"
+    },
+    {
+     "categories": [
+      "M50",
+      "M51",
+      "M53",
+      "M54"
+     ],
+     "first": "M50",
+     "id": "M50-M54",
+     "last": "M54",
+     "title": "Other dorsopathies"
+    },
+    {
+     "categories": [],
+     "first": "M60",
+     "id": "M60-M79",
+     "last": "M79",
+     "title": "Soft tissue disorders"
+    },
+    {
+     "categories": [
+      "M60",
+      "M61",
+      "M62",
+      "M63"
+     ],
+     "first": "M60",
+     "id": "M60-M63",
+     "last": "M63",
+     "title": "Disorders of muscles"
+    },
+    {
+     "categories": [
+      "M65",
+      "M66",
+      "M67"
+     ],
+     "first": "M65",
+     "id": "M65-M67",
+     "last": "M67",
+     "title": "Disorders of synovium and tendon"
+    },
+    {
+     "categories": [
+      "M70",
+      "M71",
+      "M72",
+      "M75",
+      "M76",
+      "M77",
+      "M79"
+     ],
+     "first": "M70",
+     "id": "M70-M79",
+     "last": "M79",
+     "title": "Other soft tissue disorders"
+    },
+    {
+     "categories": [],
+     "first": "M80",
+     "id": "M80-M94",
+     "last": "M94",
+     "title": "Osteopathies and chondropathies"
+    },
+    {
+     "categories": [
+      "M80",
+      "M81",
+      "M83",
+      "M84",
+      "M85"
+     ],
+     "first": "M80",
+     "id": "M80-M85",
+     "last": "M85",
+     "title": "Disorders of bone density and structure"
+    },
+    {
+     "categories": [
+      "M86",
+      "M87",
+      "M88",
+      "M89",
+      "M90"
+     ],
+     "first": "M86",
+     "id": "M86-M90",
+     "last": "M90",
+     "title": "Other osteopathies"
+    },
+    {
+     "categories": [
+      "M91",
+      "M92",
+      "M93",
+      "M94"
+     ],
+     "first": "M91",
+     "id": "M91-M94",
+     "last": "M94",
+     "title": "Chondropathies"
+    },
+    {
+     "categories": [
+      "M95"
+     ],
+     "first": "M95",
+     "id": "M95",
+     "last": "M95",
+     "title": "Other disorders of the musculoskeletal system and connective tissue"
+    },
+    {
+     "categories": [
+      "M96"
+     ],
+     "first": "M96",
+     "id": "M96",
+     "last": "M96",
+     "title": "Intraoperative and postprocedural complications and disorders of musculoskeletal system, not elsewhere classified"
+    },
+    {
+     "categories": [
+      "M97"
+     ],
+     "first": "M97",
+     "id": "M97",
+     "last": "M97",
+     "title": "Periprosthetic fracture around internal prosthetic joint"
+    },
+    {
+     "categories": [
+      "M99"
+     ],
+     "first": "M99",
+     "id": "M99",
+     "last": "M99",
+     "title": "Biomechanical lesions, not elsewhere classified"
+    }
+   ],
+   "chapter": 13,
+   "first": "M00",
+   "last": "M99",
+   "title": "Diseases of the musculoskeletal system and connective tissue"
+  },
+  {
+   "blocks": [
+    {
+     "categories": [
+      "N00",
+      "N01",
+      "N02",
+      "N03",
+      "N04",
+      "N05",
+      "N06",
+      "N07",
+      "N08"
+     ],
+     "first": "N00",
+     "id": "N00-N08",
+     "last": "N08",
+     "title": "Glomerular diseases"
+    },
+    {
+     "categories": [
+      "N10",
+      "N11",
+      "N12",
+      "N13",
+      "N14",
+      "N15",
+      "N16"
+     ],
+     "first": "N10",
+     "id": "N10-N16",
+     "last": "N16",
+     "title": "Renal tubulo-interstitial diseases"
+    },
+    {
+     "categories": [
+      "N17",
+      "N18",
+      "N19"
+     ],
+     "first": "N17",
+     "id": "N17-N19",
+     "last": "N19",
+     "title": "Acute kidney failure and chronic kidney disease"
+    },
+    {
+     "categories": [
+      "N20",
+      "N21",
+      "N22",
+      "N23"
+     ],
+     "first": "N20",
+     "id": "N20-N23",
+     "last": "N23",
+     "title": "Urolithiasis"
+    },
+    {
+     "categories": [
+      "N25",
+      "N26",
+      "N27",
+      "N28",
+      "N29"
+     ],
+     "first": "N25",
+     "id": "N25-N29",
+     "last": "N29",
+     "title": "Other disorders of kidney and ureter"
+    },
+    {
+     "categories": [
+      "N30",
+      "N31",
+      "N32",
+      "N33",
+      "N34",
+      "N35",
+      "N36",
+      "N37",
+      "N39"
+     ],
+     "first": "N30",
+     "id": "N30-N39",
+     "last": "N39",
+     "title": "Other diseases of the urinary system"
+    },
+    {
+     "categories": [
+      "N40",
+      "N41",
+      "N42",
+      "N43",
+      "N44",
+      "N45",
+      "N46",
+      "N47",
+      "N48",
+      "N49",
+      "N50",
+      "N51",
+      "N52",
+      "N53"
+     ],
+     "first": "N40",
+     "id": "N40-N53",
+     "last": "N53",
+     "title": "Diseases of male genital organs"
+    },
+    {
+     "categories": [
+      "N60",
+      "N61",
+      "N62",
+      "N63",
+      "N64",
+      "N65"
+     ],
+     "first": "N60",
+     "id": "N60-N65",
+     "last": "N65",
+     "title": "Disorders of breast"
+    },
+    {
+     "categories": [
+      "N70",
+      "N71",
+      "N72",
+      "N73",
+      "N74",
+      "N75",
+      "N76",
+      "N77"
+     ],
+     "first": "N70",
+     "id": "N70-N77",
+     "last": "N77",
+     "title": "Inflammatory diseases of female pelvic organs"
+    },
+    {
+     "categories": [
+      "N80",
+      "N81",
+      "N82",
+      "N83",
+      "N84",
+      "N85",
+      "N86",
+      "N87",
+      "N88",
+      "N89",
+      "N90",
+      "N91",
+      "N92",
+      "N93",
+      "N94",
+      "N95",
+      "N96",
+      "N97",
+      "N98"
+     ],
+     "first": "N80",
+     "id": "N80-N98",
+     "last": "N98",
+     "title": "Noninflammatory disorders of female genital tract"
+    },
+    {
+     "categories": [
+      "N99"
+     ],
+     "first": "N99",
+     "id": "N99",
+     "last": "N99",
+     "title": "Intraoperative and postprocedural complications and disorders of genitourinary system, not elsewhere classified"
+    }
+   ],
+   "chapter": 14,
+   "first": "N00",
+   "last": "N99",
+   "title": "Diseases of the genitourinary system"
+  },
+  {
+   "blocks": [
+    {
+     "categories": [
+      "O00",
+      "O01",
+      "O02",
+      "O03",
+      "O04",
+      "O07",
+      "O08"
+     ],
+     "first": "O00",
+     "id": "O00-O08",
+     "last": "O08",
+     "title": "Pregnancy with abortive outcome"
+    },
+    {
+     "categories": [
+      "O09"
+     ],
+     "first": "O09",
+     "id": "O09",
+     "last": "O09",
+     "title": "Supervision of high risk pregnancy"
+    },
+    {
+     "categories": [
+      "O10",
+      "O11",
+      "O12",
+      "O13",
+      "O14",
+      "O15",
+      "O16"
+     ],
+     "first": "O10",
+     "id": "O10-O16",
+     "last": "O16",
+     "title": "Edema, proteinuria and hypertensive disorders in pregnancy, childbirth and the puerperium"
+    },
+    {
+     "categories": [
+      "O20",
+      "O21",
+      "O22",
+      "O23",
+      "O24",
+      "O25",
+      "O26",
+      "O28",
+      "O29"
+     ],
+     "first": "O20",
+     "id": "O20-O29",
+     "last": "O29",
+     "title": "Other maternal disorders predominantly related to pregnancy"
+    },
+    {
+     "categories": [
+      "O30",
+      "O31",
+      "O32",
+      "O33",
+      "O34",
+      "O35",
+      "O36",
+      "O40",
+      "O41",
+      "O42",
+      "O43",
+      "O44",
+      "O45",
+      "O46",
+      "O47",
+      "O48"
+     ],
+     "first": "O30",
+     "id": "O30-O48",
+     "last": "O48",
+     "title": "Maternal care related to the fetus and amniotic cavity and possible delivery problems"
+    },
+    {
+     "categories": [
+      "O60",
+      "O61",
+      "O62",
+      "O63",
+      "O64",
+      "O65",
+      "O66",
+      "O67",
+      "O68",
+      "O69",
+      "O70",
+      "O71",
+      "O72",
+      "O73",
+      "O74",
+      "O75",
+      "O76",
+      "O77"
+     ],
+     "first": "O60",
+     "id": "O60-O77",
+     "last": "O77",
+     "title": "Complications of labor and delivery"
+    },
+    {
+     "categories": [
+      "O80",
+      "O82"
+     ],
+     "first": "O80",
+     "id": "O80-O82",
+     "last": "O82",
+     "title": "Encounter for delivery"
+    },
+    {
+     "categories": [
+      "O85",
+      "O86",
+      "O87",
+      "O88",
+      "O89",
+      "O90",
+      "O91",
+      "O92"
+     ],
+     "first": "O85",
+     "id": "O85-O92",
+     "last": "O92",
+     "title": "Complications predominantly related to the puerperium"
+    },
+    {
+     "categories": [
+      "O94",
+      "O98",
+      "O99",
+      "O9A"
+     ],
+     "first": "O94",
+     "id": "O94-O9A",
+     "last": "O9A",
+     "title": "Other obstetric conditions, not elsewhere classified"
+    }
+   ],
+   "chapter": 15,
+   "first": "O00",
+   "last": "O9A",
+   "title": "Pregnancy, childbirth and the puerperium"
+  },
+  {
+   "blocks": [
+    {
+     "categories": [
+      "P00",
+      "P01",
+      "P02",
+      "P03",
+      "P04"
+     ],
+     "first": "P00",
+     "id": "P00-P04",
+     "last": "P04",
+     "title": "Newborn affected by maternal factors and by complications of pregnancy, labor, and delivery"
+    },
+    {
+     "categories": [
+      "P05",
+      "P07",
+      "P08"
+     ],
+     "first": "P05",
+     "id": "P05-P08",
+     "last": "P08",
+     "title": "Disorders of newborn related to length of gestation and fetal growth"
+    },
+    {
+     "categories": [
+      "P09"
+     ],
+     "first": "P09",
+     "id": "P09",
+     "last": "P09",
+     "title": "Abnormal findings on neonatal screening"
+    },
+    {
+     "categories": [
+      "P10",
+      "P11",
+      "P12",
+      "P13",
+      "P14",
+      "P15"
+     ],
+     "first": "P10",
+     "id": "P10-P15",
+     "last": "P15",
+     "title": "Birth trauma"
+    },
+    {
+     "categories": [
+      "P19",
+      "P22",
+      "P23",
+      "P24",
+      "P25",
+      "P26",
+      "P27",
+      "P28",
+      "P29"
+     ],
+     "first": "P19",
+     "id": "P19-P29",
+     "last": "P29",
+     "title": "Respiratory and cardiovascular disorders specific to the perinatal period"
+    },
+    {
+     "categories": [
+      "P35",
+      "P36",
+      "P37",
+      "P38",
+      "P39"
+     ],
+     "first": "P35",
+     "id": "P35-P39",
+     "last": "P39",
+     "title": "Infections specific to the perinatal period"
+    },
+    {
+     "categories": [
+      "P50",
+      "P51",
+      "P52",
+      "P53",
+      "P54",
+      "P55",
+      "P56",
+      "P57",
+      "P58",
+      "P59",
+      "P60",
+      "P61"
+     ],
+     "first": "P50",
+     "id": "P50-P61",
+     "last": "P61",
+     "title": "Hemorrhagic and hematological disorders of newborn"
+    },
+    {
+     "categories": [
+      "P70",
+      "P71",
+      "P72",
+      "P74"
+     ],
+     "first": "P70",
+     "id": "P70-P74",
+     "last": "P74",
+     "title": "Transitory endocrine and metabolic disorders specific to newborn"
+    },
+    {
+     "categories": [
+      "P76",
+      "P77",
+      "P78"
+     ],
+     "first": "P76",
+     "id": "P76-P78",
+     "last": "P78",
+     "title": "Digestive system disorders of newborn"
+    },
+    {
+     "categories": [
+      "P80",
+      "P81",
+      "P83"
+     ],
+     "first": "P80",
+     "id": "P80-P83",
+     "last": "P83",
+     "title": "Conditions involving the integument and temperature regulation of newborn"
+    },
+    {
+     "categories": [
+      "P84"
+     ],
+     "first": "P84",
+     "id": "P84",
+     "last": "P84",
+     "title": "Other problems with newborn"
+    },
+    {
+     "categories": [
+      "P90",
+      "P91",
+      "P92",
+      "P93",
+      "P94",
+      "P95",
+      "P96"
+     ],
+     "first": "P90",
+     "id": "P90-P96",
+     "last": "P96",
+     "title": "Other disorders originating in the perinatal period"
+    }
+   ],
+   "chapter": 16,
+   "first": "P00",
+   "last": "P96",
+   "title": "Certain conditions originating in the perinatal period"
+  },
+  {
+   "blocks": [
+    {
+     "categories": [
+      "Q00",
+      "Q01",
+      "Q02",
+      "Q03",
+      "Q04",
+      "Q05",
+      "Q06",
+      "Q07"
+     ],
+     "first": "Q00",
+     "id": "Q00-Q07",
+     "last": "Q07",
+     "title": "Congenital malformations of the nervous system"
+    },
+    {
+     "categories": [
+      "Q10",
+      "Q11",
+      "Q12",
+      "Q13",
+      "Q14",
+      "Q15",
+      "Q16",
+      "Q17",
+      "Q18"
+     ],
+     "first": "Q10",
+     "id": "Q10-Q18",
+     "last": "Q18",
+     "title": "Congenital malformations of eye, ear, face and neck"
+    },
+    {
+     "categories": [
+      "Q20",
+      "Q21",
+      "Q22",
+      "Q23",
+      "Q24",
+      "Q25",
+      "Q26",
+      "Q27",
+      "Q28"
+     ],
+     "first": "Q20",
+     "id": "Q20-Q28",
+     "last": "Q28",
+     "title": "Congenital malformations of the circulatory system"
+    },
+    {
+     "categories": [
+      "Q30",
+      "Q31",
+      "Q32",
+      "Q33",
+      "Q34"
+     ],
+     "first": "Q30",
+     "id": "Q30-Q34",
+     "last": "Q34",
+     "title": "Congenital malformations of the respiratory system"
+    },
+    {
+     "categories": [
+      "Q35",
+      "Q36",
+      "Q37"
+     ],
+     "first": "Q35",
+     "id": "Q35-Q37",
+     "last": "Q37",
+     "title": "Cleft lip and cleft palate"
+    },
+    {
+     "categories": [
+      "Q38",
+      "Q39",
+      "Q40",
+      "Q41",
+      "Q42",
+      "Q43",
+      "Q44",
+      "Q45"
+     ],
+     "first": "Q38",
+     "id": "Q38-Q45",
+     "last": "Q45",
+     "title": "Other congenital malformations of the digestive system"
+    },
+    {
+     "categories": [
+      "Q50",
+      "Q51",
+      "Q52",
+      "Q53",
+      "Q54",
+      "Q55",
+      "Q56"
+     ],
+     "first": "Q50",
+     "id": "Q50-Q56",
+     "last": "Q56",
+     "title": "Congenital malformations of genital organs"
+    },
+    {
+     "categories": [
+      "Q60",
+      "Q61",
+      "Q62",
+      "Q63",
+      "Q64"
+     ],
+     "first": "Q60",
+     "id": "Q60-Q64",
+     "last": "Q64",
+     "title": "Congenital malformations of the urinary system"
+    },
+    {
+     "categories": [
+      "Q65",
+      "Q66",
+      "Q67",
+      "Q68",
+      "Q69",
+      "Q70",
+      "Q71",
+      "Q72",
+      "Q73",
+      "Q74",
+      "Q75",
+      "Q76",
+      "Q77",
+      "Q78",
+      "Q79"
+     ],
+     "first": "Q65",
+     "id": "Q65-Q79",
+     "last": "Q79",
+     "title": "Congenital malformations and deformations of the musculoskeletal system"
+    },
+    {
+     "categories": [
+      "Q80",
+      "Q81",
+      "Q82",
+      "Q83",
+      "Q84",
+      "Q85",
+      "Q86",
+      "Q87",
+      "Q89"
+     ],
+     "first": "Q80",
+     "id": "Q80-Q89",
+     "last": "Q89",
+     "title": "Other congenital malformations"
+    },
+    {
+     "categories": [
+      "Q90",
+      "Q91",
+      "Q92",
+      "Q93",
+      "Q95",
+      "Q96",
+      "Q97",
+      "Q98",
+      "Q99"
+     ],
+     "first": "Q90",
+     "id": "Q90-Q99",
+     "last": "Q99",
+     "title": "Chromosomal abnormalities, not elsewhere classified"
+    },
+    {
+     "categories": [
+      "QA0",
+      "QA1"
+     ],
+     "first": "QA0",
+     "id": "QA0-QA1",
+     "last": "QA1",
+     "title": "Genetic disorders, not elsewhere classified"
+    }
+   ],
+   "chapter": 17,
+   "first": "Q00",
+   "last": "QA1",
+   "title": "Congenital malformations, deformations, chromosomal abnormalities, and genetic disorders"
+  },
+  {
+   "blocks": [
+    {
+     "categories": [
+      "R00",
+      "R01",
+      "R03",
+      "R04",
+      "R05",
+      "R06",
+      "R07",
+      "R09"
+     ],
+     "first": "R00",
+     "id": "R00-R09",
+     "last": "R09",
+     "title": "Symptoms and signs involving the circulatory and respiratory systems"
+    },
+    {
+     "categories": [
+      "R10",
+      "R11",
+      "R12",
+      "R13",
+      "R14",
+      "R15",
+      "R16",
+      "R17",
+      "R18",
+      "R19"
+     ],
+     "first": "R10",
+     "id": "R10-R19",
+     "last": "R19",
+     "title": "Symptoms and signs involving the digestive system and abdomen"
+    },
+    {
+     "categories": [
+      "R20",
+      "R21",
+      "R22",
+      "R23"
+     ],
+     "first": "R20",
+     "id": "R20-R23",
+     "last": "R23",
+     "title": "Symptoms and signs involving the skin and subcutaneous tissue"
+    },
+    {
+     "categories": [
+      "R25",
+      "R26",
+      "R27",
+      "R29"
+     ],
+     "first": "R25",
+     "id": "R25-R29",
+     "last": "R29",
+     "title": "Symptoms and signs involving the nervous and musculoskeletal systems"
+    },
+    {
+     "categories": [
+      "R30",
+      "R31",
+      "R32",
+      "R33",
+      "R34",
+      "R35",
+      "R36",
+      "R37",
+      "R39"
+     ],
+     "first": "R30",
+     "id": "R30-R39",
+     "last": "R39",
+     "title": "Symptoms and signs involving the genitourinary system"
+    },
+    {
+     "categories": [
+      "R40",
+      "R41",
+      "R42",
+      "R43",
+      "R44",
+      "R45",
+      "R46"
+     ],
+     "first": "R40",
+     "id": "R40-R46",
+     "last": "R46",
+     "title": "Symptoms and signs involving cognition, perception, emotional state and behavior"
+    },
+    {
+     "categories": [
+      "R47",
+      "R48",
+      "R49"
+     ],
+     "first": "R47",
+     "id": "R47-R49",
+     "last": "R49",
+     "title": "Symptoms and signs involving speech and voice"
+    },
+    {
+     "categories": [
+      "R50",
+      "R51",
+      "R52",
+      "R53",
+      "R54",
+      "R55",
+      "R56",
+      "R57",
+      "R58",
+      "R59",
+      "R60",
+      "R61",
+      "R62",
+      "R63",
+      "R64",
+      "R65",
+      "R68",
+      "R69"
+     ],
+     "first": "R50",
+     "id": "R50-R69",
+     "last": "R69",
+     "title": "General symptoms and signs"
+    },
+    {
+     "categories": [
+      "R70",
+      "R71",
+      "R73",
+      "R74",
+      "R75",
+      "R76",
+      "R77",
+      "R78",
+      "R79"
+     ],
+     "first": "R70",
+     "id": "R70-R79",
+     "last": "R79",
+     "title": "Abnormal findings on examination of blood, without diagnosis"
+    },
+    {
+     "categories": [
+      "R80",
+      "R81",
+      "R82"
+     ],
+     "first": "R80",
+     "id": "R80-R82",
+     "last": "R82",
+     "title": "Abnormal findings on examination of urine, without diagnosis"
+    },
+    {
+     "categories": [
+      "R83",
+      "R84",
+      "R85",
+      "R86",
+      "R87",
+      "R88",
+      "R89"
+     ],
+     "first": "R83",
+     "id": "R83-R89",
+     "last": "R89",
+     "title": "Abnormal findings on examination of other body fluids, substances and tissues, without diagnosis"
+    },
+    {
+     "categories": [
+      "R90",
+      "R91",
+      "R92",
+      "R93",
+      "R94"
+     ],
+     "first": "R90",
+     "id": "R90-R94",
+     "last": "R94",
+     "title": "Abnormal findings on diagnostic imaging and in function studies, without diagnosis"
+    },
+    {
+     "categories": [
+      "R97"
+     ],
+     "first": "R97",
+     "id": "R97",
+     "last": "R97",
+     "title": "Abnormal tumor markers"
+    },
+    {
+     "categories": [
+      "R99"
+     ],
+     "first": "R99",
+     "id": "R99",
+     "last": "R99",
+     "title": "Ill-defined and unknown cause of mortality"
+    }
+   ],
+   "chapter": 18,
+   "first": "R00",
+   "last": "R99",
+   "title": "Symptoms, signs and abnormal clinical and laboratory findings, not elsewhere classified"
+  },
+  {
+   "blocks": [
+    {
+     "categories": [
+      "S00",
+      "S01",
+      "S02",
+      "S03",
+      "S04",
+      "S05",
+      "S06",
+      "S07",
+      "S08",
+      "S09"
+     ],
+     "first": "S00",
+     "id": "S00-S09",
+     "last": "S09",
+     "title": "Injuries to the head"
+    },
+    {
+     "categories": [
+      "S10",
+      "S11",
+      "S12",
+      "S13",
+      "S14",
+      "S15",
+      "S16",
+      "S17",
+      "S19"
+     ],
+     "first": "S10",
+     "id": "S10-S19",
+     "last": "S19",
+     "title": "Injuries to the neck"
+    },
+    {
+     "categories": [
+      "S20",
+      "S21",
+      "S22",
+      "S23",
+      "S24",
+      "S25",
+      "S26",
+      "S27",
+      "S28",
+      "S29"
+     ],
+     "first": "S20",
+     "id": "S20-S29",
+     "last": "S29",
+     "title": "Injuries to the thorax"
+    },
+    {
+     "categories": [
+      "S30",
+      "S31",
+      "S32",
+      "S33",
+      "S34",
+      "S35",
+      "S36",
+      "S37",
+      "S38",
+      "S39"
+     ],
+     "first": "S30",
+     "id": "S30-S39",
+     "last": "S39",
+     "title": "Injuries to the abdomen, lower back, lumbar spine, pelvis and external genitals"
+    },
+    {
+     "categories": [
+      "S40",
+      "S41",
+      "S42",
+      "S43",
+      "S44",
+      "S45",
+      "S46",
+      "S47",
+      "S48",
+      "S49"
+     ],
+     "first": "S40",
+     "id": "S40-S49",
+     "last": "S49",
+     "title": "Injuries to the shoulder and upper arm"
+    },
+    {
+     "categories": [
+      "S50",
+      "S51",
+      "S52",
+      "S53",
+      "S54",
+      "S55",
+      "S56",
+      "S57",
+      "S58",
+      "S59"
+     ],
+     "first": "S50",
+     "id": "S50-S59",
+     "last": "S59",
+     "title": "Injuries to the elbow and forearm"
+    },
+    {
+     "categories": [
+      "S60",
+      "S61",
+      "S62",
+      "S63",
+      "S64",
+      "S65",
+      "S66",
+      "S67",
+      "S68",
+      "S69"
+     ],
+     "first": "S60",
+     "id": "S60-S69",
+     "last": "S69",
+     "title": "Injuries to the wrist, hand and fingers"
+    },
+    {
+     "categories": [
+      "S70",
+      "S71",
+      "S72",
+      "S73",
+      "S74",
+      "S75",
+      "S76",
+      "S77",
+      "S78",
+      "S79"
+     ],
+     "first": "S70",
+     "id": "S70-S79",
+     "last": "S79",
+     "title": "Injuries to the hip and thigh"
+    },
+    {
+     "categories": [
+      "S80",
+      "S81",
+      "S82",
+      "S83",
+      "S84",
+      "S85",
+      "S86",
+      "S87",
+      "S88",
+      "S89"
+     ],
+     "first": "S80",
+     "id": "S80-S89",
+     "last": "S89",
+     "title": "Injuries to the knee and lower leg"
+    },
+    {
+     "categories": [
+      "S90",
+      "S91",
+      "S92",
+      "S93",
+      "S94",
+      "S95",
+      "S96",
+      "S97",
+      "S98",
+      "S99"
+     ],
+     "first": "S90",
+     "id": "S90-S99",
+     "last": "S99",
+     "title": "Injuries to the ankle and foot"
+    },
+    {
+     "categories": [],
+     "first": "T07",
+     "id": "T07-T88",
+     "last": "T88",
+     "title": "Injury, poisoning and certain other consequences of external causes"
+    },
+    {
+     "categories": [
+      "T07"
+     ],
+     "first": "T07",
+     "id": "T07",
+     "last": "T07",
+     "title": "Injuries involving multiple body regions"
+    },
+    {
+     "categories": [
+      "T14"
+     ],
+     "first": "T14",
+     "id": "T14",
+     "last": "T14",
+     "title": "Injury of unspecified body region"
+    },
+    {
+     "categories": [
+      "T15",
+      "T16",
+      "T17",
+      "T18",
+      "T19"
+     ],
+     "first": "T15",
+     "id": "T15-T19",
+     "last": "T19",
+     "title": "Effects of foreign body entering through natural orifice"
+    },
+    {
+     "categories": [],
+     "first": "T20",
+     "id": "T20-T32",
+     "last": "T32",
+     "title": "Burns and corrosions"
+    },
+    {
+     "categories": [
+      "T20",
+      "T21",
+      "T22",
+      "T23",
+      "T24",
+      "T25"
+     ],
+     "first": "T20",
+     "id": "T20-T25",
+     "last": "T25",
+     "title": "Burns and corrosions of external body surface, specified by site"
+    },
+    {
+     "categories": [
+      "T26",
+      "T27",
+      "T28"
+     ],
+     "first": "T26",
+     "id": "T26-T28",
+     "last": "T28",
+     "title": "Burns and corrosions confined to eye and internal organs"
+    },
+    {
+     "categories": [
+      "T30",
+      "T31",
+      "T32"
+     ],
+     "first": "T30",
+     "id": "T30-T32",
+     "last": "T32",
+     "title": "Burns and corrosions of multiple and unspecified body regions"
+    },
+    {
+     "categories": [
+      "T33",
+      "T34"
+     ],
+     "first": "T33",
+     "id": "T33-T34",
+     "last": "T34",
+     "title": "Frostbite"
+    },
+    {
+     "categories": [
+      "T36",
+      "T37",
+      "T38",
+      "T39",
+      "T40",
+      "T41",
+      "T42",
+      "T43",
+      "T44",
+      "T45",
+      "T46",
+      "T47",
+      "T48",
+      "T49",
+      "T50"
+     ],
+     "first": "T36",
+     "id": "T36-T50",
+     "last": "T50",
+     "title": "Poisoning by, adverse effects of and underdosing of drugs, medicaments and biological substances"
+    },
+    {
+     "categories": [
+      "T51",
+      "T52",
+      "T53",
+      "T54",
+      "T55",
+      "T56",
+      "T57",
+      "T58",
+      "T59",
+      "T60",
+      "T61",
+      "T62",
+      "T63",
+      "T64",
+      "T65"
+     ],
+     "first": "T51",
+     "id": "T51-T65",
+     "last": "T65",
+     "title": "Toxic effects of substances chiefly nonmedicinal as to source"
+    },
+    {
+     "categories": [
+      "T66",
+      "T67",
+      "T68",
+      "T69",
+      "T70",
+      "T71",
+      "T73",
+      "T74",
+      "T75",
+      "T76",
+      "T78"
+     ],
+     "first": "T66",
+     "id": "T66-T78",
+     "last": "T78",
+     "title": "Other and unspecified effects of external causes"
+    },
+    {
+     "categories": [
+      "T79"
+     ],
+     "first": "T79",
+     "id": "T79",
+     "last": "T79",
+     "title": "Certain early complications of trauma"
+    },
+    {
+     "categories": [
+      "T80",
+      "T81",
+      "T82",
+      "T83",
+      "T84",
+      "T85",
+      "T86",
+      "T87",
+      "T88"
+     ],
+     "first": "T80",
+     "id": "T80-T88",
+     "last": "T88",
+     "title": "Complications of surgical and medical care, not elsewhere classified"
+    }
+   ],
+   "chapter": 19,
+   "first": "S00",
+   "last": "T88",
+   "title": "Injury, poisoning and certain other consequences of external causes"
+  },
+  {
+   "blocks": [
+    {
+     "categories": [],
+     "first": "V00",
+     "id": "V00-X58",
+     "last": "X58",
+     "title": "Accidents"
+    },
+    {
+     "categories": [],
+     "first": "V00",
+     "id": "V00-V99",
+     "last": "V99",
+     "title": "Transport accidents"
+    },
+    {
+     "categories": [
+      "V00",
+      "V01",
+      "V02",
+      "V03",
+      "V04",
+      "V05",
+      "V06",
+      "V09"
+     ],
+     "first": "V00",
+     "id": "V00-V09",
+     "last": "V09",
+     "title": "Pedestrian injured in transport accident"
+    },
+    {
+     "categories": [
+      "V10",
+      "V11",
+      "V12",
+      "V13",
+      "V14",
+      "V15",
+      "V16",
+      "V17",
+      "V18",
+      "V19"
+     ],
+     "first": "V10",
+     "id": "V10-V19",
+     "last": "V19",
+     "title": "Pedal cycle rider injured in transport accident"
+    },
+    {
+     "categories": [
+      "V20",
+      "V21",
+      "V22",
+      "V23",
+      "V24",
+      "V25",
+      "V26",
+      "V27",
+      "V28",
+      "V29"
+     ],
+     "first": "V20",
+     "id": "V20-V29",
+     "last": "V29",
+     "title": "Motorcycle rider injured in transport accident"
+    },
+    {
+     "categories": [
+      "V30",
+      "V31",
+      "V32",
+      "V33",
+      "V34",
+      "V35",
+      "V36",
+      "V37",
+      "V38",
+      "V39"
+     ],
+     "first": "V30",
+     "id": "V30-V39",
+     "last": "V39",
+     "title": "Occupant of three-wheeled motor vehicle injured in transport accident"
+    },
+    {
+     "categories": [
+      "V40",
+      "V41",
+      "V42",
+      "V43",
+      "V44",
+      "V45",
+      "V46",
+      "V47",
+      "V48",
+      "V49"
+     ],
+     "first": "V40",
+     "id": "V40-V49",
+     "last": "V49",
+     "title": "Car occupant injured in transport accident"
+    },
+    {
+     "categories": [
+      "V50",
+      "V51",
+      "V52",
+      "V53",
+      "V54",
+      "V55",
+      "V56",
+      "V57",
+      "V58",
+      "V59"
+     ],
+     "first": "V50",
+     "id": "V50-V59",
+     "last": "V59",
+     "title": "Occupant of pick-up truck or van injured in transport accident"
+    },
+    {
+     "categories": [
+      "V60",
+      "V61",
+      "V62",
+      "V63",
+      "V64",
+      "V65",
+      "V66",
+      "V67",
+      "V68",
+      "V69"
+     ],
+     "first": "V60",
+     "id": "V60-V69",
+     "last": "V69",
+     "title": "Occupant of heavy transport vehicle injured in transport accident"
+    },
+    {
+     "categories": [
+      "V70",
+      "V71",
+      "V72",
+      "V73",
+      "V74",
+      "V75",
+      "V76",
+      "V77",
+      "V78",
+      "V79"
+     ],
+     "first": "V70",
+     "id": "V70-V79",
+     "last": "V79",
+     "title": "Bus occupant injured in transport accident"
+    },
+    {
+     "categories": [
+      "V80",
+      "V81",
+      "V82",
+      "V83",
+      "V84",
+      "V85",
+      "V86",
+      "V87",
+      "V88",
+      "V89"
+     ],
+     "first": "V80",
+     "id": "V80-V89",
+     "last": "V89",
+     "title": "Other land transport accidents"
+    },
+    {
+     "categories": [
+      "V90",
+      "V91",
+      "V92",
+      "V93",
+      "V94"
+     ],
+     "first": "V90",
+     "id": "V90-V94",
+     "last": "V94",
+     "title": "Water transport accidents"
+    },
+    {
+     "categories": [
+      "V95",
+      "V96",
+      "V97"
+     ],
+     "first": "V95",
+     "id": "V95-V97",
+     "last": "V97",
+     "title": "Air and space transport accidents"
+    },
+    {
+     "categories": [
+      "V98",
+      "V99"
+     ],
+     "first": "V98",
+     "id": "V98-V99",
+     "last": "V99",
+     "title": "Other and unspecified transport accidents"
+    },
+    {
+     "categories": [],
+     "first": "W00",
+     "id": "W00-X58",
+     "last": "X58",
+     "title": "Other external causes of accidental injury"
+    },
+    {
+     "categories": [
+      "W00",
+      "W01",
+      "W03",
+      "W04",
+      "W05",
+      "W06",
+      "W07",
+      "W08",
+      "W09",
+      "W10",
+      "W11",
+      "W12",
+      "W13",
+      "W14",
+      "W15",
+      "W16",
+      "W17",
+      "W18",
+      "W19"
+     ],
+     "first": "W00",
+     "id": "W00-W19",
+     "last": "W19",
+     "title": "Slipping, tripping, stumbling and falls"
+    },
+    {
+     "categories": [
+      "W20",
+      "W21",
+      "W22",
+      "W23",
+      "W24",
+      "W25",
+      "W26",
+      "W27",
+      "W28",
+      "W29",
+      "W30",
+      "W31",
+      "W32",
+      "W33",
+      "W34",
+      "W35",
+      "W36",
+      "W37",
+      "W38",
+      "W39",
+      "W40",
+      "W42",
+      "W44",
+      "W45",
+      "W46",
+      "W49"
+     ],
+     "first": "W20",
+     "id": "W20-W49",
+     "last": "W49",
+     "title": "Exposure to inanimate mechanical forces"
+    },
+    {
+     "categories": [
+      "W50",
+      "W51",
+      "W52",
+      "W53",
+      "W54",
+      "W55",
+      "W56",
+      "W57",
+      "W58",
+      "W59",
+      "W60",
+      "W61",
+      "W62",
+      "W64"
+     ],
+     "first": "W50",
+     "id": "W50-W64",
+     "last": "W64",
+     "title": "Exposure to animate mechanical forces"
+    },
+    {
+     "categories": [
+      "W65",
+      "W67",
+      "W69",
+      "W73",
+      "W74"
+     ],
+     "first": "W65",
+     "id": "W65-W74",
+     "last": "W74",
+     "title": "Accidental non-transport drowning and submersion"
+    },
+    {
+     "categories": [
+      "W85",
+      "W86",
+      "W88",
+      "W89",
+      "W90",
+      "W92",
+      "W93",
+      "W94",
+      "W99"
+     ],
+     "first": "W85",
+     "id": "W85-W99",
+     "last": "W99",
+     "title": "Exposure to electric current, radiation and extreme ambient air temperature and pressure"
+    },
+    {
+     "categories": [
+      "X00",
+      "X01",
+      "X02",
+      "X03",
+      "X04",
+      "X05",
+      "X06",
+      "X08"
+     ],
+     "first": "X00",
+     "id": "X00-X08",
+     "last": "X08",
+     "title": "Exposure to smoke, fire and flames"
+    },
+    {
+     "categories": [
+      "X10",
+      "X11",
+      "X12",
+      "X13",
+      "X14",
+      "X15",
+      "X16",
+      "X17",
+      "X18",
+      "X19"
+     ],
+     "first": "X10",
+     "id": "X10-X19",
+     "last": "X19",
+     "title": "Contact with heat and hot substances"
+    },
+    {
+     "categories": [
+      "X30",
+      "X31",
+      "X32",
+      "X34",
+      "X35",
+      "X36",
+      "X37",
+      "X38",
+      "X39"
+     ],
+     "first": "X30",
+     "id": "X30-X39",
+     "last": "X39",
+     "title": "Exposure to forces of nature"
+    },
+    {
+     "categories": [
+      "X50"
+     ],
+     "first": "X50",
+     "id": "X50",
+     "last": "X50",
+     "title": "Overexertion and strenuous or repetitive movements"
+    },
+    {
+     "categories": [
+      "X52",
+      "X58"
+     ],
+     "first": "X52",
+     "id": "X52-X58",
+     "last": "X58",
+     "title": "Accidental exposure to other specified factors"
+    },
+    {
+     "categories": [
+      "X71",
+      "X72",
+      "X73",
+      "X74",
+      "X75",
+      "X76",
+      "X77",
+      "X78",
+      "X79",
+      "X80",
+      "X81",
+      "X82",
+      "X83"
+     ],
+     "first": "X71",
+     "id": "X71-X83",
+     "last": "X83",
+     "title": "Intentional self-harm"
+    },
+    {
+     "categories": [
+      "X92",
+      "X93",
+      "X94",
+      "X95",
+      "X96",
+      "X97",
+      "X98",
+      "X99",
+      "Y00",
+      "Y01",
+      "Y02",
+      "Y03",
+      "Y04",
+      "Y07",
+      "Y08",
+      "Y09"
+     ],
+     "first": "X92",
+     "id": "X92-Y09",
+     "last": "Y09",
+     "title": "Assault"
+    },
+    {
+     "categories": [
+      "Y21",
+      "Y22",
+      "Y23",
+      "Y24",
+      "Y25",
+      "Y26",
+      "Y27",
+      "Y28",
+      "Y29",
+      "Y30",
+      "Y31",
+      "Y32",
+      "Y33"
+     ],
+     "first": "Y21",
+     "id": "Y21-Y33",
+     "last": "Y33",
+     "title": "Event of undetermined intent"
+    },
+    {
+     "categories": [
+      "Y35",
+      "Y36",
+      "Y37",
+      "Y38"
+     ],
+     "first": "Y35",
+     "id": "Y35-Y38",
+     "last": "Y38",
+     "title": "Legal intervention, operations of war, military operations, and terrorism"
+    },
+    {
+     "categories": [],
+     "first": "Y62",
+     "id": "Y62-Y84",
+     "last": "Y84",
+     "title": "Complications of medical and surgical care"
+    },
+    {
+     "categories": [
+      "Y62",
+      "Y63",
+      "Y64",
+      "Y65",
+      "Y66",
+      "Y69"
+     ],
+     "first": "Y62",
+     "id": "Y62-Y69",
+     "last": "Y69",
+     "title": "Misadventures to patients during surgical and medical care"
+    },
+    {
+     "categories": [
+      "Y70",
+      "Y71",
+      "Y72",
+      "Y73",
+      "Y74",
+      "Y75",
+      "Y76",
+      "Y77",
+      "Y78",
+      "Y79",
+      "Y80",
+      "Y81",
+      "Y82"
+     ],
+     "first": "Y70",
+     "id": "Y70-Y82",
+     "last": "Y82",
+     "title": "Medical devices associated with adverse incidents in diagnostic and therapeutic use"
+    },
+    {
+     "categories": [
+      "Y83",
+      "Y84"
+     ],
+     "first": "Y83",
+     "id": "Y83-Y84",
+     "last": "Y84",
+     "title": "Surgical and other medical procedures as the cause of abnormal reaction of the patient, or of later complication, without mention of misadventure at the time of the procedure"
+    },
+    {
+     "categories": [
+      "Y90",
+      "Y92",
+      "Y93",
+      "Y95",
+      "Y99"
+     ],
+     "first": "Y90",
+     "id": "Y90-Y99",
+     "last": "Y99",
+     "title": "Supplementary factors related to causes of morbidity classified elsewhere"
+    }
+   ],
+   "chapter": 20,
+   "first": "V00",
+   "last": "Y99",
+   "title": "External causes of morbidity"
+  },
+  {
+   "blocks": [
+    {
+     "categories": [
+      "Z00",
+      "Z01",
+      "Z02",
+      "Z03",
+      "Z04",
+      "Z05",
+      "Z08",
+      "Z09",
+      "Z11",
+      "Z12",
+      "Z13"
+     ],
+     "first": "Z00",
+     "id": "Z00-Z13",
+     "last": "Z13",
+     "title": "Persons encountering health services for examinations"
+    },
+    {
+     "categories": [
+      "Z14",
+      "Z15"
+     ],
+     "first": "Z14",
+     "id": "Z14-Z15",
+     "last": "Z15",
+     "title": "Genetic carrier and genetic susceptibility to disease"
+    },
+    {
+     "categories": [
+      "Z16"
+     ],
+     "first": "Z16",
+     "id": "Z16",
+     "last": "Z16",
+     "title": "Resistance to antimicrobial drugs"
+    },
+    {
+     "categories": [
+      "Z17"
+     ],
+     "first": "Z17",
+     "id": "Z17",
+     "last": "Z17",
+     "title": "Estrogen, and other hormones and factors receptor status"
+    },
+    {
+     "categories": [
+      "Z18"
+     ],
+     "first": "Z18",
+     "id": "Z18",
+     "last": "Z18",
+     "title": "Retained foreign body fragments"
+    },
+    {
+     "categories": [
+      "Z19"
+     ],
+     "first": "Z19",
+     "id": "Z19",
+     "last": "Z19",
+     "title": "Hormone sensitivity malignancy status"
+    },
+    {
+     "categories": [
+      "Z20",
+      "Z21",
+      "Z22",
+      "Z23",
+      "Z28",
+      "Z29"
+     ],
+     "first": "Z20",
+     "id": "Z20-Z29",
+     "last": "Z29",
+     "title": "Persons with potential health hazards related to communicable diseases"
+    },
+    {
+     "categories": [
+      "Z30",
+      "Z31",
+      "Z32",
+      "Z33",
+      "Z34",
+      "Z36",
+      "Z37",
+      "Z38",
+      "Z39",
+      "Z3A"
+     ],
+     "first": "Z30",
+     "id": "Z30-Z39",
+     "last": "Z39",
+     "title": "Persons encountering health services in circumstances related to reproduction"
+    },
+    {
+     "categories": [
+      "Z40",
+      "Z41",
+      "Z42",
+      "Z43",
+      "Z44",
+      "Z45",
+      "Z46",
+      "Z47",
+      "Z48",
+      "Z49",
+      "Z51",
+      "Z52",
+      "Z53"
+     ],
+     "first": "Z40",
+     "id": "Z40-Z53",
+     "last": "Z53",
+     "title": "Encounters for other specific health care"
+    },
+    {
+     "categories": [
+      "Z55",
+      "Z56",
+      "Z57",
+      "Z58",
+      "Z59",
+      "Z60",
+      "Z62",
+      "Z63",
+      "Z64",
+      "Z65"
+     ],
+     "first": "Z55",
+     "id": "Z55-Z65",
+     "last": "Z65",
+     "title": "Persons with potential health hazards related to socioeconomic and psychosocial circumstances"
+    },
+    {
+     "categories": [
+      "Z66"
+     ],
+     "first": "Z66",
+     "id": "Z66",
+     "last": "Z66",
+     "title": "Do not resuscitate status"
+    },
+    {
+     "categories": [
+      "Z67"
+     ],
+     "first": "Z67",
+     "id": "Z67",
+     "last": "Z67",
+     "title": "Blood type"
+    },
+    {
+     "categories": [
+      "Z68"
+     ],
+     "first": "Z68",
+     "id": "Z68",
+     "last": "Z68",
+     "title": "Body mass index [BMI]"
+    },
+    {
+     "categories": [
+      "Z69",
+      "Z70",
+      "Z71",
+      "Z72",
+      "Z73",
+      "Z74",
+      "Z75",
+      "Z76"
+     ],
+     "first": "Z69",
+     "id": "Z69-Z76",
+     "last": "Z76",
+     "title": "Persons encountering health services in other circumstances"
+    },
+    {
+     "categories": [
+      "Z77",
+      "Z78",
+      "Z79",
+      "Z80",
+      "Z81",
+      "Z82",
+      "Z83",
+      "Z84",
+      "Z85",
+      "Z86",
+      "Z87",
+      "Z88",
+      "Z89",
+      "Z90",
+      "Z91",
+      "Z92",
+      "Z93",
+      "Z94",
+      "Z95",
+      "Z96",
+      "Z97",
+      "Z98",
+      "Z99"
+     ],
+     "first": "Z77",
+     "id": "Z77-Z99",
+     "last": "Z99",
+     "title": "Persons with potential health hazards related to family and personal history and certain conditions influencing health status"
+    }
+   ],
+   "chapter": 21,
+   "first": "Z00",
+   "last": "Z99",
+   "title": "Factors influencing health status and contact with health services"
+  },
+  {
+   "blocks": [
+    {
+     "categories": [
+      "U07",
+      "U09"
+     ],
+     "first": "U00",
+     "id": "U00-U49",
+     "last": "U49",
+     "title": "Provisional assignment of new diseases of uncertain etiology or emergency use"
+    }
+   ],
+   "chapter": 22,
+   "first": "U00",
+   "last": "U85",
+   "title": "Codes for special purposes"
+  }
+ ],
+ "code_system": "ICD-10-CM",
+ "level": "chapter / block / 3-character category code (no category titles)",
+ "version": "FY2027"
+}

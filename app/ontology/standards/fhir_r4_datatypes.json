@@ -1,0 +1,1159 @@
+{
+ "datatypes": {
+  "Address": {
+   "elements": [
+    {
+     "max": "*",
+     "min": 0,
+     "path": "Address",
+     "short": "An address expressed using postal conventions (as opposed to GPS or other location definition formats)"
+    },
+    {
+     "infra": true,
+     "max": "1",
+     "min": 0,
+     "path": "Address.id",
+     "short": "Unique id for inter-element referencing",
+     "type": [
+      {
+       "code": "http://hl7.org/fhirpath/System.String"
+      }
+     ]
+    },
+    {
+     "infra": true,
+     "max": "*",
+     "min": 0,
+     "path": "Address.extension",
+     "short": "Additional content defined by implementations",
+     "type": [
+      {
+       "code": "Extension"
+      }
+     ]
+    },
+    {
+     "binding": {
+      "strength": "required",
+      "valueSet": "http://hl7.org/fhir/ValueSet/address-use|4.0.1"
+     },
+     "max": "1",
+     "min": 0,
+     "path": "Address.use",
+     "short": "home | work | temp | old | billing - purpose of this address",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "binding": {
+      "strength": "required",
+      "valueSet": "http://hl7.org/fhir/ValueSet/address-type|4.0.1"
+     },
+     "max": "1",
+     "min": 0,
+     "path": "Address.type",
+     "short": "postal | physical | both",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "infra": true,
+     "max": "1",
+     "min": 0,
+     "path": "Address.text",
+     "short": "Text representation of the address",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "max": "*",
+     "min": 0,
+     "path": "Address.line",
+     "short": "Street name, number, direction & P.O. Box etc.",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Address.city",
+     "short": "Name of city, town etc.",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Address.district",
+     "short": "District name (aka county)",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Address.state",
+     "short": "Sub-unit of country (abbreviations ok)",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Address.postalCode",
+     "short": "Postal code for area",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Address.country",
+     "short": "Country (e.g. can be ISO 3166 2 or 3 letter code)",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Address.period",
+     "short": "Time period when address was/is in use",
+     "type": [
+      {
+       "code": "Period"
+      }
+     ]
+    }
+   ],
+   "url": "http://hl7.org/fhir/StructureDefinition/Address"
+  },
+  "Attachment": {
+   "elements": [
+    {
+     "max": "*",
+     "min": 0,
+     "path": "Attachment",
+     "short": "Content in a format defined elsewhere"
+    },
+    {
+     "infra": true,
+     "max": "1",
+     "min": 0,
+     "path": "Attachment.id",
+     "short": "Unique id for inter-element referencing",
+     "type": [
+      {
+       "code": "http://hl7.org/fhirpath/System.String"
+      }
+     ]
+    },
+    {
+     "infra": true,
+     "max": "*",
+     "min": 0,
+     "path": "Attachment.extension",
+     "short": "Additional content defined by implementations",
+     "type": [
+      {
+       "code": "Extension"
+      }
+     ]
+    },
+    {
+     "binding": {
+      "strength": "required",
+      "valueSet": "http://hl7.org/fhir/ValueSet/mimetypes|4.0.1"
+     },
+     "max": "1",
+     "min": 0,
+     "path": "Attachment.contentType",
+     "short": "Mime type of the content, with charset etc.",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "binding": {
+      "strength": "preferred",
+      "valueSet": "http://hl7.org/fhir/ValueSet/languages"
+     },
+     "infra": true,
+     "max": "1",
+     "min": 0,
+     "path": "Attachment.language",
+     "short": "Human language of the content (BCP-47)",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Attachment.data",
+     "short": "Data inline, base64ed",
+     "type": [
+      {
+       "code": "base64Binary"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Attachment.url",
+     "short": "Uri where the data can be found",
+     "type": [
+      {
+       "code": "url"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Attachment.size",
+     "short": "Number of bytes of content (if url provided)",
+     "type": [
+      {
+       "code": "unsignedInt"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Attachment.hash",
+     "short": "Hash of the data (sha-1, base64ed)",
+     "type": [
+      {
+       "code": "base64Binary"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Attachment.title",
+     "short": "Label to display in place of the data",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Attachment.creation",
+     "short": "Date attachment was first created",
+     "type": [
+      {
+       "code": "dateTime"
+      }
+     ]
+    }
+   ],
+   "url": "http://hl7.org/fhir/StructureDefinition/Attachment"
+  },
+  "CodeableConcept": {
+   "elements": [
+    {
+     "max": "*",
+     "min": 0,
+     "path": "CodeableConcept",
+     "short": "Concept - reference to a terminology or just  text"
+    },
+    {
+     "infra": true,
+     "max": "1",
+     "min": 0,
+     "path": "CodeableConcept.id",
+     "short": "Unique id for inter-element referencing",
+     "type": [
+      {
+       "code": "http://hl7.org/fhirpath/System.String"
+      }
+     ]
+    },
+    {
+     "infra": true,
+     "max": "*",
+     "min": 0,
+     "path": "CodeableConcept.extension",
+     "short": "Additional content defined by implementations",
+     "type": [
+      {
+       "code": "Extension"
+      }
+     ]
+    },
+    {
+     "max": "*",
+     "min": 0,
+     "path": "CodeableConcept.coding",
+     "short": "Code defined by a terminology system",
+     "type": [
+      {
+       "code": "Coding"
+      }
+     ]
+    },
+    {
+     "infra": true,
+     "max": "1",
+     "min": 0,
+     "path": "CodeableConcept.text",
+     "short": "Plain text representation of the concept",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    }
+   ],
+   "url": "http://hl7.org/fhir/StructureDefinition/CodeableConcept"
+  },
+  "Coding": {
+   "elements": [
+    {
+     "max": "*",
+     "min": 0,
+     "path": "Coding",
+     "short": "A reference to a code defined by a terminology system"
+    },
+    {
+     "infra": true,
+     "max": "1",
+     "min": 0,
+     "path": "Coding.id",
+     "short": "Unique id for inter-element referencing",
+     "type": [
+      {
+       "code": "http://hl7.org/fhirpath/System.String"
+      }
+     ]
+    },
+    {
+     "infra": true,
+     "max": "*",
+     "min": 0,
+     "path": "Coding.extension",
+     "short": "Additional content defined by implementations",
+     "type": [
+      {
+       "code": "Extension"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Coding.system",
+     "short": "Identity of the terminology system",
+     "type": [
+      {
+       "code": "uri"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Coding.version",
+     "short": "Version of the system - if relevant",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Coding.code",
+     "short": "Symbol in syntax defined by the system",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Coding.display",
+     "short": "Representation defined by the system",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Coding.userSelected",
+     "short": "If this coding was chosen directly by the user",
+     "type": [
+      {
+       "code": "boolean"
+      }
+     ]
+    }
+   ],
+   "url": "http://hl7.org/fhir/StructureDefinition/Coding"
+  },
+  "ContactPoint": {
+   "elements": [
+    {
+     "max": "*",
+     "min": 0,
+     "path": "ContactPoint",
+     "short": "Details of a Technology mediated contact point (phone, fax, email, etc.)"
+    },
+    {
+     "infra": true,
+     "max": "1",
+     "min": 0,
+     "path": "ContactPoint.id",
+     "short": "Unique id for inter-element referencing",
+     "type": [
+      {
+       "code": "http://hl7.org/fhirpath/System.String"
+      }
+     ]
+    },
+    {
+     "infra": true,
+     "max": "*",
+     "min": 0,
+     "path": "ContactPoint.extension",
+     "short": "Additional content defined by implementations",
+     "type": [
+      {
+       "code": "Extension"
+      }
+     ]
+    },
+    {
+     "binding": {
+      "strength": "required",
+      "valueSet": "http://hl7.org/fhir/ValueSet/contact-point-system|4.0.1"
+     },
+     "max": "1",
+     "min": 0,
+     "path": "ContactPoint.system",
+     "short": "phone | fax | email | pager | url | sms | other",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "ContactPoint.value",
+     "short": "The actual contact point details",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "binding": {
+      "strength": "required",
+      "valueSet": "http://hl7.org/fhir/ValueSet/contact-point-use|4.0.1"
+     },
+     "max": "1",
+     "min": 0,
+     "path": "ContactPoint.use",
+     "short": "home | work | temp | old | mobile - purpose of this contact point",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "ContactPoint.rank",
+     "short": "Specify preferred order of use (1 = highest)",
+     "type": [
+      {
+       "code": "positiveInt"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "ContactPoint.period",
+     "short": "Time period when the contact point was/is in use",
+     "type": [
+      {
+       "code": "Period"
+      }
+     ]
+    }
+   ],
+   "url": "http://hl7.org/fhir/StructureDefinition/ContactPoint"
+  },
+  "Duration": {
+   "elements": [
+    {
+     "binding": {
+      "strength": "extensible",
+      "valueSet": "http://hl7.org/fhir/ValueSet/duration-units"
+     },
+     "max": "*",
+     "min": 0,
+     "path": "Duration",
+     "short": "A length of time"
+    },
+    {
+     "infra": true,
+     "max": "1",
+     "min": 0,
+     "path": "Duration.id",
+     "short": "Unique id for inter-element referencing",
+     "type": [
+      {
+       "code": "http://hl7.org/fhirpath/System.String"
+      }
+     ]
+    },
+    {
+     "infra": true,
+     "max": "*",
+     "min": 0,
+     "path": "Duration.extension",
+     "short": "Additional content defined by implementations",
+     "type": [
+      {
+       "code": "Extension"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Duration.value",
+     "short": "Numerical value (with implicit precision)",
+     "type": [
+      {
+       "code": "decimal"
+      }
+     ]
+    },
+    {
+     "binding": {
+      "strength": "required",
+      "valueSet": "http://hl7.org/fhir/ValueSet/quantity-comparator|4.0.1"
+     },
+     "max": "1",
+     "min": 0,
+     "path": "Duration.comparator",
+     "short": "< | <= | >= | > - how to understand the value",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Duration.unit",
+     "short": "Unit representation",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Duration.system",
+     "short": "System that defines coded unit form",
+     "type": [
+      {
+       "code": "uri"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Duration.code",
+     "short": "Coded form of the unit",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    }
+   ],
+   "url": "http://hl7.org/fhir/StructureDefinition/Duration"
+  },
+  "HumanName": {
+   "elements": [
+    {
+     "max": "*",
+     "min": 0,
+     "path": "HumanName",
+     "short": "Name of a human - parts and usage"
+    },
+    {
+     "infra": true,
+     "max": "1",
+     "min": 0,
+     "path": "HumanName.id",
+     "short": "Unique id for inter-element referencing",
+     "type": [
+      {
+       "code": "http://hl7.org/fhirpath/System.String"
+      }
+     ]
+    },
+    {
+     "infra": true,
+     "max": "*",
+     "min": 0,
+     "path": "HumanName.extension",
+     "short": "Additional content defined by implementations",
+     "type": [
+      {
+       "code": "Extension"
+      }
+     ]
+    },
+    {
+     "binding": {
+      "strength": "required",
+      "valueSet": "http://hl7.org/fhir/ValueSet/name-use|4.0.1"
+     },
+     "max": "1",
+     "min": 0,
+     "path": "HumanName.use",
+     "short": "usual | official | temp | nickname | anonymous | old | maiden",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "infra": true,
+     "max": "1",
+     "min": 0,
+     "path": "HumanName.text",
+     "short": "Text representation of the full name",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "HumanName.family",
+     "short": "Family name (often called 'Surname')",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "max": "*",
+     "min": 0,
+     "path": "HumanName.given",
+     "short": "Given names (not always 'first'). Includes middle names",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "max": "*",
+     "min": 0,
+     "path": "HumanName.prefix",
+     "short": "Parts that come before the name",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "max": "*",
+     "min": 0,
+     "path": "HumanName.suffix",
+     "short": "Parts that come after the name",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "HumanName.period",
+     "short": "Time period when name was/is in use",
+     "type": [
+      {
+       "code": "Period"
+      }
+     ]
+    }
+   ],
+   "url": "http://hl7.org/fhir/StructureDefinition/HumanName"
+  },
+  "Identifier": {
+   "elements": [
+    {
+     "max": "*",
+     "min": 0,
+     "path": "Identifier",
+     "short": "An identifier intended for computation"
+    },
+    {
+     "infra": true,
+     "max": "1",
+     "min": 0,
+     "path": "Identifier.id",
+     "short": "Unique id for inter-element referencing",
+     "type": [
+      {
+       "code": "http://hl7.org/fhirpath/System.String"
+      }
+     ]
+    },
+    {
+     "infra": true,
+     "max": "*",
+     "min": 0,
+     "path": "Identifier.extension",
+     "short": "Additional content defined by implementations",
+     "type": [
+      {
+       "code": "Extension"
+      }
+     ]
+    },
+    {
+     "binding": {
+      "strength": "required",
+      "valueSet": "http://hl7.org/fhir/ValueSet/identifier-use|4.0.1"
+     },
+     "max": "1",
+     "min": 0,
+     "path": "Identifier.use",
+     "short": "usual | official | temp | secondary | old (If known)",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "binding": {
+      "strength": "extensible",
+      "valueSet": "http://hl7.org/fhir/ValueSet/identifier-type"
+     },
+     "max": "1",
+     "min": 0,
+     "path": "Identifier.type",
+     "short": "Description of identifier",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Identifier.system",
+     "short": "The namespace for the identifier value",
+     "type": [
+      {
+       "code": "uri"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Identifier.value",
+     "short": "The value that is unique",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Identifier.period",
+     "short": "Time period when id is/was valid for use",
+     "type": [
+      {
+       "code": "Period"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Identifier.assigner",
+     "short": "Organization that issued id (may be just text)",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/StructureDefinition/Organization"
+       ]
+      }
+     ]
+    }
+   ],
+   "url": "http://hl7.org/fhir/StructureDefinition/Identifier"
+  },
+  "Money": {
+   "elements": [
+    {
+     "max": "*",
+     "min": 0,
+     "path": "Money",
+     "short": "An amount of economic utility in some recognized currency"
+    },
+    {
+     "infra": true,
+     "max": "1",
+     "min": 0,
+     "path": "Money.id",
+     "short": "Unique id for inter-element referencing",
+     "type": [
+      {
+       "code": "http://hl7.org/fhirpath/System.String"
+      }
+     ]
+    },
+    {
+     "infra": true,
+     "max": "*",
+     "min": 0,
+     "path": "Money.extension",
+     "short": "Additional content defined by implementations",
+     "type": [
+      {
+       "code": "Extension"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Money.value",
+     "short": "Numerical value (with implicit precision)",
+     "type": [
+      {
+       "code": "decimal"
+      }
+     ]
+    },
+    {
+     "binding": {
+      "strength": "required",
+      "valueSet": "http://hl7.org/fhir/ValueSet/currencies|4.0.1"
+     },
+     "max": "1",
+     "min": 0,
+     "path": "Money.currency",
+     "short": "ISO 4217 Currency Code",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    }
+   ],
+   "url": "http://hl7.org/fhir/StructureDefinition/Money"
+  },
+  "Period": {
+   "elements": [
+    {
+     "max": "*",
+     "min": 0,
+     "path": "Period",
+     "short": "Time range defined by start and end date/time"
+    },
+    {
+     "infra": true,
+     "max": "1",
+     "min": 0,
+     "path": "Period.id",
+     "short": "Unique id for inter-element referencing",
+     "type": [
+      {
+       "code": "http://hl7.org/fhirpath/System.String"
+      }
+     ]
+    },
+    {
+     "infra": true,
+     "max": "*",
+     "min": 0,
+     "path": "Period.extension",
+     "short": "Additional content defined by implementations",
+     "type": [
+      {
+       "code": "Extension"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Period.start",
+     "short": "Starting time with inclusive boundary",
+     "type": [
+      {
+       "code": "dateTime"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Period.end",
+     "short": "End time with inclusive boundary, if not ongoing",
+     "type": [
+      {
+       "code": "dateTime"
+      }
+     ]
+    }
+   ],
+   "url": "http://hl7.org/fhir/StructureDefinition/Period"
+  },
+  "Quantity": {
+   "elements": [
+    {
+     "max": "*",
+     "min": 0,
+     "path": "Quantity",
+     "short": "A measured or measurable amount"
+    },
+    {
+     "infra": true,
+     "max": "1",
+     "min": 0,
+     "path": "Quantity.id",
+     "short": "Unique id for inter-element referencing",
+     "type": [
+      {
+       "code": "http://hl7.org/fhirpath/System.String"
+      }
+     ]
+    },
+    {
+     "infra": true,
+     "max": "*",
+     "min": 0,
+     "path": "Quantity.extension",
+     "short": "Additional content defined by implementations",
+     "type": [
+      {
+       "code": "Extension"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Quantity.value",
+     "short": "Numerical value (with implicit precision)",
+     "type": [
+      {
+       "code": "decimal"
+      }
+     ]
+    },
+    {
+     "binding": {
+      "strength": "required",
+      "valueSet": "http://hl7.org/fhir/ValueSet/quantity-comparator|4.0.1"
+     },
+     "max": "1",
+     "min": 0,
+     "path": "Quantity.comparator",
+     "short": "< | <= | >= | > - how to understand the value",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Quantity.unit",
+     "short": "Unit representation",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Quantity.system",
+     "short": "System that defines coded unit form",
+     "type": [
+      {
+       "code": "uri"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Quantity.code",
+     "short": "Coded form of the unit",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    }
+   ],
+   "url": "http://hl7.org/fhir/StructureDefinition/Quantity"
+  },
+  "Reference": {
+   "elements": [
+    {
+     "max": "*",
+     "min": 0,
+     "path": "Reference",
+     "short": "A reference from one resource to another"
+    },
+    {
+     "infra": true,
+     "max": "1",
+     "min": 0,
+     "path": "Reference.id",
+     "short": "Unique id for inter-element referencing",
+     "type": [
+      {
+       "code": "http://hl7.org/fhirpath/System.String"
+      }
+     ]
+    },
+    {
+     "infra": true,
+     "max": "*",
+     "min": 0,
+     "path": "Reference.extension",
+     "short": "Additional content defined by implementations",
+     "type": [
+      {
+       "code": "Extension"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Reference.reference",
+     "short": "Literal reference, Relative, internal or absolute URL",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "binding": {
+      "strength": "extensible",
+      "valueSet": "http://hl7.org/fhir/ValueSet/resource-types"
+     },
+     "max": "1",
+     "min": 0,
+     "path": "Reference.type",
+     "short": "Type the reference refers to (e.g. \"Patient\")",
+     "type": [
+      {
+       "code": "uri"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Reference.identifier",
+     "short": "Logical reference, when literal reference is not known",
+     "type": [
+      {
+       "code": "Identifier"
+      }
+     ]
+    },
+    {
+     "max": "1",
+     "min": 0,
+     "path": "Reference.display",
+     "short": "Text alternative for the resource",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    }
+   ],
+   "url": "http://hl7.org/fhir/StructureDefinition/Reference"
+  }
+ },
+ "fhir_version": "4.0.1"
+}

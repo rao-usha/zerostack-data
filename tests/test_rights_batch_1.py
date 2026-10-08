@@ -41,6 +41,8 @@ ADDED_AFTER = {"ats_boards": "SPEC_151", "gleif_lei_records": "SPEC_154"}
 TIGHTENED_AFTER = {"dunl_reference": "SPEC_154: S&P licence conflict recorded, 'loosen if CC BY' closed"}
 # Blocks rights review batch 2 completed (pinned in tests/test_rights_batch_2.py).
 from tests.test_rights_batch_2 import APPROVED as BATCH_2_APPROVED  # noqa: E402
+# Notes-only changes made by later specs (pinned in tests/test_rights_batch_2.py).
+from tests.test_rights_batch_2 import NOTES_ONLY_AFTER  # noqa: E402
 HELD_FDIC = {"fdic_bank_financials", "fdic_institutions", "fdic_failed_banks", "fdic_summary_deposits"}
 
 # fields that decide (hashed) plus the citation fields that document the block
@@ -124,7 +126,8 @@ class TestNothingElseChanged:
         before, cat = _before(), _catalog()
         assert set(cat) == set(before) | set(ADDED_AFTER)
         changed = sorted(k for k, s in cat.items() if k in before and _now(s) != before[k])
-        assert set(changed) == set(APPROVED) | set(TIGHTENED_AFTER) | set(BATCH_2_APPROVED), changed
+        assert set(changed) == (set(APPROVED) | set(TIGHTENED_AFTER) | set(BATCH_2_APPROVED)
+                                | set(NOTES_ONLY_AFTER)), changed
 
     def test_later_tightening_only(self):
         """SPEC_154 dunl: same redistribution / pii, proposal closed, commercial use restricted."""

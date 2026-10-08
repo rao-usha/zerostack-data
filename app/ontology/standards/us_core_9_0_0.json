@@ -1,0 +1,1763 @@
+{
+ "fhirVersions": [
+  "4.0.1"
+ ],
+ "license": "CC0-1.0",
+ "package": "hl7.fhir.us.core",
+ "profiles": {
+  "us-core-coverage": {
+   "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Coverage",
+   "mustSupport": [
+    {
+     "id": "Coverage.identifier",
+     "max": "*",
+     "min": 0,
+     "path": "Coverage.identifier",
+     "type": [
+      {
+       "code": "Identifier"
+      }
+     ]
+    },
+    {
+     "id": "Coverage.identifier:memberid",
+     "max": "1",
+     "min": 0,
+     "path": "Coverage.identifier",
+     "type": [
+      {
+       "code": "Identifier"
+      }
+     ]
+    },
+    {
+     "id": "Coverage.identifier:memberid.type",
+     "max": "1",
+     "min": 1,
+     "path": "Coverage.identifier.type",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "Coverage.status",
+     "max": "1",
+     "min": 1,
+     "path": "Coverage.status",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "Coverage.type",
+     "max": "1",
+     "min": 0,
+     "path": "Coverage.type",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "Coverage.subscriberId",
+     "max": "1",
+     "min": 0,
+     "path": "Coverage.subscriberId",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Coverage.beneficiary",
+     "max": "1",
+     "min": 1,
+     "path": "Coverage.beneficiary",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/core/StructureDefinition/us-core-patient"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Coverage.relationship",
+     "max": "1",
+     "min": 1,
+     "path": "Coverage.relationship",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "Coverage.period",
+     "max": "1",
+     "min": 0,
+     "path": "Coverage.period",
+     "type": [
+      {
+       "code": "Period"
+      }
+     ]
+    },
+    {
+     "id": "Coverage.payor",
+     "max": "1",
+     "min": 1,
+     "path": "Coverage.payor",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization",
+        "http://hl7.org/fhir/us/core/StructureDefinition/us-core-patient",
+        "http://hl7.org/fhir/us/core/StructureDefinition/us-core-relatedperson"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Coverage.class",
+     "max": "*",
+     "min": 0,
+     "path": "Coverage.class",
+     "type": [
+      {
+       "code": "BackboneElement"
+      }
+     ]
+    },
+    {
+     "id": "Coverage.class:group",
+     "max": "1",
+     "min": 0,
+     "path": "Coverage.class",
+     "type": [
+      {
+       "code": "BackboneElement"
+      }
+     ]
+    },
+    {
+     "id": "Coverage.class:group.value",
+     "max": "1",
+     "min": 1,
+     "path": "Coverage.class.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Coverage.class:plan",
+     "max": "1",
+     "min": 0,
+     "path": "Coverage.class",
+     "type": [
+      {
+       "code": "BackboneElement"
+      }
+     ]
+    },
+    {
+     "id": "Coverage.class:plan.value",
+     "max": "1",
+     "min": 1,
+     "path": "Coverage.class.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Coverage.class:plan.name",
+     "max": "1",
+     "min": 0,
+     "path": "Coverage.class.name",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    }
+   ],
+   "references": [
+    {
+     "id": "Coverage.identifier:memberid.assigner",
+     "mustSupport": false,
+     "path": "Coverage.identifier.assigner",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Organization|4.0.1"
+     ]
+    },
+    {
+     "id": "Coverage.policyHolder",
+     "mustSupport": false,
+     "path": "Coverage.policyHolder",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Organization|4.0.1",
+      "http://hl7.org/fhir/StructureDefinition/Patient|4.0.1",
+      "http://hl7.org/fhir/StructureDefinition/RelatedPerson|4.0.1"
+     ]
+    },
+    {
+     "id": "Coverage.subscriber",
+     "mustSupport": false,
+     "path": "Coverage.subscriber",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Patient|4.0.1",
+      "http://hl7.org/fhir/StructureDefinition/RelatedPerson|4.0.1"
+     ]
+    },
+    {
+     "id": "Coverage.beneficiary",
+     "mustSupport": true,
+     "path": "Coverage.beneficiary",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/core/StructureDefinition/us-core-patient"
+     ]
+    },
+    {
+     "id": "Coverage.payor",
+     "mustSupport": true,
+     "path": "Coverage.payor",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization",
+      "http://hl7.org/fhir/us/core/StructureDefinition/us-core-patient",
+      "http://hl7.org/fhir/us/core/StructureDefinition/us-core-relatedperson"
+     ]
+    },
+    {
+     "id": "Coverage.contract",
+     "mustSupport": false,
+     "path": "Coverage.contract",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Contract|4.0.1"
+     ]
+    }
+   ],
+   "title": "US Core Coverage Profile",
+   "type": "Coverage",
+   "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-coverage"
+  },
+  "us-core-encounter": {
+   "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Encounter",
+   "mustSupport": [
+    {
+     "id": "Encounter.meta",
+     "max": "1",
+     "min": 0,
+     "path": "Encounter.meta",
+     "type": [
+      {
+       "code": "Meta"
+      }
+     ]
+    },
+    {
+     "id": "Encounter.meta.lastUpdated",
+     "max": "1",
+     "min": 0,
+     "path": "Encounter.meta.lastUpdated",
+     "type": [
+      {
+       "code": "instant"
+      }
+     ]
+    },
+    {
+     "id": "Encounter.identifier",
+     "max": "*",
+     "min": 0,
+     "path": "Encounter.identifier",
+     "type": [
+      {
+       "code": "Identifier"
+      }
+     ]
+    },
+    {
+     "id": "Encounter.identifier.system",
+     "max": "1",
+     "min": 1,
+     "path": "Encounter.identifier.system",
+     "type": [
+      {
+       "code": "uri"
+      }
+     ]
+    },
+    {
+     "id": "Encounter.identifier.value",
+     "max": "1",
+     "min": 1,
+     "path": "Encounter.identifier.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Encounter.status",
+     "max": "1",
+     "min": 1,
+     "path": "Encounter.status",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "Encounter.class",
+     "max": "1",
+     "min": 1,
+     "path": "Encounter.class",
+     "type": [
+      {
+       "code": "Coding"
+      }
+     ]
+    },
+    {
+     "id": "Encounter.type",
+     "max": "*",
+     "min": 1,
+     "path": "Encounter.type",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "Encounter.subject",
+     "max": "1",
+     "min": 1,
+     "path": "Encounter.subject",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/StructureDefinition/Group",
+        "http://hl7.org/fhir/us/core/StructureDefinition/us-core-patient"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Encounter.participant",
+     "max": "*",
+     "min": 0,
+     "path": "Encounter.participant",
+     "type": [
+      {
+       "code": "BackboneElement"
+      }
+     ]
+    },
+    {
+     "id": "Encounter.participant.type",
+     "max": "*",
+     "min": 0,
+     "path": "Encounter.participant.type",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "Encounter.participant.period",
+     "max": "1",
+     "min": 0,
+     "path": "Encounter.participant.period",
+     "type": [
+      {
+       "code": "Period"
+      }
+     ]
+    },
+    {
+     "id": "Encounter.participant.individual",
+     "max": "1",
+     "min": 0,
+     "path": "Encounter.participant.individual",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/core/StructureDefinition/us-core-practitioner",
+        "http://hl7.org/fhir/us/core/StructureDefinition/us-core-practitionerrole",
+        "http://hl7.org/fhir/us/core/StructureDefinition/us-core-relatedperson"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Encounter.period",
+     "max": "1",
+     "min": 0,
+     "path": "Encounter.period",
+     "type": [
+      {
+       "code": "Period"
+      }
+     ]
+    },
+    {
+     "id": "Encounter.reasonCode",
+     "max": "*",
+     "min": 0,
+     "path": "Encounter.reasonCode",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "Encounter.reasonReference",
+     "max": "*",
+     "min": 0,
+     "path": "Encounter.reasonReference",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/StructureDefinition/ImmunizationRecommendation",
+        "http://hl7.org/fhir/StructureDefinition/Observation",
+        "http://hl7.org/fhir/us/core/StructureDefinition/us-core-condition-encounter-diagnosis",
+        "http://hl7.org/fhir/us/core/StructureDefinition/us-core-condition-problems-health-concerns",
+        "http://hl7.org/fhir/us/core/StructureDefinition/us-core-procedure"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Encounter.hospitalization",
+     "max": "1",
+     "min": 0,
+     "path": "Encounter.hospitalization",
+     "type": [
+      {
+       "code": "BackboneElement"
+      }
+     ]
+    },
+    {
+     "id": "Encounter.hospitalization.dischargeDisposition",
+     "max": "1",
+     "min": 0,
+     "path": "Encounter.hospitalization.dischargeDisposition",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "Encounter.location",
+     "max": "*",
+     "min": 0,
+     "path": "Encounter.location",
+     "type": [
+      {
+       "code": "BackboneElement"
+      }
+     ]
+    },
+    {
+     "id": "Encounter.location.location",
+     "max": "1",
+     "min": 1,
+     "path": "Encounter.location.location",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "Encounter.serviceProvider",
+     "max": "1",
+     "min": 0,
+     "path": "Encounter.serviceProvider",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization"
+       ]
+      }
+     ]
+    }
+   ],
+   "references": [
+    {
+     "id": "Encounter.identifier.assigner",
+     "mustSupport": false,
+     "path": "Encounter.identifier.assigner",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Organization|4.0.1"
+     ]
+    },
+    {
+     "id": "Encounter.subject",
+     "mustSupport": true,
+     "path": "Encounter.subject",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Group",
+      "http://hl7.org/fhir/us/core/StructureDefinition/us-core-patient"
+     ]
+    },
+    {
+     "id": "Encounter.episodeOfCare",
+     "mustSupport": false,
+     "path": "Encounter.episodeOfCare",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/EpisodeOfCare|4.0.1"
+     ]
+    },
+    {
+     "id": "Encounter.basedOn",
+     "mustSupport": false,
+     "path": "Encounter.basedOn",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/ServiceRequest|4.0.1"
+     ]
+    },
+    {
+     "id": "Encounter.participant.individual",
+     "mustSupport": true,
+     "path": "Encounter.participant.individual",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/core/StructureDefinition/us-core-practitioner",
+      "http://hl7.org/fhir/us/core/StructureDefinition/us-core-practitionerrole",
+      "http://hl7.org/fhir/us/core/StructureDefinition/us-core-relatedperson"
+     ]
+    },
+    {
+     "id": "Encounter.appointment",
+     "mustSupport": false,
+     "path": "Encounter.appointment",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Appointment|4.0.1"
+     ]
+    },
+    {
+     "id": "Encounter.reasonReference",
+     "mustSupport": true,
+     "path": "Encounter.reasonReference",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/ImmunizationRecommendation",
+      "http://hl7.org/fhir/StructureDefinition/Observation",
+      "http://hl7.org/fhir/us/core/StructureDefinition/us-core-condition-encounter-diagnosis",
+      "http://hl7.org/fhir/us/core/StructureDefinition/us-core-condition-problems-health-concerns",
+      "http://hl7.org/fhir/us/core/StructureDefinition/us-core-procedure"
+     ]
+    },
+    {
+     "id": "Encounter.diagnosis.condition",
+     "mustSupport": false,
+     "path": "Encounter.diagnosis.condition",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Condition|4.0.1",
+      "http://hl7.org/fhir/StructureDefinition/Procedure|4.0.1"
+     ]
+    },
+    {
+     "id": "Encounter.account",
+     "mustSupport": false,
+     "path": "Encounter.account",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Account|4.0.1"
+     ]
+    },
+    {
+     "id": "Encounter.hospitalization.origin",
+     "mustSupport": false,
+     "path": "Encounter.hospitalization.origin",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Location|4.0.1",
+      "http://hl7.org/fhir/StructureDefinition/Organization|4.0.1"
+     ]
+    },
+    {
+     "id": "Encounter.hospitalization.destination",
+     "mustSupport": false,
+     "path": "Encounter.hospitalization.destination",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Location|4.0.1",
+      "http://hl7.org/fhir/StructureDefinition/Organization|4.0.1"
+     ]
+    },
+    {
+     "id": "Encounter.location.location",
+     "mustSupport": true,
+     "path": "Encounter.location.location",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location"
+     ]
+    },
+    {
+     "id": "Encounter.serviceProvider",
+     "mustSupport": true,
+     "path": "Encounter.serviceProvider",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization"
+     ]
+    },
+    {
+     "id": "Encounter.partOf",
+     "mustSupport": false,
+     "path": "Encounter.partOf",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Encounter|4.0.1"
+     ]
+    }
+   ],
+   "title": "US Core Encounter Profile",
+   "type": "Encounter",
+   "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-encounter"
+  },
+  "us-core-location": {
+   "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Location",
+   "mustSupport": [
+    {
+     "id": "Location.identifier",
+     "max": "*",
+     "min": 0,
+     "path": "Location.identifier",
+     "type": [
+      {
+       "code": "Identifier"
+      }
+     ]
+    },
+    {
+     "id": "Location.status",
+     "max": "1",
+     "min": 0,
+     "path": "Location.status",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "Location.name",
+     "max": "1",
+     "min": 1,
+     "path": "Location.name",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Location.type",
+     "max": "*",
+     "min": 0,
+     "path": "Location.type",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "Location.type.coding",
+     "max": "*",
+     "min": 1,
+     "path": "Location.type.coding",
+     "type": [
+      {
+       "code": "Coding"
+      }
+     ]
+    },
+    {
+     "id": "Location.type.coding.system",
+     "max": "1",
+     "min": 1,
+     "path": "Location.type.coding.system",
+     "type": [
+      {
+       "code": "uri"
+      }
+     ]
+    },
+    {
+     "id": "Location.type.coding.code",
+     "max": "1",
+     "min": 1,
+     "path": "Location.type.coding.code",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "Location.telecom",
+     "max": "*",
+     "min": 0,
+     "path": "Location.telecom",
+     "type": [
+      {
+       "code": "ContactPoint"
+      }
+     ]
+    },
+    {
+     "id": "Location.address",
+     "max": "1",
+     "min": 0,
+     "path": "Location.address",
+     "type": [
+      {
+       "code": "Address"
+      }
+     ]
+    },
+    {
+     "id": "Location.address.line",
+     "max": "*",
+     "min": 0,
+     "path": "Location.address.line",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Location.address.city",
+     "max": "1",
+     "min": 0,
+     "path": "Location.address.city",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Location.address.state",
+     "max": "1",
+     "min": 0,
+     "path": "Location.address.state",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Location.address.postalCode",
+     "max": "1",
+     "min": 0,
+     "path": "Location.address.postalCode",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Location.managingOrganization",
+     "max": "1",
+     "min": 0,
+     "path": "Location.managingOrganization",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization"
+       ]
+      }
+     ]
+    }
+   ],
+   "references": [
+    {
+     "id": "Location.managingOrganization",
+     "mustSupport": true,
+     "path": "Location.managingOrganization",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization"
+     ]
+    },
+    {
+     "id": "Location.partOf",
+     "mustSupport": false,
+     "path": "Location.partOf",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Location|4.0.1"
+     ]
+    },
+    {
+     "id": "Location.endpoint",
+     "mustSupport": false,
+     "path": "Location.endpoint",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Endpoint|4.0.1"
+     ]
+    }
+   ],
+   "title": "US Core Location Profile",
+   "type": "Location",
+   "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location"
+  },
+  "us-core-organization": {
+   "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Organization",
+   "mustSupport": [
+    {
+     "id": "Organization.identifier",
+     "max": "*",
+     "min": 0,
+     "path": "Organization.identifier",
+     "type": [
+      {
+       "code": "Identifier"
+      }
+     ]
+    },
+    {
+     "id": "Organization.identifier.system",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.identifier.system",
+     "type": [
+      {
+       "code": "uri"
+      }
+     ]
+    },
+    {
+     "id": "Organization.identifier.value",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.identifier.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.identifier:NPI",
+     "max": "*",
+     "min": 0,
+     "path": "Organization.identifier",
+     "type": [
+      {
+       "code": "Identifier"
+      }
+     ]
+    },
+    {
+     "id": "Organization.identifier:NPI.system",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.identifier.system",
+     "type": [
+      {
+       "code": "uri"
+      }
+     ]
+    },
+    {
+     "id": "Organization.identifier:NPI.value",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.identifier.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.identifier:CLIA.system",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.identifier.system",
+     "type": [
+      {
+       "code": "uri"
+      }
+     ]
+    },
+    {
+     "id": "Organization.identifier:CLIA.value",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.identifier.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.identifier:NAIC.system",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.identifier.system",
+     "type": [
+      {
+       "code": "uri"
+      }
+     ]
+    },
+    {
+     "id": "Organization.identifier:NAIC.value",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.identifier.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.active",
+     "max": "1",
+     "min": 1,
+     "path": "Organization.active",
+     "type": [
+      {
+       "code": "boolean"
+      }
+     ]
+    },
+    {
+     "id": "Organization.name",
+     "max": "1",
+     "min": 1,
+     "path": "Organization.name",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.telecom",
+     "max": "*",
+     "min": 0,
+     "path": "Organization.telecom",
+     "type": [
+      {
+       "code": "ContactPoint"
+      }
+     ]
+    },
+    {
+     "id": "Organization.telecom.system",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.telecom.system",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "Organization.telecom.value",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.telecom.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.address",
+     "max": "*",
+     "min": 0,
+     "path": "Organization.address",
+     "type": [
+      {
+       "code": "Address"
+      }
+     ]
+    },
+    {
+     "id": "Organization.address.line",
+     "max": "4",
+     "min": 0,
+     "path": "Organization.address.line",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.address.city",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.address.city",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.address.state",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.address.state",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.address.postalCode",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.address.postalCode",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Organization.address.country",
+     "max": "1",
+     "min": 0,
+     "path": "Organization.address.country",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    }
+   ],
+   "references": [
+    {
+     "id": "Organization.identifier.assigner",
+     "mustSupport": false,
+     "path": "Organization.identifier.assigner",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Organization|4.0.1"
+     ]
+    },
+    {
+     "id": "Organization.identifier:NPI.assigner",
+     "mustSupport": false,
+     "path": "Organization.identifier.assigner",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Organization|4.0.1"
+     ]
+    },
+    {
+     "id": "Organization.identifier:CLIA.assigner",
+     "mustSupport": false,
+     "path": "Organization.identifier.assigner",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Organization|4.0.1"
+     ]
+    },
+    {
+     "id": "Organization.identifier:NAIC.assigner",
+     "mustSupport": false,
+     "path": "Organization.identifier.assigner",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Organization|4.0.1"
+     ]
+    },
+    {
+     "id": "Organization.partOf",
+     "mustSupport": false,
+     "path": "Organization.partOf",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Organization|4.0.1"
+     ]
+    },
+    {
+     "id": "Organization.endpoint",
+     "mustSupport": false,
+     "path": "Organization.endpoint",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Endpoint|4.0.1"
+     ]
+    }
+   ],
+   "title": "US Core Organization Profile",
+   "type": "Organization",
+   "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization"
+  },
+  "us-core-patient": {
+   "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Patient",
+   "mustSupport": [
+    {
+     "id": "Patient.identifier",
+     "max": "*",
+     "min": 1,
+     "path": "Patient.identifier",
+     "type": [
+      {
+       "code": "Identifier"
+      }
+     ]
+    },
+    {
+     "id": "Patient.identifier.system",
+     "max": "1",
+     "min": 1,
+     "path": "Patient.identifier.system",
+     "type": [
+      {
+       "code": "uri"
+      }
+     ]
+    },
+    {
+     "id": "Patient.identifier.value",
+     "max": "1",
+     "min": 1,
+     "path": "Patient.identifier.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Patient.name",
+     "max": "*",
+     "min": 1,
+     "path": "Patient.name",
+     "type": [
+      {
+       "code": "HumanName"
+      }
+     ]
+    },
+    {
+     "id": "Patient.name.family",
+     "max": "1",
+     "min": 0,
+     "path": "Patient.name.family",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Patient.name.given",
+     "max": "*",
+     "min": 0,
+     "path": "Patient.name.given",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Patient.telecom.system",
+     "max": "1",
+     "min": 1,
+     "path": "Patient.telecom.system",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "Patient.telecom.value",
+     "max": "1",
+     "min": 1,
+     "path": "Patient.telecom.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Patient.telecom.use",
+     "max": "1",
+     "min": 0,
+     "path": "Patient.telecom.use",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "Patient.birthDate",
+     "max": "1",
+     "min": 0,
+     "path": "Patient.birthDate",
+     "type": [
+      {
+       "code": "date"
+      }
+     ]
+    },
+    {
+     "id": "Patient.address",
+     "max": "*",
+     "min": 0,
+     "path": "Patient.address",
+     "type": [
+      {
+       "code": "Address"
+      }
+     ]
+    },
+    {
+     "id": "Patient.address.line",
+     "max": "*",
+     "min": 0,
+     "path": "Patient.address.line",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Patient.address.city",
+     "max": "1",
+     "min": 0,
+     "path": "Patient.address.city",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Patient.address.state",
+     "max": "1",
+     "min": 0,
+     "path": "Patient.address.state",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Patient.address.postalCode",
+     "max": "1",
+     "min": 0,
+     "path": "Patient.address.postalCode",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Patient.communication.language",
+     "max": "1",
+     "min": 1,
+     "path": "Patient.communication.language",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    }
+   ],
+   "references": [
+    {
+     "id": "Patient.identifier.assigner",
+     "mustSupport": false,
+     "path": "Patient.identifier.assigner",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Organization|4.0.1"
+     ]
+    },
+    {
+     "id": "Patient.contact.organization",
+     "mustSupport": false,
+     "path": "Patient.contact.organization",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Organization|4.0.1"
+     ]
+    },
+    {
+     "id": "Patient.generalPractitioner",
+     "mustSupport": false,
+     "path": "Patient.generalPractitioner",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Organization|4.0.1",
+      "http://hl7.org/fhir/StructureDefinition/PractitionerRole|4.0.1",
+      "http://hl7.org/fhir/StructureDefinition/Practitioner|4.0.1"
+     ]
+    },
+    {
+     "id": "Patient.managingOrganization",
+     "mustSupport": false,
+     "path": "Patient.managingOrganization",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Organization|4.0.1"
+     ]
+    },
+    {
+     "id": "Patient.link.other",
+     "mustSupport": false,
+     "path": "Patient.link.other",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Patient|4.0.1",
+      "http://hl7.org/fhir/StructureDefinition/RelatedPerson|4.0.1"
+     ]
+    }
+   ],
+   "title": "US Core Patient Profile",
+   "type": "Patient",
+   "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-patient"
+  },
+  "us-core-practitioner": {
+   "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Practitioner",
+   "mustSupport": [
+    {
+     "id": "Practitioner.identifier",
+     "max": "*",
+     "min": 1,
+     "path": "Practitioner.identifier",
+     "type": [
+      {
+       "code": "Identifier"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.identifier.system",
+     "max": "1",
+     "min": 1,
+     "path": "Practitioner.identifier.system",
+     "type": [
+      {
+       "code": "uri"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.identifier.value",
+     "max": "1",
+     "min": 1,
+     "path": "Practitioner.identifier.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.identifier:NPI",
+     "max": "*",
+     "min": 0,
+     "path": "Practitioner.identifier",
+     "type": [
+      {
+       "code": "Identifier"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.identifier:NPI.system",
+     "max": "1",
+     "min": 1,
+     "path": "Practitioner.identifier.system",
+     "type": [
+      {
+       "code": "uri"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.identifier:NPI.value",
+     "max": "1",
+     "min": 1,
+     "path": "Practitioner.identifier.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.identifier:NCSBNID.system",
+     "max": "1",
+     "min": 1,
+     "path": "Practitioner.identifier.system",
+     "type": [
+      {
+       "code": "uri"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.identifier:NCSBNID.value",
+     "max": "1",
+     "min": 1,
+     "path": "Practitioner.identifier.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.name",
+     "max": "*",
+     "min": 1,
+     "path": "Practitioner.name",
+     "type": [
+      {
+       "code": "HumanName"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.name.family",
+     "max": "1",
+     "min": 1,
+     "path": "Practitioner.name.family",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.telecom",
+     "max": "*",
+     "min": 0,
+     "path": "Practitioner.telecom",
+     "type": [
+      {
+       "code": "ContactPoint"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.telecom.system",
+     "max": "1",
+     "min": 0,
+     "path": "Practitioner.telecom.system",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.telecom.value",
+     "max": "1",
+     "min": 0,
+     "path": "Practitioner.telecom.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.address",
+     "max": "*",
+     "min": 0,
+     "path": "Practitioner.address",
+     "type": [
+      {
+       "code": "Address"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.address.line",
+     "max": "4",
+     "min": 0,
+     "path": "Practitioner.address.line",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.address.city",
+     "max": "1",
+     "min": 0,
+     "path": "Practitioner.address.city",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.address.state",
+     "max": "1",
+     "min": 0,
+     "path": "Practitioner.address.state",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.address.postalCode",
+     "max": "1",
+     "min": 0,
+     "path": "Practitioner.address.postalCode",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "Practitioner.address.country",
+     "max": "1",
+     "min": 0,
+     "path": "Practitioner.address.country",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    }
+   ],
+   "references": [
+    {
+     "id": "Practitioner.identifier.assigner",
+     "mustSupport": false,
+     "path": "Practitioner.identifier.assigner",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Organization|4.0.1"
+     ]
+    },
+    {
+     "id": "Practitioner.identifier:NPI.assigner",
+     "mustSupport": false,
+     "path": "Practitioner.identifier.assigner",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Organization|4.0.1"
+     ]
+    },
+    {
+     "id": "Practitioner.identifier:NCSBNID.assigner",
+     "mustSupport": false,
+     "path": "Practitioner.identifier.assigner",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Organization|4.0.1"
+     ]
+    },
+    {
+     "id": "Practitioner.qualification.issuer",
+     "mustSupport": false,
+     "path": "Practitioner.qualification.issuer",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Organization|4.0.1"
+     ]
+    }
+   ],
+   "title": "US Core Practitioner Profile",
+   "type": "Practitioner",
+   "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-practitioner"
+  },
+  "us-core-practitionerrole": {
+   "baseDefinition": "http://hl7.org/fhir/StructureDefinition/PractitionerRole",
+   "mustSupport": [
+    {
+     "id": "PractitionerRole.practitioner",
+     "max": "1",
+     "min": 0,
+     "path": "PractitionerRole.practitioner",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/core/StructureDefinition/us-core-practitioner"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.organization",
+     "max": "1",
+     "min": 0,
+     "path": "PractitionerRole.organization",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.code",
+     "max": "*",
+     "min": 0,
+     "path": "PractitionerRole.code",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.specialty",
+     "max": "*",
+     "min": 0,
+     "path": "PractitionerRole.specialty",
+     "type": [
+      {
+       "code": "CodeableConcept"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.location",
+     "max": "*",
+     "min": 0,
+     "path": "PractitionerRole.location",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.telecom",
+     "max": "*",
+     "min": 0,
+     "path": "PractitionerRole.telecom",
+     "type": [
+      {
+       "code": "ContactPoint"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.telecom.system",
+     "max": "1",
+     "min": 1,
+     "path": "PractitionerRole.telecom.system",
+     "type": [
+      {
+       "code": "code"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.telecom.value",
+     "max": "1",
+     "min": 1,
+     "path": "PractitionerRole.telecom.value",
+     "type": [
+      {
+       "code": "string"
+      }
+     ]
+    },
+    {
+     "id": "PractitionerRole.endpoint",
+     "max": "*",
+     "min": 0,
+     "path": "PractitionerRole.endpoint",
+     "type": [
+      {
+       "code": "Reference",
+       "targetProfile": [
+        "http://hl7.org/fhir/StructureDefinition/Endpoint|4.0.1"
+       ]
+      }
+     ]
+    }
+   ],
+   "references": [
+    {
+     "id": "PractitionerRole.practitioner",
+     "mustSupport": true,
+     "path": "PractitionerRole.practitioner",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/core/StructureDefinition/us-core-practitioner"
+     ]
+    },
+    {
+     "id": "PractitionerRole.organization",
+     "mustSupport": true,
+     "path": "PractitionerRole.organization",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/core/StructureDefinition/us-core-organization"
+     ]
+    },
+    {
+     "id": "PractitionerRole.location",
+     "mustSupport": true,
+     "path": "PractitionerRole.location",
+     "targetProfile": [
+      "http://hl7.org/fhir/us/core/StructureDefinition/us-core-location"
+     ]
+    },
+    {
+     "id": "PractitionerRole.healthcareService",
+     "mustSupport": false,
+     "path": "PractitionerRole.healthcareService",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/HealthcareService|4.0.1"
+     ]
+    },
+    {
+     "id": "PractitionerRole.endpoint",
+     "mustSupport": true,
+     "path": "PractitionerRole.endpoint",
+     "targetProfile": [
+      "http://hl7.org/fhir/StructureDefinition/Endpoint|4.0.1"
+     ]
+    }
+   ],
+   "title": "US Core PractitionerRole Profile",
+   "type": "PractitionerRole",
+   "url": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-practitionerrole"
+  }
+ },
+ "version": "9.0.0"
+}
