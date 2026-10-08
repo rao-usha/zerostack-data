@@ -200,8 +200,9 @@ class TestApprovedBlocks:
 class TestNothingElseChanged:
     def test_exactly_the_thirty_changed(self):
         before, cat = _before(), _catalog()
-        assert set(cat) == set(before)
-        changed = {k for k, s in cat.items() if _now(s) != before[k]}
+        added_after = {"cms_hospitals"}  # SPEC_162: catalogued on the cms family default
+        assert set(cat) == set(before) | added_after
+        changed = {k for k, s in cat.items() if k not in added_after and _now(s) != before[k]}
         assert changed == set(APPROVED), sorted(changed ^ set(APPROVED))
 
     def test_held_bts_vmt_untouched(self):

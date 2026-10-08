@@ -1,0 +1,475 @@
+{
+ "domain": "healthcare_provider",
+ "version": "hc-gold-v1",
+ "spec": "SPEC_162",
+ "as_of": "2026-10-08",
+ "source": "app/ontology/gold/probes.py on nexdata-api-1 (read-only transaction), before alembic 0022 and the NPI backfill",
+ "labels_are_hidden_from_models": true,
+ "tally": {
+  "HOLD": 3,
+  "PARTIAL": 7,
+  "NEED": 17,
+  "SCHEMA": 3,
+  "groundable": 10
+ },
+ "plan_tally": {
+  "HOLD": 5,
+  "PARTIAL": 7,
+  "NEED": 15,
+  "SCHEMA": 3
+ },
+ "gold_cqs": [
+  "CQ01",
+  "CQ02",
+  "CQ04",
+  "CQ05",
+  "CQ08",
+  "CQ11",
+  "CQ12",
+  "CQ14",
+  "CQ15",
+  "CQ18",
+  "CQ19",
+  "CQ23",
+  "CQ25"
+ ],
+ "gold_note": "Gold SQL covers the plan's 13 groundable CQs (HOLD+PARTIAL after SPEC_163). Live, 10 are groundable: CQ04 waits for SPEC_163, CQ08 and CQ23 probe NEED today.",
+ "results": [
+  {
+   "cq": "CQ01",
+   "question": "Given an NPI: individual or organization, active or deactivated, enumeration and last-update dates, DBA name",
+   "plan_label": "PARTIAL",
+   "label": "PARTIAL",
+   "changed": false,
+   "groundable": true,
+   "gold_sql": true,
+   "why": "every row is status 'A' (no deactivations); dba_name NULL on every row",
+   "metrics": {
+    "n": 39817,
+    "has_type": 39817,
+    "has_enum_date": 39817,
+    "has_last_updated": 39817,
+    "has_dba": 0,
+    "non_active": 0
+   }
+  },
+  {
+   "cq": "CQ02",
+   "question": "A practitioner's credentials, primary NUCC specialty, and licence state for that taxonomy",
+   "plan_label": "HOLD",
+   "label": "HOLD",
+   "changed": false,
+   "groundable": true,
+   "gold_sql": true,
+   "why": "credential, primary taxonomy and licence state (primary only)",
+   "metrics": {
+    "n_individual": 28792,
+    "has_taxonomy": 28792,
+    "has_credential": 26365,
+    "has_license_state": 28700
+   }
+  },
+  {
+   "cq": "CQ03",
+   "question": "All taxonomies a provider holds, and which is primary",
+   "plan_label": "NEED",
+   "label": "NEED",
+   "changed": false,
+   "groundable": false,
+   "gold_sql": false,
+   "why": "primary taxonomy only; no table of all 15 taxonomy slots",
+   "metrics": {
+    "multi_taxonomy_tables": 0
+   }
+  },
+  {
+   "cq": "CQ04",
+   "question": "NUCC grouping, classification and specialization a taxonomy code rolls up to",
+   "plan_label": "NEED",
+   "label": "NEED",
+   "changed": false,
+   "groundable": false,
+   "gold_sql": true,
+   "why": "no NUCC grouping/classification/specialization table (SPEC_163 vendors it)",
+   "metrics": {
+    "nucc_tables": 0
+   },
+   "expected_after": "HOLD once SPEC_163 loads the NUCC table (nucc_taxonomy)"
+  },
+  {
+   "cq": "CQ05",
+   "question": "Individual NPIs sharing a practice address or phone with an organization NPI",
+   "plan_label": "HOLD",
+   "label": "HOLD",
+   "changed": false,
+   "groundable": true,
+   "gold_sql": true,
+   "why": "5331 individuals share an address+ZIP or phone with an org (derived, low confidence)",
+   "metrics": {
+    "n_individual": 28792,
+    "sharing_individuals": 5331
+   }
+  },
+  {
+   "cq": "CQ06",
+   "question": "Group practices a practitioner reassigns billing to (org PAC ID)",
+   "plan_label": "NEED",
+   "label": "NEED",
+   "changed": false,
+   "groundable": false,
+   "gold_sql": false,
+   "why": "no source table loaded",
+   "metrics": {
+    "reassignment_tables": 0
+   }
+  },
+  {
+   "cq": "CQ07",
+   "question": "Hospitals a practitioner is affiliated with",
+   "plan_label": "NEED",
+   "label": "NEED",
+   "changed": false,
+   "groundable": false,
+   "gold_sql": false,
+   "why": "no source table loaded",
+   "metrics": {
+    "affiliation_tables": 0
+   }
+  },
+  {
+   "cq": "CQ08",
+   "question": "Whether an organization NPI is a subpart, and its parent",
+   "plan_label": "PARTIAL",
+   "label": "NEED",
+   "changed": true,
+   "groundable": false,
+   "gold_sql": true,
+   "why": "organization_subpart populated on 0 of 11025 type-2 rows; no parent column",
+   "metrics": {
+    "n_org": 11025,
+    "has_subpart_flag": 0,
+    "parent_columns": 0
+   },
+   "note": "Plan said PARTIAL; live organization_subpart is NULL on all 11,025 type-2 rows (parser read 'organization_subpart', the API sends 'organizational_subpart').",
+   "expected_after": "PARTIAL once type-2 NPIs are re-fetched with the SPEC_162 parser fix (organizational_subpart)"
+  },
+  {
+   "cq": "CQ09",
+   "question": "Organization NPIs belonging to the same legal entity (EIN/TIN) or health system",
+   "plan_label": "NEED",
+   "label": "NEED",
+   "changed": false,
+   "groundable": false,
+   "gold_sql": false,
+   "why": "no EIN/TIN for any NPI (NPPES publishes none)",
+   "metrics": {
+    "npi_tables_with_tin": 0
+   }
+  },
+  {
+   "cq": "CQ10",
+   "question": "CCN <-> NPI <-> Medicare enrollment ID crosswalk for a hospital",
+   "plan_label": "NEED",
+   "label": "NEED",
+   "changed": false,
+   "groundable": false,
+   "gold_sql": false,
+   "why": "no CCN-NPI pair (cost-report npi / prvdr_num all NULL; cms_hospitals has no NPI)",
+   "metrics": {
+    "crosswalk_rows": 0
+   }
+  },
+  {
+   "cq": "CQ11",
+   "question": "Where a provider practises (address, ZIP, state, county FIPS, RUCA rural flag)",
+   "plan_label": "PARTIAL",
+   "label": "PARTIAL",
+   "changed": false,
+   "groundable": true,
+   "gold_sql": true,
+   "why": "address/ZIP/state held; county/RUCA only for 233 of 39817 NPIs (utilization), no ZIP-county crosswalk",
+   "metrics": {
+    "n": 39817,
+    "has_zip": 39814,
+    "has_state": 39817,
+    "has_ruca": 233,
+    "crosswalk_tables": 0
+   },
+   "expected_after": "still PARTIAL after the backfill: RUCA for the 3,216 utilization NPIs only; HOLD needs the HUD ZIP-county crosswalk"
+  },
+  {
+   "cq": "CQ12",
+   "question": "Providers of taxonomy X per ZIP or county, and per capita",
+   "plan_label": "PARTIAL",
+   "label": "PARTIAL",
+   "changed": false,
+   "groundable": true,
+   "gold_sql": true,
+   "why": "39817 NPIs: a targeted sample, so counts per ZIP are biased; no per-capita join",
+   "metrics": {
+    "n": 39817,
+    "taxonomies": 337,
+    "zips": 7033
+   }
+  },
+  {
+   "cq": "CQ13",
+   "question": "A provider's secondary practice locations",
+   "plan_label": "NEED",
+   "label": "NEED",
+   "changed": false,
+   "groundable": false,
+   "gold_sql": false,
+   "why": "no source table loaded",
+   "metrics": {
+    "practice_location_tables": 0
+   }
+  },
+  {
+   "cq": "CQ14",
+   "question": "A hospital's type, emergency capability and county",
+   "plan_label": "HOLD",
+   "label": "PARTIAL",
+   "changed": true,
+   "groundable": true,
+   "gold_sql": true,
+   "why": "type and emergency held; county populated on 0 of 5426 rows",
+   "metrics": {
+    "n": 5426,
+    "has_type": 5426,
+    "has_emergency": 5426,
+    "has_county": 0
+   },
+   "note": "Plan said HOLD; live county (and city) is NULL on all 5,426 hospitals.",
+   "expected_after": "HOLD once BUG-CMS-HOSP-GEO is fixed and cms_hospitals reloaded (county)"
+  },
+  {
+   "cq": "CQ15",
+   "question": "Whether a provider takes Medicare assignment",
+   "plan_label": "HOLD",
+   "label": "HOLD",
+   "changed": false,
+   "groundable": true,
+   "gold_sql": true,
+   "why": "assignment flag for 3216 sampled NPIs",
+   "metrics": {
+    "npis": 3216,
+    "has_assignment_flag": 3216
+   }
+  },
+  {
+   "cq": "CQ16",
+   "question": "Commercial or MA networks that include a provider, and negotiated rates",
+   "plan_label": "NEED",
+   "label": "NEED",
+   "changed": false,
+   "groundable": false,
+   "gold_sql": false,
+   "why": "no source table loaded",
+   "metrics": {
+    "network_tables": 0
+   }
+  },
+  {
+   "cq": "CQ17",
+   "question": "A provider's enrollment in a state Medicaid program",
+   "plan_label": "NEED",
+   "label": "NEED",
+   "changed": false,
+   "groundable": false,
+   "gold_sql": false,
+   "why": "no source table loaded",
+   "metrics": {
+    "medicaid_tables": 0
+   }
+  },
+  {
+   "cq": "CQ18",
+   "question": "For an NPI: HCPCS billed, volumes, average allowed and paid",
+   "plan_label": "PARTIAL",
+   "label": "PARTIAL",
+   "changed": false,
+   "groundable": true,
+   "gold_sql": true,
+   "why": "no data_year / unique key yet (duplicates; alembic 0022 not applied); sample of 3216 NPIs",
+   "metrics": {
+    "n": 40054,
+    "npis": 3216,
+    "has_allowed": 40054,
+    "has_paid": 40054,
+    "has_year_key": 0
+   },
+   "expected_after": "still PARTIAL after alembic 0022 (sample of 3,216 NPIs); the duplicate issue clears"
+  },
+  {
+   "cq": "CQ19",
+   "question": "Top HCPCS by place of service for a specialty in a state",
+   "plan_label": "PARTIAL",
+   "label": "PARTIAL",
+   "changed": false,
+   "groundable": true,
+   "gold_sql": true,
+   "why": "79 provider types, 52 states, sample of 3216 NPIs",
+   "metrics": {
+    "npis": 3216,
+    "provider_types": 79,
+    "states": 52,
+    "places": 2
+   }
+  },
+  {
+   "cq": "CQ20",
+   "question": "A hospital's beds, total costs, net income",
+   "plan_label": "NEED",
+   "label": "NEED",
+   "changed": false,
+   "groundable": false,
+   "gold_sql": false,
+   "why": "10 cost-report rows, every data column NULL",
+   "metrics": {
+    "n": 10,
+    "has_beds": 0,
+    "has_costs": 0,
+    "has_net_income": 0
+   }
+  },
+  {
+   "cq": "CQ21",
+   "question": "Part D prescribing by provider",
+   "plan_label": "NEED",
+   "label": "NEED",
+   "changed": false,
+   "groundable": false,
+   "gold_sql": false,
+   "why": "no source table loaded",
+   "metrics": {
+    "prescriber_tables": 0
+   }
+  },
+  {
+   "cq": "CQ22",
+   "question": "Owners of a hospital, SNF, HHA or hospice (%, PE/REIT/holding flags)",
+   "plan_label": "NEED",
+   "label": "NEED",
+   "changed": false,
+   "groundable": false,
+   "gold_sql": false,
+   "why": "no source table loaded",
+   "metrics": {
+    "owner_tables": 0
+   }
+  },
+  {
+   "cq": "CQ23",
+   "question": "Practices that are PE portfolio companies, and the NPI/location footprint per platform",
+   "plan_label": "PARTIAL",
+   "label": "NEED",
+   "changed": true,
+   "groundable": false,
+   "gold_sql": true,
+   "why": "no NPI <-> portfolio link and no exact name match",
+   "metrics": {
+    "portfolio_companies": 362,
+    "npi_link_columns": 0,
+    "name_matched_companies": 0
+   },
+   "note": "Plan said PARTIAL; no exact legal-name match between 362 pe_portfolio_companies and type-2 NPIs, and no NPI link.",
+   "expected_after": "PARTIAL or HOLD after SPEC_168 links type-2 NPIs to core.entity"
+  },
+  {
+   "cq": "CQ24",
+   "question": "When a provider's owner or affiliation changed",
+   "plan_label": "NEED",
+   "label": "NEED",
+   "changed": false,
+   "groundable": false,
+   "gold_sql": false,
+   "why": "no source table loaded",
+   "metrics": {
+    "change_history_tables": 0
+   }
+  },
+  {
+   "cq": "CQ25",
+   "question": "A hospital's overall and domain star ratings",
+   "plan_label": "HOLD",
+   "label": "PARTIAL",
+   "changed": true,
+   "groundable": true,
+   "gold_sql": true,
+   "why": "overall rating on 2866 of 5426 hospitals; the domain comparison columns are NULL on 5426 rows",
+   "metrics": {
+    "n": 5426,
+    "has_overall": 2866,
+    "has_domain": 0
+   },
+   "note": "Plan said HOLD; the six domain comparison columns are NULL on every row (overall rating on 2,866).",
+   "expected_after": "HOLD once the domain comparison columns are loaded (same cms_hospitals parser bug)"
+  },
+  {
+   "cq": "CQ26",
+   "question": "Whether a provider or entity is excluded from federal programs",
+   "plan_label": "NEED",
+   "label": "NEED",
+   "changed": false,
+   "groundable": false,
+   "gold_sql": false,
+   "why": "no source table loaded",
+   "metrics": {
+    "exclusion_tables": 0
+   }
+  },
+  {
+   "cq": "CQ27",
+   "question": "Industry payments a provider received",
+   "plan_label": "NEED",
+   "label": "NEED",
+   "changed": false,
+   "groundable": false,
+   "gold_sql": false,
+   "why": "no source table loaded",
+   "metrics": {
+    "payment_tables": 0
+   }
+  },
+  {
+   "cq": "CQ28",
+   "question": "How patient demographics are represented, aligned with FHIR Patient and OMOP PERSON",
+   "plan_label": "SCHEMA",
+   "label": "SCHEMA",
+   "changed": false,
+   "groundable": false,
+   "gold_sql": false,
+   "why": "patient-level schema question; no patient data is ever loaded",
+   "metrics": {
+    "patient_tables": 0
+   }
+  },
+  {
+   "cq": "CQ29",
+   "question": "How an Encounter links practitioner, organization, location, ICD-10-CM diagnosis and HCPCS service",
+   "plan_label": "SCHEMA",
+   "label": "SCHEMA",
+   "changed": false,
+   "groundable": false,
+   "gold_sql": false,
+   "why": "patient-level schema question; no patient data is ever loaded",
+   "metrics": {
+    "encounter_tables": 0
+   }
+  },
+  {
+   "cq": "CQ30",
+   "question": "How coverage and plan enrollment periods are represented (FHIR Coverage / OMOP PAYER_PLAN_PERIOD)",
+   "plan_label": "SCHEMA",
+   "label": "SCHEMA",
+   "changed": false,
+   "groundable": false,
+   "gold_sql": false,
+   "why": "patient-level schema question; no patient data is ever loaded",
+   "metrics": {
+    "coverage_tables": 0
+   }
+  }
+ ]
+}

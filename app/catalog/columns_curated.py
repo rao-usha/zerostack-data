@@ -24,6 +24,10 @@ _EDGAR = "https://www.sec.gov/search-filings/edgar-application-programming-inter
 _ADV = ("https://www.sec.gov/data-research/sec-markets-data/"
         "information-about-registered-investment-advisers-exempt-reporting-advisers")
 _IAPD = "https://adviserinfo.sec.gov/compilation"
+_NPPES = "https://npiregistry.cms.hhs.gov/api-page"
+_MUP = ("https://data.cms.gov/provider-summary-by-type-of-service/medicare-physician-other-practitioners/"
+        "medicare-physician-other-practitioners-by-provider-and-service")
+_HGI = "https://data.cms.gov/provider-data/dataset/xubh-q36u"
 
 _B = "business_contact"
 
@@ -555,6 +559,129 @@ _TABLES: Dict[str, tuple] = {
     "family_offices": ("curated", None, {
         "principal_name": {"description": "Main family member behind the office (a natural person).", "pii": _B},
         "principal_family": {"description": "Family behind the office (a family surname).", "pii": _B},
+    }),
+    # ---------------------------------------------------------- healthcare (SPEC_162)
+    # nppes_providers, cms_medicare_utilization and cms_hospitals have no static DDL (f-string
+    # templates), so these rows are their whole column dictionary.
+    "nppes_providers": ("upstream", _NPPES, {
+        "npi": {"description": "National Provider Identifier: 10 digits, Luhn check digit with the 80840 "
+                               "prefix. One per individual (type 1) or organization subpart (type 2).",
+                "semantic_type": "npi"},
+        "entity_type": "NPPES entity type: '1' individual practitioner, '2' organization "
+                       "(from the API's NPI-1 / NPI-2 enumeration_type).",
+        "legal_name": {"description": "Organization legal business name (type 2), or 'first last' of the "
+                                      "practitioner (type 1).", "pii": _B},
+        "first_name": {"description": "Practitioner first name (type 1).", "pii": _B},
+        "last_name": {"description": "Practitioner last name (type 1).", "pii": _B},
+        "credential": "Credential text as entered by the provider (MD, DO, NP, PA-C ...); free text.",
+        "dba_name": {"description": "Doing-business-as / other organization name from other_names "
+                                    "(SPEC_162 parser fix; NULL on rows loaded before it).", "pii": _B},
+        "gender": {"description": "Practitioner sex as reported to NPPES (API key sex): M, F, type 1 only; NULL on rows loaded before the SPEC_162 parser fix.",
+                   "pii": "personal"},
+        "practice_address_line1": {"description": "Primary practice location, street line 1.", "pii": _B},
+        "practice_address_line2": {"description": "Primary practice location, street line 2.", "pii": _B},
+        "practice_city": "Primary practice location city.",
+        "practice_state": {"description": "Primary practice location state (USPS code).",
+                           "semantic_type": "us_state"},
+        "practice_zip": {"description": "Primary practice location postal code as published: 5 or 9 "
+                                        "digits, no dash.", "semantic_type": "zip5"},
+        "practice_phone": {"description": "Primary practice location phone, digits only.", "pii": _B},
+        "practice_fax": {"description": "Primary practice location fax, digits only.", "pii": _B},
+        "mailing_address_line1": {"description": "Mailing address, street line 1.", "pii": _B},
+        "mailing_address_line2": {"description": "Mailing address, street line 2.", "pii": _B},
+        "mailing_city": "Mailing address city.",
+        "mailing_state": {"description": "Mailing address state (USPS code).", "semantic_type": "us_state"},
+        "mailing_zip": {"description": "Mailing postal code as published: 5 or 9 digits.",
+                        "semantic_type": "zip5"},
+        "taxonomy_code": {"description": "Primary NUCC Health Care Provider Taxonomy code (only the "
+                                         "primary of up to 15 is loaded).", "semantic_type": "nucc_taxonomy"},
+        "taxonomy_description": "NUCC classification (and specialization) text of the primary taxonomy, as "
+                                "returned by the Registry API.",
+        "taxonomy_license": "State licence number tied to the primary taxonomy.",
+        "taxonomy_state": {"description": "State that issued taxonomy_license.", "semantic_type": "us_state"},
+        "enumeration_date": {"description": "Date the NPI was assigned.", "semantic_type": "period_date"},
+        "last_updated": {"description": "Date the NPI record was last updated in NPPES.",
+                         "semantic_type": "period_date"},
+        "status": "NPI status: 'A' active. The Registry API returns active NPIs only, so every row is 'A'; "
+                  "deactivations are not loaded.",
+        "sole_proprietor": "Sole proprietor flag for type-1 NPIs (YES / NO / X), as published.",
+        "organization_subpart": "Organization subpart flag for type-2 NPIs (YES / NO), from the API's "
+                                "organizational_subpart (SPEC_162 parser fix; NULL on rows loaded before it).",
+        "ingestion_timestamp": {"description": "When Nexdata last wrote the row.", "source": "curated"},
+    }),
+    "cms_medicare_utilization": ("upstream", _MUP, {
+        "id": {"description": "Surrogate row id (SERIAL); not stable across reloads.", "source": "curated"},
+        "data_year": {"description": "Calendar year of the Medicare Part B claims (the CMS release year); "
+                                     "part of the unique key (SPEC_162).", "source": "curated"},
+        "rndrng_npi": {"description": "NPI of the rendering provider.", "semantic_type": "npi"},
+        "rndrng_prvdr_last_org_name": {"description": "Rendering provider last name, or organization name "
+                                                      "for type-2 NPIs.", "pii": _B},
+        "rndrng_prvdr_first_name": {"description": "Rendering provider first name.", "pii": _B},
+        "rndrng_prvdr_mi": {"description": "Rendering provider middle initial.", "pii": _B},
+        "rndrng_prvdr_crdntls": "Rendering provider credentials (MD, DO ...), as entered in NPPES.",
+        "rndrng_prvdr_gndr": {"description": "Rendering provider sex from NPPES (M / F); blank for "
+                                             "organizations.", "pii": "personal"},
+        "rndrng_prvdr_ent_cd": "Rendering provider entity code: I individual, O organization.",
+        "rndrng_prvdr_st1": {"description": "Rendering provider street address line 1 (NPPES practice "
+                                            "location).", "pii": _B},
+        "rndrng_prvdr_st2": {"description": "Rendering provider street address line 2.", "pii": _B},
+        "rndrng_prvdr_city": "Rendering provider city.",
+        "rndrng_prvdr_state_abrvtn": {"description": "Rendering provider state (USPS code; also AA/AE/AP, XX, "
+                                                     "ZZ for military and foreign).", "semantic_type": "us_state"},
+        "rndrng_prvdr_state_fips": {"description": "Rendering provider state FIPS code.",
+                                    "semantic_type": "fips_state"},
+        "rndrng_prvdr_zip5": {"description": "Rendering provider 5-digit ZIP.", "semantic_type": "zip5"},
+        "rndrng_prvdr_ruca": "Rural-Urban Commuting Area code of the provider ZIP (1-10, with decimals).",
+        "rndrng_prvdr_ruca_desc": "Text description of the RUCA code.",
+        "rndrng_prvdr_cntry": "Rendering provider country (US for almost every row).",
+        "rndrng_prvdr_type": "Provider type derived by CMS from the claims specialty code (e.g. Internal "
+                             "Medicine, Physical Therapist in Private Practice).",
+        "rndrng_prvdr_mdcr_prtcptg_ind": "Medicare participation indicator: Y if the provider accepts "
+                                         "assignment (participating), N otherwise.",
+        "hcpcs_cd": {"description": "HCPCS code of the service (Level I = AMA CPT, Level II = CMS).",
+                     "semantic_type": "hcpcs"},
+        "hcpcs_desc": "HCPCS description. Level I descriptors are AMA CPT copyright (see the dataset rights).",
+        "hcpcs_drug_ind": "Y when the HCPCS code is a drug on the ASP Drug Pricing file.",
+        "place_of_srvc": "Place of service: F facility, O office / non-facility.",
+        "tot_benes": "Number of distinct Medicare beneficiaries receiving the service (CMS suppresses counts "
+                     "below 11).",
+        "tot_srvcs": "Number of services provided.",
+        "tot_bene_day_srvcs": "Number of distinct beneficiary / per-day services.",
+        "avg_sbmtd_chrg": {"description": "Average submitted charge for the service.", "unit": "USD",
+                           "semantic_type": "amount_usd"},
+        "avg_mdcr_alowd_amt": {"description": "Average Medicare allowed amount (Medicare payment + deductible "
+                                              "+ coinsurance).", "unit": "USD", "semantic_type": "amount_usd"},
+        "avg_mdcr_pymt_amt": {"description": "Average amount Medicare paid after deductible and coinsurance.",
+                              "unit": "USD", "semantic_type": "amount_usd"},
+        "avg_mdcr_stdzd_amt": {"description": "Average Medicare payment standardized to remove geographic "
+                                              "differences.", "unit": "USD", "semantic_type": "amount_usd"},
+        "ingestion_timestamp": {"description": "When Nexdata wrote the row (2023 rows: 2026-02 loads; 2024: "
+                                               "2026-09).", "source": "curated"},
+    }),
+    "cms_hospitals": ("upstream", _HGI, {
+        "id": {"description": "Surrogate row id (SERIAL); not stable across reloads.", "source": "curated"},
+        "facility_id": {"description": "CMS Certification Number (CCN) of the hospital: 6 characters, the "
+                                       "first two the state code.", "semantic_type": "ccn"},
+        "facility_name": "Hospital name.",
+        "address": "Hospital street address.",
+        "city": "Hospital city (NULL on every row: BUG-CMS-HOSP-GEO).",
+        "state": {"description": "Hospital state (USPS code, territories included).",
+                  "semantic_type": "us_state"},
+        "zip_code": {"description": "Hospital 5-digit ZIP.", "semantic_type": "zip5"},
+        "county": "County / parish name (NULL on every row: BUG-CMS-HOSP-GEO).",
+        "hospital_type": "CMS hospital type: Acute Care Hospitals, Critical Access Hospitals, Psychiatric, "
+                         "Childrens, Rural Emergency Hospital, VA / DoD acute care, Long-term.",
+        "ownership": "Hospital ownership category (Voluntary non-profit - Private, Proprietary, Government - "
+                     "State ...).",
+        "emergency_services": "True when the hospital provides emergency services.",
+        "overall_rating": "Hospital overall star rating 1-5; NULL where CMS publishes 'Not Available'.",
+        "mortality_rating": "Mortality national comparison (Above / Same as / Below the national average); NULL on every row (BUG-CMS-HOSP-GEO parser).",
+        "readmission_rating": "Readmission national comparison; NULL on every row.",
+        "patient_experience_rating": "Patient experience national comparison; NULL on every row.",
+        "effectiveness_rating": "Effectiveness of care national comparison; NULL on every row.",
+        "timeliness_rating": "Timeliness of care national comparison; NULL on every row.",
+        "imaging_rating": "Efficient use of medical imaging national comparison; NULL on every row.",
+        "ingested_at": {"description": "When Nexdata wrote the row (one load, 2026-03-31).", "source": "curated"},
     }),
     # ---------------------------------------------------------------- people
     "people": ("curated", None, {

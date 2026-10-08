@@ -207,7 +207,7 @@ class TestVocabulary:
             assert "{col}" in t.normalize_sql and t.specificity > 0
         with pytest.raises(ValueError):
             normalize_expr("ssn", "x")
-        assert len(SEMANTIC_TYPES) == 24
+        assert len(SEMANTIC_TYPES) == 29  # SPEC_162: ccn, pac_id, nucc_taxonomy, hcpcs, icd10cm
 
 
 # ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@ High-level functions that coordinate data fetching, table creation, and data loa
 
 import logging
 import re
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Sequence
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -55,7 +55,8 @@ async def ingest_medicare_utilization(
     Args:
         db: Database session
         job_id: Ingestion job ID for tracking
-        year: Optional year filter (defaults to latest available)
+        year: Data year; selects the pinned DKAN release (metadata
+            ``dkan_versions``; None = ``default_data_year``). Unknown years raise.
         state: Optional state filter (two-letter abbreviation)
         limit: Optional limit on number of records (for testing)
         states: State list (job_splitter partitions pass this); overrides
@@ -66,7 +67,10 @@ async def ingest_medicare_utilization(
     DKAN runs are per state: that state's rows are deleted and the fresh pages
     inserted as they arrive, committed once per state. Reruns replace rather
     than duplicate, a failed state keeps its previous rows, and memory holds
-    one page, not the dataset (SPEC_140).
+    one page, not the dataset (SPEC_140). SPEC_162: the replace is scoped to
+    (state, data_year), so other years survive, and every insert is an upsert
+    on the unique key (data_year, rndrng_npi, hcpcs_cd, place_of_srvc), so
+    overlapping pages can never duplicate a row.
 
     Returns:
         Dictionary with ingestion results
@@ -87,31 +91,17 @@ async def ingest_medicare_utilization(
         # 1. Get dataset metadata
         meta = metadata.get_dataset_metadata(dataset_type)
         table_name = meta["table_name"]
-        dataset_id = meta.get("socrata_dataset_id")
 
-        # Check API availability — prefer DKAN, fall back to Socrata
-        dkan_dataset_id = meta.get("dkan_dataset_id")
-        use_dkan = dataset_id is None and dkan_dataset_id is not None
+        # SPEC_162: a pinned per-year DKAN release, never the moving series id. An
+        # unknown year fails here (it used to be ignored silently).
+        data_year, dkan_dataset_id = metadata.dkan_version_for_year(dataset_type, year)
 
-        if dataset_id is None and dkan_dataset_id is None:
-            error_msg = (
-                f"CMS dataset '{dataset_type}' has no Socrata or DKAN dataset ID configured. "
-                f"Please visit {meta.get('source_url', 'data.cms.gov')} "
-                f"to find the current dataset ID."
-            )
-            logger.error(error_msg)
-            if job:
-                job.status = JobStatus.FAILED
-                job.error_message = error_msg
-                job.completed_at = datetime.utcnow()
-                db.commit()
-            raise ValueError(error_msg)
-
-        # 2. Create table if not exists
+        # 2. Create table if not exists; the live table must carry the 0022 key
         logger.info(f"Preparing table {table_name}")
         create_sql = metadata.generate_create_table_sql(dataset_type)
         db.execute(text(create_sql))
         db.commit()
+        _require_unique_key(db, table_name, meta["unique_constraint"])
 
         # 3. Register dataset
         _register_dataset(db, dataset_type, meta)
@@ -126,52 +116,28 @@ async def ingest_medicare_utilization(
             )
 
         try:
-            # 5. Fetch data via DKAN (per state, streamed) or Socrata
-            if use_dkan:
-                if states:
-                    state_list = [s.upper() for s in states]
-                elif state:
-                    state_list = [state.upper()]
-                else:
-                    state_list = list(ALL_UTILIZATION_STATES)
-
-                logger.info(
-                    f"Fetching DKAN dataset {dkan_dataset_id} for {len(state_list)} state(s)"
-                )
-                rows_inserted = 0
-                for st in state_list:
-                    remaining = None if limit is None else limit - rows_inserted
-                    if remaining is not None and remaining <= 0:
-                        break
-                    rows_inserted += await _replace_state_rows(
-                        db, client, dkan_dataset_id, table_name, meta["columns"],
-                        st, page_size, remaining,
-                    )
-                records = None
+            # 5. Fetch via DKAN, per state, streamed (SPEC_140)
+            if states:
+                state_list = [s.upper() for s in states]
+            elif state:
+                state_list = [state.upper()]
             else:
-                # Legacy Socrata path
-                where_clauses = []
-                if state:
-                    where_clauses.append(f"rndrng_prvdr_state_abrvtn='{state.upper()}'")
-                where_clause = " AND ".join(where_clauses) if where_clauses else None
+                state_list = list(ALL_UTILIZATION_STATES)
 
-                logger.info(f"Fetching data from Socrata dataset {dataset_id}")
-                records = await client.fetch_socrata_data(
-                    dataset_id=dataset_id,
-                    limit=1000,
-                    where=where_clause,
-                    max_records=limit,
+            logger.info(
+                f"Fetching DKAN dataset {dkan_dataset_id} (data year {data_year}) "
+                f"for {len(state_list)} state(s)"
+            )
+            rows_inserted = 0
+            for st in state_list:
+                remaining = None if limit is None else limit - rows_inserted
+                if remaining is not None and remaining <= 0:
+                    break
+                rows_inserted += await _replace_state_rows(
+                    db, client, dkan_dataset_id, table_name, meta["columns"],
+                    st, page_size, remaining, data_year=data_year,
+                    conflict_key=meta["unique_key"],
                 )
-
-            if records is not None:
-                logger.info(f"Fetched {len(records)} records")
-
-                # 7. Insert data
-                if records:
-                    await _batch_insert_data(db, table_name, records, meta["columns"])
-
-                # 8. Calculate results
-                rows_inserted = len(records)
             duration = (datetime.utcnow() - start_time).total_seconds()
 
             # 9. Update job status
@@ -197,8 +163,9 @@ async def ingest_medicare_utilization(
                 "table_name": table_name,
                 "rows_inserted": rows_inserted,
                 "duration_seconds": duration,
-                "dataset_id": dkan_dataset_id if use_dkan else dataset_id,
-                "api": "dkan" if use_dkan else "socrata",
+                "dataset_id": dkan_dataset_id,
+                "data_year": data_year,
+                "api": "dkan",
             }
 
         finally:
@@ -563,6 +530,24 @@ def _unpivot_drug_spending_records(
     return long_records
 
 
+def _require_unique_key(db: Session, table_name: str, constraint: str) -> None:
+    """Fail before any write when the table lacks the SPEC_162 unique key: the
+    upsert needs it, and a table without it is one alembic 0022 has not
+    migrated yet (fresh tables get it from the CREATE TABLE)."""
+    found = db.execute(
+        text(
+            "SELECT 1 FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid "
+            "WHERE c.conname = :c AND t.relname = :t"
+        ),
+        {"c": constraint, "t": table_name},
+    ).first()
+    if not found:
+        raise RuntimeError(
+            f"{table_name} has no unique constraint {constraint}: run "
+            f"`alembic upgrade 0022_cms_utilization_year_key` before ingesting (SPEC_162)"
+        )
+
+
 async def _replace_state_rows(
     db: Session,
     client: CMSClient,
@@ -572,29 +557,54 @@ async def _replace_state_rows(
     state: str,
     page_size: int,
     max_records: Optional[int],
+    data_year: Optional[int] = None,
+    conflict_key: Optional[Sequence[str]] = None,
 ) -> int:
-    """Replace one state's utilization rows: delete, stream pages in, commit
-    once. Any failure rolls back to the state's previous rows."""
+    """Replace one state's utilization rows for one data year: delete, stream
+    pages in (upserts on ``conflict_key``), commit once. Any failure rolls back
+    to the state's previous rows. Returns the rows received from the API."""
     inserted = 0
     try:
-        db.execute(
-            text(f"DELETE FROM {table_name} WHERE rndrng_prvdr_state_abrvtn = :st"),
-            {"st": state},
-        )
+        if data_year is None:
+            db.execute(
+                text(f"DELETE FROM {table_name} WHERE rndrng_prvdr_state_abrvtn = :st"),
+                {"st": state},
+            )
+        else:
+            db.execute(
+                text(
+                    f"DELETE FROM {table_name} "
+                    f"WHERE rndrng_prvdr_state_abrvtn = :st AND data_year = :y"
+                ),
+                {"st": state, "y": data_year},
+            )
+        extra = {"data_year": data_year} if data_year is not None else None
         async for page in client.iter_dkan_pages(
             dataset_id,
             size=page_size,
             filters={UTILIZATION_STATE_FILTER: state},
             max_records=max_records,
         ):
-            await _batch_insert_data(db, table_name, page, column_defs, commit=False)
+            await _batch_insert_data(
+                db, table_name, page, column_defs, commit=False,
+                extra=extra, conflict_key=conflict_key,
+            )
             inserted += len(page)
         db.commit()
     except Exception:
         db.rollback()
         raise
-    logger.info(f"CMS utilization {state}: {inserted} rows")
+    logger.info(f"CMS utilization {state} ({data_year}): {inserted} rows")
     return inserted
+
+
+def _dedupe_on_key(rows: List[Dict[str, Any]], key: Sequence[str]) -> List[Dict[str, Any]]:
+    """Last row wins per key (NULLs compare equal): one INSERT ... ON CONFLICT
+    DO UPDATE may not touch the same row twice."""
+    by_key: Dict[tuple, Dict[str, Any]] = {}
+    for row in rows:
+        by_key[tuple(row.get(c) for c in key)] = row
+    return list(by_key.values())
 
 
 async def _batch_insert_data(
@@ -604,6 +614,8 @@ async def _batch_insert_data(
     column_defs: Dict[str, Dict[str, str]],
     batch_size: int = 1000,
     commit: bool = True,
+    extra: Optional[Dict[str, Any]] = None,
+    conflict_key: Optional[Sequence[str]] = None,
 ) -> None:
     """
     Batch insert data into Postgres using parameterized queries.
@@ -614,6 +626,9 @@ async def _batch_insert_data(
         records: List of records from CMS API
         column_defs: Column definitions from metadata
         batch_size: Number of rows per batch
+        extra: Constant column values set on every row (e.g. data_year)
+        conflict_key: Unique key columns: rows are deduped on it and written
+            with ON CONFLICT DO UPDATE (SPEC_162). None = plain INSERT.
     """
     if not records:
         return
@@ -623,6 +638,15 @@ async def _batch_insert_data(
 
     # Column list for the parameterized multi-row INSERT below
     columns_sql = ", ".join(all_columns)
+    on_conflict = ""
+    if conflict_key:
+        updates = ", ".join(
+            f"{c} = EXCLUDED.{c}" for c in all_columns if c not in conflict_key
+        )
+        on_conflict = (
+            f" ON CONFLICT ({', '.join(conflict_key)}) DO UPDATE SET {updates}, "
+            f"ingestion_timestamp = CURRENT_TIMESTAMP"
+        )
 
     # Process in batches
     for i in range(0, len(records), batch_size):
@@ -638,8 +662,12 @@ async def _batch_insert_data(
                 normalized[col_name] = _normalize_value(
                     raw_value, column_defs[col_name]["type"]
                 )
+            if extra:
+                normalized.update(extra)
 
             normalized_batch.append(normalized)
+        if conflict_key:
+            normalized_batch = _dedupe_on_key(normalized_batch, conflict_key)
 
         # One multi-row VALUES statement per chunk: executemany on text() is a
         # round trip per row (~50 s per 1000-row page over the Cloud SQL proxy).
@@ -655,7 +683,7 @@ async def _batch_insert_data(
                 f"{col}_{n}": row[col] for n, row in enumerate(chunk) for col in all_columns
             }
             db.execute(
-                text(f"INSERT INTO {table_name} ({columns_sql}) VALUES {values_sql}"),
+                text(f"INSERT INTO {table_name} ({columns_sql}) VALUES {values_sql}{on_conflict}"),
                 params,
             )
         if commit:

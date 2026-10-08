@@ -37,6 +37,8 @@ APPROVED = {
 }
 # Datasets added after the batch-1 snapshot (each carries its own cited block and spec).
 ADDED_AFTER = {"ats_boards": "SPEC_151", "gleif_lei_records": "SPEC_154"}
+# Added later on the family default rights, unassessed (storage / commercial_use None) until a review
+FAMILY_DEFAULT_AFTER = {"cms_hospitals": "SPEC_162 (cms family default; SPEC_163 reviews)"}
 # Blocks a later spec TIGHTENED (never loosened): pinned field by field in the test below.
 TIGHTENED_AFTER = {"dunl_reference": "SPEC_154: S&P licence conflict recorded, 'loosen if CC BY' closed"}
 # Blocks rights review batch 2 completed (pinned in tests/test_rights_batch_2.py).
@@ -122,7 +124,7 @@ class TestNothingElseChanged:
         to differ; their diff is pinned field by field (sign-off included) in
         ``test_only_deciding_terms_and_citations_changed``."""
         before, cat = _before(), _catalog()
-        assert set(cat) == set(before) | set(ADDED_AFTER)
+        assert set(cat) == set(before) | set(ADDED_AFTER) | set(FAMILY_DEFAULT_AFTER)
         changed = sorted(k for k, s in cat.items() if k in before and _now(s) != before[k])
         assert set(changed) == set(APPROVED) | set(TIGHTENED_AFTER) | set(BATCH_2_APPROVED), changed
 
@@ -159,6 +161,9 @@ class TestNothingElseChanged:
         for key, s in cat.items():
             if key in ADDED_AFTER:
                 assert s.citation_url and s.citation_quote and s.rights_confidence, key
+                continue
+            if key in FAMILY_DEFAULT_AFTER:  # nothing assessed, so nothing to cite
+                assert (s.storage, s.commercial_use) == (None, None), key
                 continue
             for f in ("storage", "commercial_use"):
                 if before[key][f] is None and getattr(s, f) is not None:
